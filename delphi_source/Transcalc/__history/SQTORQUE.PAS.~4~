@@ -1,0 +1,1130 @@
+(* ********************************************* *)
+(* Square Torque Unit *)
+(* ********************************************* *)
+unit Sqtorque;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons, acStream, acList, Log, LogItem, LogStrm,
+  Printers, Vcl.Dialogs, ioUtils, ShellAPI;
+
+const
+  MAXTEXTLENGTH = 40;
+  MAXERRORLENGTH = 255;
+
+type
+  RealType = double;
+
+  (* ********************************************* *)
+  (* Square Torque Object *)
+  (* ********************************************* *)
+type
+  TSqrTorque = class(TLogItem)
+  private
+    FAppliedTorque: shortstring;
+    FWidth: shortstring;
+    FPoisson: shortstring;
+    FModulus: shortstring;
+    FGageLength: shortstring;
+    FGageFactor: shortstring;
+    FAverage: shortstring;
+    FGradient: shortstring;
+    FFullSpan: shortstring;
+    TheString: shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+    procedure ShowTheForm; override;
+    procedure PrintTheForm; override;
+    function GetAsString: String; override;
+  public
+    constructor create;
+    destructor destroy; override;
+    property AppliedTorque: shortstring read FAppliedTorque
+      write FAppliedTorque;
+    property Width: shortstring read FWidth write FWidth;
+    property Poisson: shortstring read FPoisson write FPoisson;
+    property Modulus: shortstring read FModulus write FModulus;
+    property GageLength: shortstring read FGageLength write FGageLength;
+    property GageFactor: shortstring read FGageFactor write FGageFactor;
+    property Average: shortstring read FAverage write FAverage;
+    property Gradient: shortstring read FGradient write FGradient;
+    property FullSpan: shortstring read FFullSpan write FFullSpan;
+    property TheStringText: shortstring read TheString write TheString;
+  end;
+
+  (* ********************************************* *)
+  (* Square Torque Form Object *)
+  (* ********************************************* *)
+type
+  TSqTorqueShftFrm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    EB_AppliedTorque: TEdit;
+    ST_TorqueUnit: TLabel;
+    GroupBox2: TGroupBox;
+    Label1: TLabel;
+    EB_Width: TEdit;
+    ST_WidthUnit: TLabel;
+    GroupBox5: TGroupBox;
+    EB_GageLength: TEdit;
+    ST_LengthUnit: TLabel;
+    Panel2: TPanel;
+    GroupBox6: TGroupBox;
+    Label6: TLabel;
+    Label7: TLabel;
+    ST_Average: TLabel;
+    Label14: TLabel;
+    ST_Gradient: TLabel;
+    Label18: TLabel;
+    GroupBox3: TGroupBox;
+    EB_Poisson: TEdit;
+    Label2: TLabel;
+    Label15: TLabel;
+    ST_modulusUnit: TLabel;
+    Label19: TLabel;
+    ST_FullSpan: TLabel;
+    Label21: TLabel;
+    EB_modulus: TEdit;
+    Label17: TLabel;
+    Label22: TLabel;
+    EB_GageFactor: TEdit;
+    BN_Compute: TBitBtn;
+    BN_Help: TBitBtn;
+    BN_Print: TBitBtn;
+    Image1: TImage;
+    SaveDialogPrint: TSaveDialog;
+    // Sheet1: TSheet;
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function CalculateMinStrain: RealType;
+    function CalculateMaxStrain: RealType;
+    function CalculateAvgStrain: RealType;
+    function CalculateGradient: RealType;
+    function CalculateFullSpan: RealType;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    Old_AppliedTorque: string;
+    Old_Width: string;
+    Old_Poisson: string;
+    Old_Modulus: string;
+    Old_GageLength: string;
+    Old_GageFactor: string;
+    Old_Average: string;
+    Old_Gradient: string;
+    Old_FullSpan: string;
+    AverageText: string;
+    GradientText: string;
+    SpanText: string;
+    IsThereAnError: boolean;
+    ExceptionRaised: boolean;
+    Torque: RealType;
+    TorqueWidth: RealType;
+    Ratio: RealType;
+    Elasticity: RealType;
+    Length: RealType;
+    Factor: RealType;
+    MinE: RealType;
+    MaxE: RealType;
+    AverageE: RealType;
+    TheGradient: RealType;
+    Sensitivity: RealType;
+  public
+    SqrTorqueObject: TSqrTorque;
+    SqrTorqueChosen: boolean;
+  end;
+
+var
+  SqTorqueShftFrm: TSqTorqueShftFrm;
+
+implementation
+
+uses MainMenu, Convert, Design;
+{$R *.DFM}
+
+(* ********************************************* *)
+(* Square Torque Object Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TSqrTorque.create }
+constructor TSqrTorque.create;
+begin
+  { ...creating object }
+  inherited create;
+  { ...associating string with object }
+  TheString := 'Torque - Square Shaft'
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.destroy }
+destructor TSqrTorque.destroy;
+begin
+  { ...destroying object }
+  inherited destroy;
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.GetAsString }
+function TSqrTorque.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.ShowTheForm }
+procedure TSqrTorque.ShowTheForm;
+begin
+  Application.CreateForm(TSqTorqueShftFrm, SqTorqueShftFrm);
+  SqTorqueShftFrm.showmodal;
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.PrintTheForm }
+procedure TSqrTorque.PrintTheForm;
+var
+  Sender: TObject;
+begin
+  Sender := self;
+  Application.CreateForm(TSqTorqueShftFrm, SqTorqueShftFrm);
+  SqTorqueShftFrm.visible := false;
+  SqTorqueShftFrm.FormActivate(Sender);
+  SqTorqueShftFrm.BN_PrintClick(Sender);
+  SqTorqueShftFrm.BN_CancelClick(Sender);
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.AssignTo }
+procedure TSqrTorque.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TSqrTorque) and (self is Dest.ClassType) then
+  begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TSqrTorque do
+    begin
+      FAppliedTorque := self.FAppliedTorque;
+      FWidth := self.FWidth;
+      FPoisson := self.FPoisson;
+      FModulus := self.FModulus;
+      FGageLength := self.FGageLength;
+      FGageFactor := self.FGageFactor;
+      FAverage := self.FAverage;
+      FGradient := self.FGradient;
+      FFullSpan := self.FFullSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else
+  begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.InitFields }
+procedure TSqrTorque.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.SaveToStream }
+procedure TSqrTorque.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FAppliedTorque, sizeof(shortstring));
+  Stream.SaveBuffer(FWidth, sizeof(shortstring));
+  Stream.SaveBuffer(FPoisson, sizeof(shortstring));
+  Stream.SaveBuffer(FModulus, sizeof(shortstring));
+  Stream.SaveBuffer(FGageLength, sizeof(shortstring));
+  Stream.SaveBuffer(FGageFactor, sizeof(shortstring));
+  Stream.SaveBuffer(FAverage, sizeof(shortstring));
+  Stream.SaveBuffer(FGradient, sizeof(shortstring));
+  Stream.SaveBuffer(FFullSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************************************* *)
+{ TSqrTorque.ReadFromStream }
+procedure TSqrTorque.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FAppliedTorque, sizeof(shortstring));
+  Stream.ReadBuffer(FWidth, sizeof(shortstring));
+  Stream.ReadBuffer(FPoisson, sizeof(shortstring));
+  Stream.ReadBuffer(FModulus, sizeof(shortstring));
+  Stream.ReadBuffer(FGageLength, sizeof(shortstring));
+  Stream.ReadBuffer(FGageFactor, sizeof(shortstring));
+  Stream.ReadBuffer(FAverage, sizeof(shortstring));
+  Stream.ReadBuffer(FGradient, sizeof(shortstring));
+  Stream.ReadBuffer(FFullSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************* *)
+(* Square Torque Form Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.CalculateMinStrain }
+function TSqTorqueShftFrm.CalculateMinStrain: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  Numerator: RealType;
+  Denominator: RealType;
+  MinResult: RealType;
+  Button: integer;
+begin
+  MinResult := 0.0;
+  ExceptionRaised := false;
+  Numerator := (Length / 2) * 0.707;
+  Denominator := TorqueWidth / 2;
+  try
+    MinResult := sqrt(-(sqr((Numerator / Denominator) * MaxE)) + sqr(MaxE));
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_NoMinStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateMinStrain := MinResult;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.CalculateMaxStrain }
+function TSqTorqueShftFrm.CalculateMaxStrain: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  MaxStress: RealType;
+  ShearMod: RealType;
+  Numerator: RealType;
+  Denominator: RealType;
+  MaxResult: RealType;
+  Button: integer;
+begin
+  MaxResult := 0.0;
+  ExceptionRaised := false;
+  ShearMod := Elasticity / (2 * (1 + Ratio));
+  MaxStress := Torque / (0.22 * (TorqueWidth * TorqueWidth * TorqueWidth));
+  Numerator := MaxStress;
+  Denominator := ShearMod;
+  try
+    MaxResult := (Numerator / Denominator) * 0.5 * 1E6;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_NoMaxStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateMaxStrain := MaxResult;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.CalculateAvgStrain }
+function TSqTorqueShftFrm.CalculateAvgStrain: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  Numerator: RealType;
+  Denominator: RealType;
+  AvgResult: RealType;
+  Button: integer;
+begin
+  AvgResult := 0.0;
+  ExceptionRaised := false;
+  Numerator := MinE + MaxE;
+  Denominator := 2;
+  try
+    AvgResult := Numerator / Denominator;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_NoAvgStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateAvgStrain := AvgResult;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.CalculateGradient }
+function TSqTorqueShftFrm.CalculateGradient: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  Numerator: RealType;
+  Denominator: RealType;
+  GradientResult: RealType;
+  Button: integer;
+begin
+  GradientResult := 0.0;
+  ExceptionRaised := false;
+  Numerator := MaxE - MinE;
+  Denominator := MaxE;
+  try
+    GradientResult := (Numerator / Denominator) { * 100 };
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_NoGradient, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateGradient := GradientResult * 100;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.CalculateFullSpan }
+function TSqTorqueShftFrm.CalculateFullSpan: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  FirstTerm: RealType;
+  SecondTerm: RealType;
+  SpanResult: RealType;
+  Button: integer;
+begin
+  SpanResult := 0.0;
+  ExceptionRaised := false;
+  FirstTerm := Factor;
+  SecondTerm := (2 * (AverageE * 2)) / 4;
+  try
+    SpanResult := (FirstTerm * SecondTerm) * 1E-3;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_NoFullSpan, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateFullSpan := SpanResult;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.FormCreate }
+procedure TSqTorqueShftFrm.FormCreate(Sender: TObject);
+var
+  TorqueUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  DimensionUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  ModulusUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+begin
+  { ...determining whether to use Std. or Si units for form units }
+  if MainForm.UnitsAreUS = true then
+  begin
+    LoadString(hinstance, ID_SZ_TorqueStd, TorqueUnit, sizeof(TorqueUnit));
+    LoadString(hinstance, ID_SZ_Inches, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_PSI, ModulusUnit, sizeof(ModulusUnit));
+  end
+  else
+  begin
+    LoadString(hinstance, ID_SZ_TorqueMetric, TorqueUnit, sizeof(TorqueUnit));
+    LoadString(hinstance, ID_SZ_MM, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_GPa, ModulusUnit, sizeof(ModulusUnit));
+  end;
+  { ...placing form units on form }
+  ST_TorqueUnit.caption := TorqueUnit;
+  ST_WidthUnit.caption := DimensionUnit;
+  ST_modulusUnit.caption := ModulusUnit;
+  ST_LengthUnit.caption := DimensionUnit;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.BN_ComputeClick }
+procedure TSqTorqueShftFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINAPPLIEDTORQUE_US = 0.0000;
+  MAXAPPLIEDTORQUE_US = 500000;
+  MINWIDTH_US = 0.20;
+  MAXWIDTH_US = 20.0;
+  MINPOISSON_US = 0.1;
+  MAXPOISSON_US = 0.4;
+  MINMODULUS_US = 5000000;
+  MAXMODULUS_US = 50000000;
+  MINGAGELENGTH_US = 0.008;
+  MAXGAGELENGTH_US = 1;
+  MINGAGEFACTOR_US = 1.0;
+  MAXGAGEFACTOR_US = 5.0;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH] of char;
+  ErrorUnit: array [0 .. MAXERRORLENGTH] of char;
+  ErrorAnd: array [0 .. MAXERRORLENGTH] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH] of char;
+  StrUnit: string;
+  StrAnd: string;
+  StrMsg: string;
+  StrMin: string;
+  strMax: string;
+  EditStrings: string;
+  MinAppliedTorque: RealType;
+  MaxAppliedTorque: RealType;
+  MinWidth: RealType;
+  MaxWidth: RealType;
+  MinPoisson: RealType;
+  MaxPoisson: RealType;
+  MinModulus: RealType;
+  MaxModulus: RealType;
+  MinGageLength: RealType;
+  MaxGageLength: RealType;
+  MinGageFactor: RealType;
+  MaxGageFactor: RealType;
+  ErrorCode: integer;
+  Button: integer;
+begin
+  { ...Determining which values to use std. or si for min and max values }
+  if MainForm.UnitsAreUS = true then
+  begin
+    MinAppliedTorque := MINAPPLIEDTORQUE_US;
+    MaxAppliedTorque := MAXAPPLIEDTORQUE_US;
+    MinWidth := MINWIDTH_US;
+    MaxWidth := MAXWIDTH_US;
+    MinPoisson := MINPOISSON_US;
+    MaxPoisson := MAXPOISSON_US;
+    MinModulus := MINMODULUS_US;
+    MaxModulus := MAXMODULUS_US;
+    MinGageLength := MINGAGELENGTH_US;
+    MaxGageLength := MAXGAGELENGTH_US;
+    MinGageFactor := MINGAGEFACTOR_US;
+    MaxGageFactor := MAXGAGEFACTOR_US;
+  end
+  else
+  begin
+    MinAppliedTorque := MINAPPLIEDTORQUE_US * 0.11298;
+    MaxAppliedTorque := MAXAPPLIEDTORQUE_US * 0.11298;
+    MinWidth := Inches_To_mm(MINWIDTH_US);
+    MaxWidth := Inches_To_mm(MAXWIDTH_US);
+    MinPoisson := MINPOISSON_US;
+    MaxPoisson := MAXPOISSON_US;
+    MinModulus := PSI_To_GPa(MINMODULUS_US);
+    MaxModulus := PSI_To_GPa(MAXMODULUS_US);
+    MinGageLength := Inches_To_mm(MINGAGELENGTH_US);
+    MaxGageLength := Inches_To_mm(MAXGAGELENGTH_US);
+    MinGageFactor := MINGAGEFACTOR_US;
+    MaxGageFactor := MAXGAGEFACTOR_US;
+  end;
+  ST_Average.caption := '';
+  ST_Gradient.caption := '';
+  ST_FullSpan.caption := '';
+  { ...checking Applied Torque to see if valid }
+  IsThereAnError := false;
+  EditStrings := EB_AppliedTorque.text;
+  val(EditStrings, Torque, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedTorque.setfocus;
+    EB_AppliedTorque.clearselection;
+    exit;
+  end
+  else if (Torque < MinAppliedTorque) or (Torque > MaxAppliedTorque) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_TorqueStd, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_TorqueMetric, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_AppliedTorque, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinAppliedTorque, ffFixed, 8, 3);
+    strMax := floattostrf(MaxAppliedTorque, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedTorque.setfocus;
+    EB_AppliedTorque.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then
+  begin
+    Torque := Torque * 1000;
+  end;
+  { ...checking Torque Width to see if valid }
+  EditStrings := EB_Width.text;
+  val(EditStrings, TorqueWidth, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end
+  else if (TorqueWidth < MinWidth) or (TorqueWidth > MaxWidth) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_TorqueWidth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinWidth, ffFixed, 8, 3);
+    strMax := floattostrf(MaxWidth, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end;
+  { ...checking to see if Poisson is valid }
+  EditStrings := EB_Poisson.text;
+  val(EditStrings, Ratio, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end
+  else if (Ratio < MinPoisson) or (Ratio > MaxPoisson) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Poisson, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinPoisson, ffFixed, 8, 3);
+    strMax := floattostrf(MaxPoisson, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end;
+  { ...checking to see if Modulus value is valid }
+  EditStrings := EB_modulus.text;
+  val(EditStrings, Elasticity, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_modulus.setfocus;
+    EB_modulus.clearselection;
+    exit;
+  end
+  else if (Elasticity < MinModulus) or (Elasticity > MaxModulus) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_PSI, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_GPa, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Modulus, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinModulus, ffFixed, 8, 3);
+    strMax := floattostrf(MaxModulus, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_modulus.setfocus;
+    EB_modulus.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then
+  begin
+    Elasticity := Elasticity * 1000;
+  end;
+  { ...checking to see if Gage Length is valid }
+  EditStrings := EB_GageLength.text;
+  val(EditStrings, Length, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end
+  else if (Length < MinGageLength) or (Length > MaxGageLength) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_GageLength, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageLength, ffFixed, 8, 3);
+    strMax := floattostrf(MaxGageLength, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+  { ...checking to see if Gage Factor is valid }
+  EditStrings := EB_GageFactor.text;
+  val(EditStrings, Factor, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (Factor < MinGageFactor) or (Factor > MaxGageFactor) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageFactor, ffFixed, 8, 3);
+    strMax := floattostrf(MaxGageFactor, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  { ...checking to make sure gage length is not greater than width/0.707 }
+  if Length > (TorqueWidth / 0.707) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageLengthWidth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+  { ...doing calculations }
+  if IsThereAnError = false then
+  begin
+    { ...Max Strain }
+    MaxE := CalculateMaxStrain;
+    if abs(MaxE) > 5000 then
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ST_Average.caption := '';
+      ST_Gradient.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    { ...Min Strain }
+    MinE := CalculateMinStrain;
+    if abs(MinE) > 5000 then
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ST_Average.caption := '';
+      ST_Gradient.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    { ...Average Strain }
+    AverageE := CalculateAvgStrain;
+    if abs(AverageE) < 5000 then
+    begin
+      if ExceptionRaised = false then
+      begin
+        AverageText := floattostrf(AverageE, ffFixed, 4, 0);
+        ST_Average.caption := AverageText;
+      end;
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ST_Average.caption := '';
+      ST_Gradient.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    { ...Gradient }
+    TheGradient := CalculateGradient;
+    if ExceptionRaised = false then
+    begin
+      GradientText := floattostrf(TheGradient, ffFixed, 4, 1);
+      ST_Gradient.caption := GradientText;
+    end;
+    { ...Full Bridge Sensitivity }
+    Sensitivity := CalculateFullSpan;
+    if ExceptionRaised = false then
+    begin
+      SpanText := floattostrf(Sensitivity, ffFixed, 4, 3);
+      ST_FullSpan.caption := SpanText;
+    end;
+    if abs(AverageE) > 1700 then
+    begin
+      LoadString(hinstance, ID_SZ_StrainExceeds1700, ErrorMsg,
+        sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ModalResult := 0;
+    end;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.BN_CancelClick }
+procedure TSqTorqueShftFrm.BN_CancelClick(Sender: TObject);
+begin
+  { ...placing initial values in edit boxes }
+  EB_AppliedTorque.text := Old_AppliedTorque;
+  EB_Width.text := Old_Width;
+  EB_Poisson.text := Old_Poisson;
+  EB_modulus.text := Old_Modulus;
+  EB_GageLength.text := Old_GageLength;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_Average.caption := Old_Average;
+  ST_Gradient.caption := Old_Gradient;
+  ST_FullSpan.caption := Old_FullSpan;
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.FormActivate }
+procedure TSqTorqueShftFrm.FormActivate(Sender: TObject);
+var
+  EditStrings: string;
+  i: integer;
+  TheItem: TacStreamable;
+begin
+  { getting item from object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TSqrTorque then
+    begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  { ...if there is an object, them placing values in edit boxes }
+  if TheItem <> nil then
+  begin
+    EB_AppliedTorque.text := (TheItem as TSqrTorque).AppliedTorque;
+    EB_Width.text := (TheItem as TSqrTorque).Width;
+    EB_Poisson.text := (TheItem as TSqrTorque).Poisson;
+    EB_modulus.text := (TheItem as TSqrTorque).Modulus;
+    EB_GageLength.text := (TheItem as TSqrTorque).GageLength;
+    EB_GageFactor.text := (TheItem as TSqrTorque).GageFactor;
+    ST_Average.caption := (TheItem as TSqrTorque).Average;
+    ST_Gradient.caption := (TheItem as TSqrTorque).Gradient;
+    ST_FullSpan.caption := (TheItem as TSqrTorque).FullSpan;
+  end;
+  { ...placing initial values in old variables in case cancel clicked }
+  Old_AppliedTorque := EB_AppliedTorque.text;
+  Old_Width := EB_Width.text;
+  Old_Poisson := EB_Poisson.text;
+  Old_Modulus := EB_modulus.text;
+  Old_GageLength := EB_GageLength.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_Average := ST_Average.caption;
+  Old_Gradient := ST_Gradient.caption;
+  Old_FullSpan := ST_FullSpan.caption;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.BN_OKClick }
+procedure TSqTorqueShftFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem: TacStreamable;
+  i: integer;
+  j: integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = true then
+  begin
+    exit;
+  end;
+  MainForm.DesignChosen := true;
+  { getting item from object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TSqrTorque then
+    begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  { ...if there is an object, them placing values in edit boxes }
+  if TheItem = nil then
+  begin
+    { ...creating object and placing values in the object }
+    SqrTorqueObject := TSqrTorque.create;
+    SqrTorqueObject.AppliedTorque := EB_AppliedTorque.text;
+    SqrTorqueObject.Width := EB_Width.text;
+    SqrTorqueObject.Poisson := EB_Poisson.text;
+    SqrTorqueObject.Modulus := EB_modulus.text;
+    SqrTorqueObject.GageLength := EB_GageLength.text;
+    SqrTorqueObject.GageFactor := EB_GageFactor.text;
+    SqrTorqueObject.Average := ST_Average.caption;
+    SqrTorqueObject.Gradient := ST_Gradient.caption;
+    SqrTorqueObject.FullSpan := ST_FullSpan.caption;
+    MainForm.AddToLog(SqrTorqueObject);
+    j := 0;
+    { ...placing string associated with object in outline }
+    repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Design Verification') or
+      (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, SqrTorqueObject.GetAsString);
+  end
+  else
+  begin
+    (TheItem as TSqrTorque).AppliedTorque := EB_AppliedTorque.text;
+    (TheItem as TSqrTorque).Width := EB_Width.text;
+    (TheItem as TSqrTorque).Poisson := EB_Poisson.text;
+    (TheItem as TSqrTorque).Modulus := EB_modulus.text;
+    (TheItem as TSqrTorque).GageLength := EB_GageLength.text;
+    (TheItem as TSqrTorque).GageFactor := EB_GageFactor.text;
+    (TheItem as TSqrTorque).Average := ST_Average.caption;
+    (TheItem as TSqrTorque).Gradient := ST_Gradient.caption;
+    (TheItem as TSqrTorque).FullSpan := ST_FullSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.DesignDlgShowing = true then
+  begin
+    DesignDlg.close;
+  end;
+end;
+
+procedure TSqTorqueShftFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.BN_PrintClick }
+procedure TSqTorqueShftFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderPChar: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderString: string;
+  DateString: string;
+  id: longint;
+  MetaHandle: Thandle;
+  sserror: integer;
+  htmlText: string;
+  Stream: tResourceStream;
+  strstream: tStringStream;
+
+begin
+  Stream := tResourceStream.create(hinstance, 'SqrTor', RT_RCDATA);
+  strstream := tStringStream.create();
+
+  try
+    strstream.LoadFromStream(Stream);
+    htmlText := strstream.DataString;
+  finally
+    strstream.Free();
+    Stream.Free();
+  end;
+  htmlText := StringReplace(htmlText, '$af2', ST_TorqueUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bw2', ST_WidthUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$me2', ST_modulusUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gl2', ST_LengthUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+
+  htmlText := StringReplace(htmlText, '$af1', EB_AppliedTorque.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bw1', EB_Width.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$pr1', EB_Poisson.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$me1', EB_modulus.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gl1', EB_GageLength.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gf1', EB_GageFactor.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gs1', ST_Average.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sv1', ST_Gradient.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sf1', ST_FullSpan.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  SaveDialogPrint.FileName := '';
+  SaveDialogPrint.InitialDir := tPath.GetDocumentsPath;
+  if SaveDialogPrint.Execute
+  then
+  begin
+    tfile.writeAllText(SaveDialogPrint.FileName, htmlText);
+    ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName), nil, nil,
+      SW_SHOWNORMAL);
+  end;
+  { ...clearing sheet for new values }
+  (* SSClearRange(Sheet1.SS, 4, 5, 17, 5, 3);
+    {placing Units on sheet}
+    SSSetActiveCell(Sheet1.SS, 4, 6);
+    Sheet1.text := ST_TorqueUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 6, 6);
+    Sheet1.text := ST_WidthUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 9, 6);
+    Sheet1.text := ST_ModulusUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 11, 6);
+    Sheet1.text := ST_LengthUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 4, 5);
+    Sheet1.text := EB_AppliedTorque.text;
+    SSSetActiveCell(Sheet1.SS, 6, 5);
+    Sheet1.text := EB_Width.text;
+    SSSetActiveCell(Sheet1.SS, 8, 5);
+    Sheet1.text := EB_Poisson.text;
+    SSSetActiveCell(Sheet1.SS, 9, 5);
+    Sheet1.text := EB_Modulus.text;
+    SSSetActiveCell(Sheet1.SS, 11, 5);
+    Sheet1.text := EB_GageLength.text;
+    SSSetActiveCell(Sheet1.SS, 12, 5);
+    Sheet1.text := EB_GageFactor.text;
+    SSSetActiveCell(Sheet1.SS, 15, 5);
+    Sheet1.text := ST_Average.caption;
+    SSSetActiveCell(Sheet1.SS, 16, 5);
+    Sheet1.text := ST_Gradient.caption;
+    SSSetActiveCell(Sheet1.SS, 17, 5);
+    Sheet1.text := ST_FullSpan.caption;
+    sserror := SSObjNewPicture(Sheet1.ss, 2, 20, 5.57, 29, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+    SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+    DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+    HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+    strpcopy(HeaderPChar, HeaderString);
+    SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+    SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+    SSFilePrint(Sheet1.ss, 0); *)
+end;
+
+(* ********************************************************************* *)
+{ TSqTorqueShftFrm.BN_HelpClick }
+procedure TSqTorqueShftFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(1120);
+end;
+
+begin
+  { ...registering object }
+  RegisterClasses([TSqrTorque]);
+
+end.

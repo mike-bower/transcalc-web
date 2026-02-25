@@ -1,0 +1,574 @@
+(* ********************************************* *)
+(* Design  Menu Item Unit *)
+(* ********************************************* *)
+unit Design;
+
+interface
+
+uses WinTypes, WinProcs, Classes, Graphics, Forms, Controls, Buttons,
+  StdCtrls, ExtCtrls;
+
+(* ********************************************* *)
+(* Design  Menu Item Object *)
+(* ********************************************* *)
+type
+  TDesignDlg = class(TForm)
+    OKBtn: TBitBtn;
+    CancelBtn: TBitBtn;
+    HelpBtn: TBitBtn;
+    Bevel1: TBevel;
+    Label1: TLabel;
+    RB_BBCantilever: TRadioButton;
+    RB_BBReverse: TRadioButton;
+    RB_BBDual: TRadioButton;
+    RB_BBBinocular: TRadioButton;
+    RB_BBSBeam: TRadioButton;
+    Label2: TLabel;
+    RB_CSquareX: TRadioButton;
+    RB_CRndHollow: TRadioButton;
+    RB_CRndSolid: TRadioButton;
+    Label3: TLabel;
+    RB_SSquareCant: TRadioButton;
+    RB_SRndCant: TRadioButton;
+    RB_SRndSBeam: TRadioButton;
+    Label4: TLabel;
+    RB_TSqrShaft: TRadioButton;
+    RB_TRndSldShaft: TRadioButton;
+    RB_TRndHlwShaft: TRadioButton;
+    Label5: TLabel;
+    RB_PDiaphragm: TRadioButton;
+    ImageBBCantilever: TImage;
+    ImageBBReverse: TImage;
+    ImageBBDual: TImage;
+    ImageBinocular: TImage;
+    ImageSBeam: TImage;
+    ImageColSqrX: TImage;
+    ImageColRndHollow: TImage;
+    ImageColRndSolid: TImage;
+    ImageShrSqrCantilever: TImage;
+    ImageShrRndCantilever: TImage;
+    ImageShrRndSBeam: TImage;
+    ImageTorqueSqrShft: TImage;
+    ImageTorqueRndSolid: TImage;
+    ImageTorqueRndHollow: TImage;
+    ImagePressure: TImage;
+    procedure FormActivate(Sender: TObject);
+    procedure RB_BBCantileverClick(Sender: TObject);
+    procedure RB_BBReverseClick(Sender: TObject);
+    procedure RB_BBDualClick(Sender: TObject);
+    procedure RB_BBBinocularClick(Sender: TObject);
+    procedure RB_BBSBeamClick(Sender: TObject);
+    procedure RB_CSquareXClick(Sender: TObject);
+    procedure RB_CRndHollowClick(Sender: TObject);
+    procedure RB_CRndSolidClick(Sender: TObject);
+    procedure RB_SSquareCantClick(Sender: TObject);
+    procedure RB_SRndCantClick(Sender: TObject);
+    procedure RB_SRndSBeamClick(Sender: TObject);
+    procedure RB_TSqrShaftClick(Sender: TObject);
+    procedure RB_TRndSldShaftClick(Sender: TObject);
+    procedure RB_TRndHlwShaftClick(Sender: TObject);
+    procedure RB_PDiaphragmClick(Sender: TObject);
+    procedure OKBtnClick(Sender: TObject);
+    procedure CancelBtnClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure HelpBtnClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  DesignDlg: TDesignDlg;
+
+implementation
+
+uses BBCant, RevBB, MainMenu, Bino, SBBeam, DualBB, SqrCol, RndHlwC,
+  RndSldC, ShearSqr, SherRnd1, ShearSB, SqTorque, RndSldTq, RndHlwTq,
+  Pressure;
+{$R *.DFM}
+
+
+(* ********************************************************************* *)
+{ TDesignDlg.FormActivate }
+procedure TDesignDlg.FormActivate(Sender: TObject);
+begin
+  { ...initializing radio button and image to come up a cantilever bending beam }
+  RB_BBCantilever.checked := true;
+  ImageBBCantilever.visible := true;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_BBCantileverClick }
+procedure TDesignDlg.RB_BBCantileverClick(Sender: TObject);
+begin
+  { ...setting dlg for cantilever bending beam radio button and image }
+  RB_BBCantilever.checked := true;
+  ImageBBCantilever.visible := true;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_BBReverseClick }
+procedure TDesignDlg.RB_BBReverseClick(Sender: TObject);
+begin
+  { ...setting dlg for reverse bending beam radio button and image }
+  RB_BBReverse.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := true;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_BBDualClick }
+procedure TDesignDlg.RB_BBDualClick(Sender: TObject);
+begin
+  { ...setting dlg for dual bending beam radio button and image }
+  RB_BBDual.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := true;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_BBBinocularClick }
+procedure TDesignDlg.RB_BBBinocularClick(Sender: TObject);
+begin
+  { ...setting dlg for binocular bending beam radio button and image }
+  RB_BBBinocular.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := true;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_BBSBeamClick }
+procedure TDesignDlg.RB_BBSBeamClick(Sender: TObject);
+begin
+  { ...setting dlg for s-beam bending beam radio button and image }
+  RB_BBSBeam.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := true;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_CSquareXClick }
+procedure TDesignDlg.RB_CSquareXClick(Sender: TObject);
+begin
+  { ...setting dlg for square column beam radio button and image }
+  RB_CSquareX.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := true;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_CRndHollowClick }
+procedure TDesignDlg.RB_CRndHollowClick(Sender: TObject);
+begin
+  { ...setting dlg for round hollow column beam radio button and image }
+  RB_CRndHollow.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := true;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_CRndSolidClick }
+procedure TDesignDlg.RB_CRndSolidClick(Sender: TObject);
+begin
+  RB_CRndSolid.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := true;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_SSquareCantClick }
+procedure TDesignDlg.RB_SSquareCantClick(Sender: TObject);
+begin
+  { ...setting dlg for shear square cantilever beam radio button and image }
+  RB_SSquareCant.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := true;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_SRndCantClick }
+procedure TDesignDlg.RB_SRndCantClick(Sender: TObject);
+begin
+  { ...setting dlg for shear square round beam radio button and image }
+  RB_SRndCant.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := true;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_SRndSBeamClick }
+procedure TDesignDlg.RB_SRndSBeamClick(Sender: TObject);
+begin
+  { ...setting dlg for shear round s-beam radio button and image }
+  RB_SRndSBeam.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := true;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_TSqrShaftClick }
+procedure TDesignDlg.RB_TSqrShaftClick(Sender: TObject);
+begin
+  { ...setting dlg for torque square shaft radio button and image }
+  RB_TSqrShaft.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := true;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_TRndSldShaftClick }
+procedure TDesignDlg.RB_TRndSldShaftClick(Sender: TObject);
+begin
+  { ...setting dlg for round solid torque radio button and image }
+  RB_TRndSldShaft.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := true;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_TRndHlwShaftClick }
+procedure TDesignDlg.RB_TRndHlwShaftClick(Sender: TObject);
+begin
+  { ...setting dlg for round hollow torque radio button and image }
+  RB_TRndHlwShaft.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := true;
+  ImagePressure.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.RB_PDiaphragmClick }
+procedure TDesignDlg.RB_PDiaphragmClick(Sender: TObject);
+begin
+  { ...setting dlg for pressure diaphragm radio button and image }
+  RB_PDiaphragm.checked := true;
+  ImageBBCantilever.visible := false;
+  ImageBBReverse.visible := false;
+  ImageBBDual.visible := false;
+  ImageBinocular.visible := false;
+  ImageSBeam.visible := false;
+  ImageColSqrX.visible := false;
+  ImageColRndHollow.visible := false;
+  ImageColRndSolid.visible := false;
+  ImageShrSqrCantilever.visible := false;
+  ImageShrRndCantilever.visible := false;
+  ImageShrRndSBeam.visible := false;
+  ImageTorqueSqrShft.visible := false;
+  ImageTorqueRndSolid.visible := false;
+  ImageTorqueRndHollow.visible := false;
+  ImagePressure.visible := true;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.OKBtnClick }
+procedure TDesignDlg.OKBtnClick(Sender: TObject);
+begin
+  MainForm.DesignDlgShowing := true;
+  { ...displaying the appropiate form based on which radio button checked }
+  if RB_BBCantilever.checked = true then
+  begin
+    Application.CreateForm(TCantileverBBFrm, CantileverBBFrm);
+    CantileverBBFrm.showmodal;
+  end
+  else if RB_BBReverse.checked = true then
+  begin
+    Application.CreateForm(TReverseBBFrm, ReverseBBFrm);
+    ReverseBBFrm.showmodal;
+  end
+  else if RB_BBDual.checked = true then
+  begin
+    Application.CreateForm(TDualBBFrm, DualBBFrm);
+    DualBBFrm.showmodal;
+  end
+  else if RB_BBBinocular.checked = true then
+  begin
+    Application.CreateForm(TBinocularBBFrm, BinocularBBFrm);
+    BinocularBBFrm.showmodal;
+  end
+  else if RB_BBSBeam.checked = true then
+  begin
+    Application.CreateForm(TSBeamBBFrm, SBeamBBFrm);
+    SBeamBBFrm.showmodal;
+  end
+  else if RB_CSquareX.checked = true then
+  begin
+    Application.CreateForm(TSqrColumnFrm, SqrColumnFrm);
+    SqrColumnFrm.showmodal;
+  end
+  else if RB_CRndHollow.checked = true then
+  begin
+    Application.CreateForm(TRndHollowColFrm, RndHollowColFrm);
+    RndHollowColFrm.showmodal;
+  end
+  else if RB_CRndSolid.checked = true then
+  begin
+    Application.CreateForm(TRndSolidColFrm, RndSolidColFrm);
+    RndSolidColFrm.showmodal;
+  end
+  else if RB_SSquareCant.checked = true then
+  begin
+    Application.CreateForm(TSqrShearWebFrm, SqrShearWebFrm);
+    SqrShearWebFrm.showmodal;
+  end
+  else if RB_SRndCant.checked = true then
+  begin
+    Application.CreateForm(TRndShrWebFrm, RndShrWebFrm);
+    RndShrWebFrm.showmodal;
+  end
+  else if RB_SRndSBeam.checked = true then
+  begin
+    Application.CreateForm(TRndSBeamShrFrm, RndSBeamShrFrm);
+    RndSBeamShrFrm.showmodal;
+  end
+  else if RB_TSqrShaft.checked = true then
+  begin
+    Application.CreateForm(TSqTorqueShftFrm, SqTorqueShftFrm);
+    SqTorqueShftFrm.showmodal;
+  end
+  else if RB_TRndSldShaft.checked = true then
+  begin
+    Application.CreateForm(TRndSldTorqueFrm, RndSldTorqueFrm);
+    RndSldTorqueFrm.showmodal;
+  end
+  else if RB_TRndHlwShaft.checked = true then
+  begin
+    Application.CreateForm(TRndHlwTorqueFrm, RndHlwTorqueFrm);
+    RndHlwTorqueFrm.showmodal;
+  end
+  else if RB_PDiaphragm.checked = true then
+  begin
+    Application.CreateForm(TPressureFrm, PressureFrm);
+    PressureFrm.showmodal;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.CancelBtnClick }
+procedure TDesignDlg.CancelBtnClick(Sender: TObject);
+begin
+  { ...closing form because user cancelled operation }
+  Close;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.FormCreate }
+procedure TDesignDlg.FormCreate(Sender: TObject);
+begin
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.FormClose }
+procedure TDesignDlg.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  MainForm.DesignDlgShowing := false;
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TDesignDlg.HelpBtnClick }
+procedure TDesignDlg.HelpBtnClick(Sender: TObject);
+begin
+  Application.HelpContext(1000);
+end;
+
+end.

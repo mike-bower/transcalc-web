@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Axial - Round Solid</title>
+</head>
+<body>
+    <table width="900" style="table-layout:fixed; font-size: 20px" align="center">
+        <colgroup>
+            <col width="50" />
+            <col width="12" />
+            <col width="38" />
+        </colgroup>
+        <tr>
+            <th colspan="3" style="font-size:30px">
+                Axial - Round Solid
+            </th>
+        </tr>
+        <tr><td height="20"></td></tr>
+        <tr>
+            <td align="right">Applied Force, F:</td>
+            <td align="right">$af1</td>
+            <td align="left">$af2</td>
+        </tr>
+        <tr>
+            <td align="right"><b>Column Dimensions</b></td>
+            <td align="right"></td>
+            <td align="left"></td>
+        </tr>
+        <tr>
+            <td align="right">Diameter, d:</td>
+            <td align="right">$id1</td>
+            <td align="left">$id2</td>
+        </tr>
+        <tr>
+            <td align="right"><b>Material Properties</b></td>
+            <td align="right"></td>
+            <td align="left"></td>
+        </tr>
+        <tr>
+            <td align="right">Poisson's Ratio:</td>
+            <td align="right">$pr1</td>
+        </tr>
+        <tr>
+            <td align="right">Modulus of Elasticity:</td>
+            <td align="right">$me1</td>
+            <td align="left">$me2</td>
+        </tr>
+        <tr>
+            <td align="right"><b>Gage Parameter</b></td>
+            <td align="right"></td>
+            <td align="left"></td>
+        </tr>
+        <tr>
+            <td align="right">Gage Factor:</td>
+            <td align="right">$gf1</td>
+            <td align="left"></td>
+        </tr>
+        <tr><td height="20"></td></tr>
+        <tr>
+            <td align="right"><b>Calculated Values</b></td>
+            <td align="right"></td>
+            <td align="left"></td>
+        </tr>
+        <tr>
+            <td align="right">Axial Strain:</td>
+            <td align="right">$as1</td>
+            <td align="left">&micro;&epsilon;</td>
+        </tr>
+        <tr>
+            <td align="right">Circumferential Strain:</td>
+            <td align="right">$cs1</td>
+            <td align="left">&micro;&epsilon;</td>
+        </tr>
+        <tr>
+            <td align="right">Full Bridge Span:</td>
+            <td align="right">$sf1</td>
+            <td align="left">mV&frasl;V</td>
+        </tr>
+        <tr><td height="20"></td></tr>
+    </table>
+    <center>
+    <img  src="data:image/jpg;base64,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"/>
+        </center>
+</body>
+</html>

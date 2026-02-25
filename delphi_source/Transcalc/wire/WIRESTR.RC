@@ -1,0 +1,22 @@
+/****************************************************************************
+
+
+wirestr.rc
+
+produced by Borland Resource Workshop
+
+
+*****************************************************************************/
+#include "wirestr.inc"
+
+STRINGTABLE 
+{
+ ID_SZ_Ohms, "ohms"
+ ID_SZ_ErrorMsg, "TransCalc message"
+ ID_SZ_inches, "in."
+ ID_SZ_MM, "mm."
+ ID_SZ_NotValidNo, "Not a valid number."
+ ID_SZ_And, "and"
+ ID_SZ_Length, "The length value must be between"
+ ID_SZ_Resistance, "The resistance value must be between"
+}

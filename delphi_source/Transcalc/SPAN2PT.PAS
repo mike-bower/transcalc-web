@@ -1,0 +1,1422 @@
+(* ********************************************** *)
+(* Span vs. Temperature 2 point Unit *)
+(* ********************************************** *)
+unit Span2pt;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, StdCtrls, Buttons, ExtCtrls, acStream, acList, Log, LogStrm,
+  LogItem, Printers, ioUtils, ShellAPI;
+
+const
+  MAXTEXTLENGTH = 40;
+  MAXERRORLENGTH = 255;
+
+type
+  RealType = Double;
+
+  { - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - }
+  { Wire Object Definition }
+type
+  TWire = class(Tobject)
+    Name: string;
+    Resistivity: real;
+    TCR: real;
+  end;
+
+  (* ********************************************* *)
+  (* Span vs. Temperature 2 pt. Object *)
+  (* ********************************************* *)
+type
+  TSpanvsTemp2pt = class(TLogItem)
+  private
+    FLowTemperature: shortstring;
+    FLowOutput: shortstring;
+    FHighTemperature: shortstring;
+    FHighOutput: shortstring;
+    FWireType: Int16;
+    FResistorTCR: shortstring;
+    FBridgeResist: shortstring;
+    FResistors: shortstring;
+    FRMod: shortstring;
+    FSpan: shortstring;
+    TheString: shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+    procedure ShowTheForm; override;
+    procedure PrintTheForm; override;
+    function GetAsString: String; override;
+  public
+    constructor create;
+    destructor destroy; override;
+    property LowTemperature: shortstring read FLowTemperature
+      write FLowTemperature;
+    property LowOutput: shortstring read FLowOutput write FLowOutput;
+    property HighTemperature: shortstring read FHighTemperature
+      write FHighTemperature;
+    property HighOutput: shortstring read FHighOutput write FHighOutput;
+    property TheWireType: Int16 read FWireType write FWireType;
+    property ResistorTCR: shortstring read FResistorTCR write FResistorTCR;
+    property BridgeResist: shortstring read FBridgeResist write FBridgeResist;
+    property Resist: shortstring read FResistors write FResistors;
+    property RMod: shortstring read FRMod write FRMod;
+    property Span: shortstring read FSpan write FSpan;
+    property TheStringText: shortstring read TheString write TheString;
+  end;
+
+  (* ********************************************* *)
+  (* TSpan vs Temperature Two Pt Form Object *)
+  (* ********************************************* *)
+type
+  TSvsTTwoPtForm = class(TForm)
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    EB_LowTemperature: TEdit;
+    ST_LowTempUnits: TLabel;
+    Label2: TLabel;
+    EB_LowOutput: TEdit;
+    GroupBox2: TGroupBox;
+    Label5: TLabel;
+    Label3: TLabel;
+    EB_HighTemperature: TEdit;
+    ST_HighTempUnits: TLabel;
+    Label6: TLabel;
+    EB_HighOutput: TEdit;
+    Label7: TLabel;
+    GroupBox3: TGroupBox;
+    ST_ResistorTCRUnits: TLabel;
+    GroupBox4: TGroupBox;
+    EB_BridgeResistance: TEdit;
+    Label4: TLabel;
+    Panel2: TPanel;
+    GroupBox5: TGroupBox;
+    Panel3: TPanel;
+    ImageD01: TImage;
+    ImageC01: TImage;
+    RB_C01: TRadioButton;
+    RB_D01: TRadioButton;
+    BN_Select: TBitBtn;
+    Panel5: TPanel;
+    GroupBox6: TGroupBox;
+    Label8: TLabel;
+    ST_Resistance: TLabel;
+    Label10: TLabel;
+    BN_Compute: TBitBtn;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    RB_APattern: TRadioButton;
+    RB_BPattern: TRadioButton;
+    RB_Wire: TRadioButton;
+    ImageAPattern: TImage;
+    ImageBPattern: TImage;
+    ImageWire: TImage;
+    Label9: TLabel;
+    Label11: TLabel;
+    ST_Span: TLabel;
+    BN_Help: TBitBtn;
+    GroupBox7: TGroupBox;
+    CB_WireType: TComboBox;
+    ST_ResistanceTCR: TLabel;
+    Image1: TImage;
+    // Sheet1: TSheet;
+    BN_Print: TBitBtn;
+    EB_ResistorTCR: TEdit;
+    SaveDialogPrint: TSaveDialog;
+    procedure RB_C01Click(Sender: Tobject);
+    procedure RB_D01Click(Sender: Tobject);
+    procedure BN_SelectClick(Sender: Tobject);
+    procedure FormCreate(Sender: Tobject);
+    procedure BN_CancelClick(Sender: Tobject);
+    procedure BN_ComputeClick(Sender: Tobject);
+    procedure FormActivate(Sender: Tobject);
+    procedure BN_OKClick(Sender: Tobject);
+    function CalculateResistance: RealType;
+    function CalculateSpan: RealType;
+    procedure RB_APatternClick(Sender: Tobject);
+    procedure RB_BPatternClick(Sender: Tobject);
+    procedure RB_WireClick(Sender: Tobject);
+    procedure FormClose(Sender: Tobject; var Action: TCloseAction);
+    procedure CB_WireTypeChange(Sender: Tobject);
+    procedure BN_PrintClick(Sender: Tobject);
+    procedure BN_HelpClick(Sender: Tobject);
+  private
+    { Private Declarations }
+    OldLowTemp: string;
+    OldLowOut: string;
+    OldHighTemp: string;
+    OldHighOut: string;
+    OldResistTCR: string;
+    OldBridgeResist: string;
+    OldResistor: string;
+    Old_Resistance: string;
+    Old_Span: string;
+    Resistor: string;
+    ExceptionRaised: boolean;
+    IsThereAnError: boolean;
+    LowTemp: RealType;
+    LowOut: RealType;
+    HighTemp: RealType;
+    HighOut: RealType;
+    ResistTCR: RealType;
+    ResistBridge: RealType;
+    ResistValue: RealType;
+    SpanValue: RealType;
+    TheType: integer;
+  public
+    { Public declarations }
+    SpanvsTemp2ptObject: TSpanvsTemp2pt;
+    Wire: TWire;
+  end;
+
+var
+  SvsTTwoPtForm: TSvsTTwoPtForm;
+
+implementation
+
+uses D012pt, MainMenu, Convert, Span2C01, APattern, BPattern, CPattern,
+  DPattern,
+  Wire2pt, Compenst;
+{$R *.DFM}
+
+(* ********************************************* *)
+(* Span vs Temp 2 Pt. Object Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.create }
+constructor TSpanvsTemp2pt.create;
+begin
+  { ...create object }
+  inherited create;
+  { ...associating string with with object }
+  TheString := 'Span Shift with Temperature Change, 2 points';
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.destroy }
+destructor TSpanvsTemp2pt.destroy;
+begin
+  { ...destroying object }
+  inherited destroy;
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.GetAsString }
+function TSpanvsTemp2pt.GetAsString: String;
+begin
+  Result := string(TheString);
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.ShowTheForm }
+procedure TSpanvsTemp2pt.ShowTheForm;
+begin
+  Application.CreateForm(TSvsTTwoPtForm, SvsTTwoPtForm);
+  SvsTTwoPtForm.showmodal;
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.PrintTheForm }
+procedure TSpanvsTemp2pt.PrintTheForm;
+var
+  Sender: Tobject;
+begin
+  Sender := self;
+  Application.CreateForm(TSvsTTwoPtForm, SvsTTwoPtForm);
+  SvsTTwoPtForm.visible := false;
+  SvsTTwoPtForm.FormActivate(Sender);
+  SvsTTwoPtForm.BN_PrintClick(Sender);
+  SvsTTwoPtForm.BN_CancelClick(Sender);
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.AssignTo }
+procedure TSpanvsTemp2pt.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TSpanvsTemp2pt) and (self is Dest.ClassType) then
+  begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TSpanvsTemp2pt do
+    begin
+      FLowTemperature := self.FLowTemperature;
+      FLowOutput := self.FLowOutput;
+      FHighTemperature := self.FHighTemperature;
+      FHighOutput := self.FHighOutput;
+      FWireType := self.FWireType;
+      FResistorTCR := self.FResistorTCR;
+      FBridgeResist := self.FBridgeResist;
+      FResistors := self.FResistors;
+      FRMod := self.FRMod;
+      FSpan := self.FSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else
+  begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.InitFields }
+procedure TSpanvsTemp2pt.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.SaveToStream }
+procedure TSpanvsTemp2pt.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FLowTemperature, sizeof(shortstring));
+  Stream.SaveBuffer(FLowOutput, sizeof(shortstring));
+  Stream.SaveBuffer(FHighTemperature, sizeof(shortstring));
+  Stream.SaveBuffer(FHighOutput, sizeof(shortstring));
+  Stream.SaveBuffer(FWireType, sizeof(Int16));
+  Stream.SaveBuffer(FResistorTCR, sizeof(shortstring));
+  Stream.SaveBuffer(FBridgeResist, sizeof(shortstring));
+  Stream.SaveBuffer(FResistors, sizeof(shortstring));
+  Stream.SaveBuffer(FRMod, sizeof(shortstring));
+  Stream.SaveBuffer(FSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************************************* *)
+{ TSpanvsTemp2pt.ReadFromStream }
+procedure TSpanvsTemp2pt.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FLowTemperature, sizeof(shortstring));
+  Stream.ReadBuffer(FLowOutput, sizeof(shortstring));
+  Stream.ReadBuffer(FHighTemperature, sizeof(shortstring));
+  Stream.ReadBuffer(FHighOutput, sizeof(shortstring));
+  Stream.ReadBuffer(FWireType, sizeof(Int16));
+  Stream.ReadBuffer(FResistorTCR, sizeof(shortstring));
+  Stream.ReadBuffer(FBridgeResist, sizeof(shortstring));
+  Stream.ReadBuffer(FResistors, sizeof(shortstring));
+  Stream.ReadBuffer(FRMod, sizeof(shortstring));
+  Stream.ReadBuffer(FSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************* *)
+(* Span vs. Temperature 2 point Form Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.CalculateResistance }
+function TSvsTTwoPtForm.CalculateResistance: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  DiffInTemp: RealType;
+  DiffInSpan: RealType;
+  ResistanceValue: RealType;
+  DsDivDt: RealType;
+  Button: integer;
+begin
+  Result := 0.0;
+  ResistanceValue := 0.0;
+  ExceptionRaised := false;
+  DiffInTemp := HighTemp - LowTemp;
+  if LowOut = 0.0 then
+  begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    exit;
+  end
+  else
+  begin
+    try
+      DiffInSpan := (HighOut - LowOut) / LowOut;
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    if (DiffInTemp <> 0) and (DiffInSpan <> 0) then
+    begin
+      try
+        DsDivDt := DiffInSpan / DiffInTemp;
+      except
+        on EMathError do
+        begin
+          LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+            sizeof(ErrorMsg));
+          LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+            sizeof(ErrorCaption));
+          Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+            mb_OK or mb_IconExclamation);
+          ExceptionRaised := true;
+          exit;
+        end;
+      end;
+      if (ResistTCR / 100) <> DsDivDt then
+      begin
+        try
+          ResistanceValue := (DsDivDt * ResistBridge) /
+            ((ResistTCR / 100) - DsDivDt);
+        except
+          on EMathError do
+          begin
+            LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+              sizeof(ErrorMsg));
+            LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+              sizeof(ErrorCaption));
+            Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+              mb_OK or mb_IconExclamation);
+            ExceptionRaised := true;
+            exit;
+          end;
+        end;
+      end
+      else
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    { flagging negative resistance value because makes the calculation funky }
+    if (ResistanceValue <= 0) then
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+    CalculateResistance := ResistanceValue;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.CalculateSpan }
+function TSvsTTwoPtForm.CalculateSpan: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  Numerator: RealType;
+  Denominator: RealType;
+  TheSpanValue: RealType;
+  Button: integer;
+begin
+  Result := 0.0;
+  ExceptionRaised := false;
+  try
+    Numerator := LowOut * ResistBridge;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    Denominator := (ResistBridge + ResistValue);
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    TheSpanValue := Numerator / Denominator;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  CalculateSpan := TheSpanValue;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.RB_APatternClick }
+procedure TSvsTTwoPtForm.RB_APatternClick(Sender: Tobject);
+begin
+  RB_APattern.checked := true;
+  ImageAPattern.visible := true;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+  ImageWire.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.RB_BPatternClick }
+procedure TSvsTTwoPtForm.RB_BPatternClick(Sender: Tobject);
+begin
+  RB_BPattern.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := true;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+  ImageWire.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.RB_C01Click }
+procedure TSvsTTwoPtForm.RB_C01Click(Sender: Tobject);
+begin
+  RB_C01.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := false;
+  ImageC01.visible := true;
+  ImageD01.visible := false;
+  ImageWire.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.RB_D01Click }
+procedure TSvsTTwoPtForm.RB_D01Click(Sender: Tobject);
+begin
+  RB_D01.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := true;
+  ImageWire.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.RB_WireClick }
+procedure TSvsTTwoPtForm.RB_WireClick(Sender: Tobject);
+begin
+  RB_Wire.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+  ImageWire.visible := true;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.BN_SelectClick }
+procedure TSvsTTwoPtForm.BN_SelectClick(Sender: Tobject);
+begin
+  if RB_APattern.checked = true then
+  begin
+    Application.CreateForm(TAPatternForm, APatternForm);
+    APatternForm.showmodal;
+  end
+  else if RB_BPattern.checked = true then
+  begin
+    Application.CreateForm(TBPatternForm, BPatternForm);
+    BPatternForm.showmodal;
+  end
+  else if RB_C01.checked = true then
+  begin
+    Application.CreateForm(TCPatternForm, CPatternForm);
+    CPatternForm.ShowFormModal(SvsTTwoPtForm);
+  end
+  else if RB_D01.checked = true then
+  begin
+    Application.CreateForm(TDPatternForm, DPatternForm);
+    DPatternForm.ShowFormModal(SvsTTwoPtForm);
+  end
+  else if RB_Wire.checked = true then
+  begin
+    Application.CreateForm(TWireTable2ptForm, WireTable2ptForm);
+    WireTable2ptForm.showmodal;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.FormCreate }
+procedure TSvsTTwoPtForm.FormCreate(Sender: Tobject);
+var
+  StaticUnits: array [0 .. MAXTEXTLENGTH - 1] of char;
+begin
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+  RB_APattern.checked := true;
+  ImageAPattern.visible := true;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+  ImageWire.visible := false;
+  { ...checking to see if if std. or SI in form units }
+  if MainForm.UnitsAreUS = true then
+  begin
+    LoadString(hinstance, ID_SZ_DEGREEF, StaticUnits, sizeof(StaticUnits));
+    ST_LowTempUnits.caption := StaticUnits;
+    ST_HighTempUnits.caption := StaticUnits;
+    LoadString(hinstance, ID_SZ_PercentF, StaticUnits, sizeof(StaticUnits));
+    ST_ResistorTCRUnits.caption := StaticUnits;
+  end
+  else
+  begin
+    LoadString(hinstance, ID_SZ_DEGREEC, StaticUnits, sizeof(StaticUnits));
+    ST_LowTempUnits.caption := StaticUnits;
+    ST_HighTempUnits.caption := StaticUnits;
+    LoadString(hinstance, ID_SZ_PercentC, StaticUnits, sizeof(StaticUnits));
+    ST_ResistorTCRUnits.caption := StaticUnits;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.BN_CancelClick }
+procedure TSvsTTwoPtForm.BN_CancelClick(Sender: Tobject);
+begin
+  { ...placing old value in Edit box }
+  EB_LowTemperature.text := OldLowTemp;
+  EB_LowOutput.text := OldLowOut;
+  EB_HighTemperature.text := OldHighTemp;
+  EB_HighOutput.text := OldHighOut;
+  ST_ResistanceTCR.caption := OldResistTCR;
+  EB_BridgeResistance.text := OldBridgeResist;
+  ST_Resistance.caption := Old_Resistance;
+  ST_Span.caption := Old_Span;
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.BN_ComputeClick }
+procedure TSvsTTwoPtForm.BN_ComputeClick(Sender: Tobject);
+const
+  MINTEMPERATURE_US = -100;
+  MAXTEMPERATURE_US = 500;
+  MINOUTPUT_US = 0.0001;
+  MAXOUTPUT_US = 10;
+  MINRESISTANCETCR_US = 0.1;
+  MAXRESISTANCETCR_US = 0.5;
+  MINBRIDGERESISTANCE_US = 50;
+  MAXBRIDGERESISTANCE_US = 10000;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorUnit: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorAnd: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  StrUnit: string;
+  StrAnd: string;
+  StrMsg: string;
+  StrMin: string;
+  StrMax: string;
+  EditStrings: string;
+  MinTemperature: RealType;
+  MaxTemperature: RealType;
+  MinOutput: RealType;
+  MaxOutput: RealType;
+  MinResistanceTCR: RealType;
+  MaxResistanceTCR: RealType;
+  MinBridgeResistance: RealType;
+  MaxBridgeResistance: RealType;
+  ErrorCode: integer;
+  Button: integer;
+begin
+  { ...Determining which units to use, Std. or SI, for min and max values }
+  if MainForm.UnitsAreUS = true then
+  begin
+    MinTemperature := MINTEMPERATURE_US;
+    MaxTemperature := MAXTEMPERATURE_US;
+    MinOutput := MINOUTPUT_US;
+    MaxOutput := MAXOUTPUT_US;
+    MinResistanceTCR := MINRESISTANCETCR_US;
+    MaxResistanceTCR := MAXRESISTANCETCR_US;
+    MinBridgeResistance := MINBRIDGERESISTANCE_US;
+    MaxBridgeResistance := MAXBRIDGERESISTANCE_US;
+  end
+  else
+  begin
+    MinTemperature := F_to_C(MINTEMPERATURE_US);
+    MaxTemperature := F_to_C(MAXTEMPERATURE_US);
+    MinOutput := MINOUTPUT_US;
+    MaxOutput := MAXOUTPUT_US;
+    MinResistanceTCR := 1.8 * (MINRESISTANCETCR_US);
+    MaxResistanceTCR := 1.8 * (MAXRESISTANCETCR_US);
+    MinBridgeResistance := MINBRIDGERESISTANCE_US;
+    MaxBridgeResistance := MAXBRIDGERESISTANCE_US;
+  end;
+  ST_Resistance.caption := '';
+  ST_Span.caption := '';
+  IsThereAnError := false;
+  { ..checking to see if LowTemperature is valid }
+  EditStrings := EB_LowTemperature.text;
+  StrVal(EditStrings, LowTemp, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowTemperature.setfocus;
+    EB_LowTemperature.clearselection;
+    exit;
+  end
+  else if (LowTemp < MinTemperature) or (LowTemp > MaxTemperature) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_DEGREEF, ErrorUnit, sizeof(ErrorUnit));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_DEGREEC, ErrorUnit, sizeof(ErrorUnit));
+    end;
+    LoadString(hinstance, ID_SZ_LowTemp, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinTemperature, ffFixed, 8, 0);
+    StrMax := floattostrf(MaxTemperature, ffFixed, 8, 0);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowTemperature.setfocus;
+    EB_LowTemperature.clearselection;
+    exit;
+  end;
+  { ..checking to see if LowOutput is valid }
+  EditStrings := EB_LowOutput.text;
+  StrVal(EditStrings, LowOut, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowOutput.setfocus;
+    EB_LowOutput.clearselection;
+    exit;
+  end
+  else if (LowOut < MinOutput) or (LowOut > MaxOutput) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_MV, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_LowOutput, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinOutput, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxOutput, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowOutput.setfocus;
+    EB_LowOutput.clearselection;
+    exit;
+  end;
+  { ..checking to see if HighTemperature is valid }
+  EditStrings := EB_HighTemperature.text;
+  StrVal(EditStrings, HighTemp, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighTemperature.setfocus;
+    EB_HighTemperature.clearselection;
+    exit;
+  end
+  else if (HighTemp < MinTemperature) or (HighTemp > MaxTemperature) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_DEGREEF, ErrorUnit, sizeof(ErrorUnit));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_DEGREEC, ErrorUnit, sizeof(ErrorUnit));
+    end;
+    LoadString(hinstance, ID_SZ_HighTemp, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinTemperature, ffFixed, 8, 0);
+    StrMax := floattostrf(MaxTemperature, ffFixed, 8, 0);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighTemperature.setfocus;
+    EB_HighTemperature.clearselection;
+    exit;
+  end;
+  { ..checking to see if HighOutput is valid }
+  EditStrings := EB_HighOutput.text;
+  StrVal(EditStrings, HighOut, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighOutput.setfocus;
+    EB_HighOutput.clearselection;
+    exit;
+  end
+  else if (HighOut < MinOutput) or (HighOut > MaxOutput) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_MV, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_HighOutput, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinOutput, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxOutput, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighOutput.setfocus;
+    EB_HighOutput.clearselection;
+    exit;
+  end;
+  { ..checking to see if Resistance TCR is valid }
+  if CB_WireType.ItemIndex = 3 then
+    EditStrings := EB_ResistorTCR.text
+  else
+    EditStrings := ST_ResistanceTCR.caption;
+  StrVal(EditStrings, ResistTCR, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    if CB_WireType.ItemIndex = 3 then
+    begin
+      EB_ResistorTCR.setfocus;
+      EB_ResistorTCR.clearselection;
+    end;
+    exit;
+  end
+  else if (ResistTCR < MinResistanceTCR) or (ResistTCR > MaxResistanceTCR) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_PercentF, ErrorUnit, sizeof(ErrorUnit));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_PercentC, ErrorUnit, sizeof(ErrorUnit));
+    end;
+    LoadString(hinstance, ID_SZ_ResistanceTCR, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinResistanceTCR, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxResistanceTCR, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    if CB_WireType.ItemIndex = 3 then
+    begin
+      EB_ResistorTCR.setfocus;
+      EB_ResistorTCR.clearselection;
+    end;
+    exit;
+  end;
+  { ..checking to see if Bridge Resistance is valid }
+  EditStrings := EB_BridgeResistance.text;
+  StrVal(EditStrings, ResistBridge, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_BridgeResistance.setfocus;
+    EB_BridgeResistance.clearselection;
+    exit;
+  end
+  else if (ResistBridge < MinBridgeResistance) or
+    (ResistBridge > MaxBridgeResistance) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_BridgeResist, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinBridgeResistance, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxBridgeResistance, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_BridgeResistance.setfocus;
+    EB_BridgeResistance.clearselection;
+    exit;
+  end;
+  { ...calculating Resistance value }
+  if (LowTemp > HighTemp) then
+  begin
+    { ..display message telling user the high temp must be higher than low temp }
+    LoadString(hinstance, ID_SZ_LowTempHighTemp, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    IsThereAnError := true;
+    EB_HighTemperature.setfocus;
+    exit;
+  end;
+  if (LowOut > HighOut) then
+  begin
+    { ..display message telling user the high span must be higher than low span }
+    LoadString(hinstance, ID_SZ_LowOutHighOut, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    IsThereAnError := true;
+    EB_HighOutput.setfocus;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = true then
+  begin
+    if ((HighTemp - LowTemp) > 0) and ((HighTemp - LowTemp) < 50) then
+    begin
+      LoadString(hinstance, ID_SZ_TempDiff50F, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+    end;
+  end
+  else
+  begin
+    if ((HighTemp - LowTemp) > -18) and ((HighTemp - LowTemp) < 10) then
+    begin
+      LoadString(hinstance, ID_SZ_TempDiff10C, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+    end;
+  end;
+  if IsThereAnError = false then
+  begin
+    ResistValue := CalculateResistance;
+    if ExceptionRaised = false then
+    begin
+      ST_Resistance.caption := floattostrf(abs(ResistValue), ffFixed, 6, 2);
+      SpanValue := CalculateSpan;
+      if ExceptionRaised = false then
+      begin
+        ST_Span.caption := floattostrf(abs(SpanValue), ffFixed, 6, 5);
+      end;
+    end;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.FormActivate }
+procedure TSvsTTwoPtForm.FormActivate(Sender: Tobject);
+var
+  EditStrings: string;
+  i: integer;
+  TheItem: TacStreamable;
+  TheItems: string;
+begin
+  { ...getting the object if there is one }
+  TheItem := nil;
+  i := 0;
+  { ...add 1st Wire Type to Combobox }
+  TheItems := CB_WireType.items.strings[0];
+  CB_WireType.items.delete(0);
+  Wire := TWire.create;
+  Wire.Name := 'Balco';
+  Wire.Resistivity := 120;
+  Wire.TCR := 0.25;
+  CB_WireType.items.addobject(TheItems, Wire);
+  { ...add 2nd Wire Type to Combobox }
+  TheItems := CB_WireType.items.strings[1];
+  CB_WireType.items.delete(1);
+  Wire := TWire.create;
+  Wire.Name := 'Copper';
+  Wire.Resistivity := 10.371;
+  Wire.TCR := 0.22;
+  CB_WireType.items.addobject(TheItems, Wire);
+  { ...add 3rd Wire Type to Combobox }
+  TheItems := CB_WireType.items.strings[2];
+  CB_WireType.items.delete(2);
+  Wire := TWire.create;
+  Wire.Name := 'Nickel, pure';
+  Wire.Resistivity := 45;
+  Wire.TCR := 0.33;
+  CB_WireType.items.addobject(TheItems, Wire);
+  { ...add 4th Wire Type to Combobox (User-Defined) }
+  TheItems := CB_WireType.items.strings[3];
+  CB_WireType.items.delete(3);
+  Wire := TWire.create;
+  Wire.Name := 'User-Defined';
+  Wire.Resistivity := 350;
+  Wire.TCR := 0;
+  CB_WireType.items.addobject(TheItems, Wire);
+  Repeat
+    If MainForm.Flog.AtIndex(i) is TSpanvsTemp2pt then
+    begin
+      TheItem := MainForm.Flog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  { ...if there is an object, then place values in edit boxes }
+  if TheItem <> nil then
+  begin
+    EB_LowTemperature.text :=
+      string((TheItem as TSpanvsTemp2pt).LowTemperature);
+    EB_LowOutput.text := string((TheItem as TSpanvsTemp2pt).LowOutput);
+    EB_HighTemperature.text :=
+      string((TheItem as TSpanvsTemp2pt).HighTemperature);
+    EB_HighOutput.text := string((TheItem as TSpanvsTemp2pt).HighOutput);
+    CB_WireType.ItemIndex := (TheItem as TSpanvsTemp2pt).TheWireType;
+    if CB_WireType.ItemIndex = 0 then
+    begin
+      EB_ResistorTCR.visible := false;
+      ST_ResistanceTCR.visible := true;
+      RB_APattern.enabled := true;
+      RB_BPattern.enabled := false;
+      RB_C01.enabled := true;
+      RB_D01.enabled := true;
+      RB_Wire.enabled := true;
+      RB_APattern.checked := true;
+      BN_Select.enabled := true;
+      Panel3.visible := true;
+    end
+    else if CB_WireType.ItemIndex = 1 then
+    begin
+      EB_ResistorTCR.visible := false;
+      ST_ResistanceTCR.visible := true;
+      RB_APattern.enabled := true;
+      RB_BPattern.enabled := false;
+      RB_C01.enabled := false;
+      RB_D01.enabled := false;
+      RB_Wire.enabled := true;
+      RB_APattern.checked := true;
+      BN_Select.enabled := true;
+      Panel3.visible := true;
+    end
+    else if CB_WireType.ItemIndex = 2 then
+    begin
+      EB_ResistorTCR.visible := false;
+      ST_ResistanceTCR.visible := true;
+      RB_APattern.enabled := true;
+      RB_BPattern.enabled := true;
+      RB_C01.enabled := false;
+      RB_D01.enabled := false;
+      RB_Wire.enabled := true;
+      RB_APattern.checked := true;
+      BN_Select.enabled := true;
+      Panel3.visible := true;
+    end
+    else if CB_WireType.ItemIndex = 3 then
+    begin
+      EB_ResistorTCR.text := string((TheItem as TSpanvsTemp2pt).ResistorTCR);
+      EB_ResistorTCR.visible := true;
+      ST_ResistanceTCR.visible := false;
+      RB_APattern.enabled := false;
+      RB_APattern.checked := false;
+      RB_BPattern.enabled := false;
+      RB_BPattern.checked := false;
+      RB_C01.enabled := false;
+      RB_C01.checked := false;
+      RB_D01.enabled := false;
+      RB_D01.checked := false;
+      RB_Wire.enabled := false;
+      RB_Wire.checked := false;
+      BN_Select.enabled := false;
+      Panel3.visible := false;
+    end;
+    ST_ResistanceTCR.caption := string((TheItem as TSpanvsTemp2pt).ResistorTCR);
+    EB_BridgeResistance.text :=
+      string((TheItem as TSpanvsTemp2pt).BridgeResist);
+    ST_Resistance.caption := string((TheItem as TSpanvsTemp2pt).RMod);
+    ST_Span.caption := string((TheItem as TSpanvsTemp2pt).Span);
+  end
+  else
+  begin
+    CB_WireType.ItemIndex := 0;
+    CB_WireTypeChange(Sender);
+  end;
+  { ...placing value in old value in case cancel clicked }
+  OldLowTemp := EB_LowTemperature.text;
+  OldLowOut := EB_LowOutput.text;
+  OldHighTemp := EB_HighTemperature.text;
+  OldHighOut := EB_HighOutput.text;
+  OldResistTCR := ST_ResistanceTCR.caption;
+  OldBridgeResist := EB_BridgeResistance.text;
+  Old_Resistance := ST_Resistance.caption;
+  Old_Span := ST_Span.caption;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.BN_OKClick }
+procedure TSvsTTwoPtForm.BN_OKClick(Sender: Tobject);
+var
+  TheItem: TacStreamable;
+  i: integer;
+  j: integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = true then
+  begin
+    exit;
+  end;
+  { ...getting the object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    If MainForm.Flog.AtIndex(i) is TSpanvsTemp2pt then
+    begin
+      TheItem := MainForm.Flog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  { ...if there is an object, then place values in edit boxes }
+  if TheItem = nil then
+  begin
+    { ...placing values in object }
+    SpanvsTemp2ptObject := TSpanvsTemp2pt.create;
+    SpanvsTemp2ptObject.LowTemperature := EB_LowTemperature.text;
+    SpanvsTemp2ptObject.LowOutput := EB_LowOutput.text;
+    SpanvsTemp2ptObject.HighTemperature := EB_HighTemperature.text;
+    SpanvsTemp2ptObject.HighOutput := EB_HighOutput.text;
+    SpanvsTemp2ptObject.TheWireType := CB_WireType.ItemIndex;
+    if CB_WireType.ItemIndex = 3 then { User-Defined }
+      SpanvsTemp2ptObject.ResistorTCR := EB_ResistorTCR.text
+    else
+      SpanvsTemp2ptObject.ResistorTCR := ST_ResistanceTCR.caption;
+    SpanvsTemp2ptObject.BridgeResist := EB_BridgeResistance.text;
+    SpanvsTemp2ptObject.RMod := ST_Resistance.caption;
+    SpanvsTemp2ptObject.Span := ST_Span.caption;
+    MainForm.AddToLog(SpanvsTemp2ptObject);
+    j := 0;
+    { ...placing object string in outline }
+    Repeat
+      inc(j);
+    until (MainForm.XCalcOutline.items[j].text = 'Circuit Refinements') or
+      (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, SpanvsTemp2ptObject.GetAsString);
+  end
+  else
+  begin
+    (TheItem as TSpanvsTemp2pt).LowTemperature := EB_LowTemperature.text;
+    (TheItem as TSpanvsTemp2pt).LowOutput := EB_LowOutput.text;
+    (TheItem as TSpanvsTemp2pt).HighTemperature := EB_HighTemperature.text;
+    (TheItem as TSpanvsTemp2pt).HighOutput := EB_HighOutput.text;
+    (TheItem as TSpanvsTemp2pt).TheWireType := CB_WireType.ItemIndex;
+    if CB_WireType.ItemIndex = 3 then
+      (TheItem as TSpanvsTemp2pt).ResistorTCR := EB_ResistorTCR.text
+    else
+      (TheItem as TSpanvsTemp2pt).ResistorTCR := ST_ResistanceTCR.caption;
+    (TheItem as TSpanvsTemp2pt).BridgeResist := EB_BridgeResistance.text;
+    (TheItem as TSpanvsTemp2pt).RMod := ST_Resistance.caption;
+    (TheItem as TSpanvsTemp2pt).Span := ST_Span.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.CompDlgShowing = true then
+  begin
+    CompensationDlg.close;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.FormClose }
+procedure TSvsTTwoPtForm.FormClose(Sender: Tobject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.CB_WireTypeChange }
+procedure TSvsTTwoPtForm.CB_WireTypeChange(Sender: Tobject);
+var
+  TheObject: Tobject;
+  TheWire: Tobject;
+  TheItems: TStrings;
+  TheStr: ANSIString;
+  WireID: string;
+  WireGage: string;
+  Diameter: string;
+  ResistNo: real { type };
+  TCRNo: real { Type };
+  converted: RealType;
+  Resistance: RealType;
+  i: integer;
+  j: integer;
+begin
+  if CB_WireType.text = 'Copper' then
+  begin
+    EB_ResistorTCR.visible := false;
+    ST_ResistanceTCR.visible := true;
+    RB_APattern.enabled := true;
+    RB_BPattern.enabled := false;
+    RB_C01.enabled := false;
+    RB_D01.enabled := false;
+    RB_Wire.enabled := true;
+    RB_APattern.checked := true;
+    BN_Select.enabled := true;
+    Panel3.visible := true;
+  end
+  else if CB_WireType.text = 'Balco' then
+  begin
+    EB_ResistorTCR.visible := false;
+    ST_ResistanceTCR.visible := true;
+    RB_APattern.enabled := true;
+    RB_BPattern.enabled := false;
+    RB_C01.enabled := true;
+    RB_D01.enabled := true;
+    RB_Wire.enabled := true;
+    RB_APattern.checked := true;
+    BN_Select.enabled := true;
+    Panel3.visible := true;
+  end
+  else if CB_WireType.text = 'Nickel, pure' then
+  begin
+    EB_ResistorTCR.visible := false;
+    ST_ResistanceTCR.visible := true;
+    RB_APattern.enabled := true;
+    RB_BPattern.enabled := true;
+    RB_C01.enabled := false;
+    RB_D01.enabled := false;
+    RB_Wire.enabled := true;
+    RB_APattern.checked := true;
+    BN_Select.enabled := true;
+    Panel3.visible := true;
+  end
+  else if CB_WireType.text = 'User-Defined' then
+  begin
+    EB_ResistorTCR.visible := true;
+    ST_ResistanceTCR.visible := false;
+    RB_APattern.enabled := false;
+    RB_APattern.checked := false;
+    RB_BPattern.enabled := false;
+    RB_BPattern.checked := false;
+    RB_C01.enabled := false;
+    RB_C01.checked := false;
+    RB_D01.enabled := false;
+    RB_D01.checked := false;
+    RB_Wire.enabled := false;
+    RB_Wire.checked := false;
+    Panel3.visible := false;
+    BN_Select.enabled := false;
+    EB_ResistorTCR.setfocus;
+  end;
+  TheType := CB_WireType.ItemIndex;
+  TheItems := CB_WireType.items;
+  TheObject := TheItems.objects[CB_WireType.ItemIndex];
+  WireID := TheItems.strings[CB_WireType.ItemIndex];
+  TheObject := TheItems.objects[CB_WireType.items.indexof(WireID)];
+  { ...placing TCR in string grid }
+  TCRNo := TWire(TheObject).TCR;
+  if MainForm.UnitsAreUS = true then
+  begin
+    theStr := FloatToStrF(TCRNo, ffFixed,8,2)   ;
+//    str(TCRNo: 8: 2, TheStr);
+  end
+  else
+  begin
+    TCRNo := TCRNo * 9 / 5;
+    theStr := FloatToStrF(TCRNo, ffFixed,8,2)   ;
+  //  str(TCRNo: 8: 2, TheStr);
+  end;
+  ST_ResistanceTCR.caption := TheStr;
+  ST_Resistance.caption := '';
+  ST_Span.caption := '';
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.BN_PrintClick }
+procedure TSvsTTwoPtForm.BN_PrintClick(Sender: Tobject);
+var
+  GridSelection: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderPChar: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderString: string;
+  DateString: string;
+  id: longint;
+  MetaHandle: Thandle;
+  sserror: integer;
+  htmlText: string;
+  Stream: tResourceStream;
+  strstream: tStringStream;
+
+begin
+  Stream := tResourceStream.create(hinstance, 'Span2pt', RT_RCDATA);
+  strstream := tStringStream.create();
+
+  try
+    strstream.LoadFromStream(Stream);
+    htmlText := strstream.DataString;
+  finally
+    strstream.Free();
+    Stream.Free();
+  end;
+
+  htmlText := StringReplace(htmlText, '$lt2', ST_LowTempUnits.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$ht2', ST_HighTempUnits.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rt2', ST_ResistorTCRUnits.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+
+  htmlText := StringReplace(htmlText, '$lt1', EB_LowTemperature.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$lv1', EB_LowOutput.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$ht1', EB_HighTemperature.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$hv1', EB_HighOutput.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rm1', CB_WireType.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rt1', ST_ResistanceTCR.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$br1', EB_BridgeResistance.text,
+    [rfReplaceAll, rfIgnoreCase]);
+
+  htmlText := StringReplace(htmlText, '$cr1', ST_Resistance.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$ba1', ST_Span.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  SaveDialogPrint.FileName := '';
+  SaveDialogPrint.InitialDir := tPath.GetDocumentsPath;
+  if SaveDialogPrint.Execute
+  then
+  begin
+    tfile.writeAllText(SaveDialogPrint.FileName, htmlText);
+    ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName), nil, nil,
+      SW_SHOWNORMAL);
+  end;
+
+  (* id := 0;
+    {...clearing sheet for new values}
+    SSClearRange(Sheet1.SS, 4, 4, 19, 4, 3);
+    {...placing units on sheet}
+    SSSetActiveCell(Sheet1.SS, 5, 5);
+    Sheet1.text := ST_LowTempUnits.caption;
+    SSSetActiveCell(Sheet1.SS, 8, 5);
+    Sheet1.text := ST_HighTempUnits.caption;
+    SSSetActiveCell(Sheet1.SS, 13, 5);
+    Sheet1.text := ST_ResistorTCRUnits.caption;
+    {...placing values on Sheet}
+    SSSetActiveCell(Sheet1.SS, 5, 4);
+    Sheet1.text := EB_LowTemperature.text;
+    SSSetActiveCell(Sheet1.SS, 6, 4);
+    Sheet1.text := EB_LowOutput.text;
+    SSSetActiveCell(Sheet1.SS, 8, 4);
+    Sheet1.text := EB_HighTemperature.text;
+    SSSetActiveCell(Sheet1.SS, 9, 4);
+    Sheet1.text := EB_HighOutput.text;
+    SSSetActiveCell(Sheet1.SS, 11, 5); {Set Alignment for WireType}
+    SSSetAlignment(Sheet1.SS, 7, 0, 3, 0);
+    SSSetActiveCell(Sheet1.SS, 11, 4);
+    SSSetAlignment(Sheet1.SS, 7, 0, 3, 0);
+    Sheet1.text := CB_WireType.text;
+    SSSetActiveCell(Sheet1.SS, 13, 4);
+    if CB_WireType.ItemIndex = 3 then  {User-Defined}
+    Sheet1.text := EB_ResistorTCR.text
+    else
+    Sheet1.text := ST_ResistanceTCR.caption;
+    SSSetActiveCell(Sheet1.SS, 15, 4);
+    Sheet1.text := EB_BridgeResistance.text;
+    SSSetActiveCell(Sheet1.SS, 18, 4);
+    Sheet1.text := ST_Resistance.caption;
+    SSSetActiveCell(Sheet1.SS, 19, 4);
+    Sheet1.text := ST_Span.caption;;
+    sserror := SSObjNewPicture(Sheet1.ss, 1, 23, 6, 30, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+    SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+    DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+    HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+    strpcopy(HeaderPChar, HeaderString);
+    SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+    SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+    SSFilePrint(Sheet1.ss, 0); *)
+end;
+
+(* ********************************************************************* *)
+{ TSvsTTwoPtForm.BN_HelpClick }
+procedure TSvsTTwoPtForm.BN_HelpClick(Sender: Tobject);
+begin
+  Application.HelpContext(2030);
+end;
+
+begin
+  { ...registering object }
+  RegisterClasses([TSpanvsTemp2pt]);
+
+end.

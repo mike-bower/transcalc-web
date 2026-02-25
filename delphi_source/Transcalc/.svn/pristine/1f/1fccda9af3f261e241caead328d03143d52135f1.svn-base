@@ -1,0 +1,240 @@
+{ Calculate the cube of a number}
+unit math;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons;
+
+const
+  MAXTEXTLENGTH   = 40;
+  MAXERRORLENGTH  = 80;
+
+  function Cube(v:double): double;
+  function Cubic( var S1,S2,S3: double; A,B,C,D: double):boolean;
+ (*
+  function SetValue(pst:PStatic ;r:real; n,d:word): Boolean;
+  *)
+implementation
+uses Mainmenu, OptShunt;
+(*
+function SetValue(pst:PStatic ;r:real; n,d:word): Boolean;
+var
+  ts: String;
+  cst: Array[0..255] of char;
+begin
+  Str(r:n:d, ts);
+  StrPCopy(cst,ts);
+  pst^.SetText(cst);
+end;
+*)
+
+function Cube(v:Double): double;
+begin
+  Cube := v*v*v;
+end;
+
+{ Calculate the equation Ax^3 + Bx^2 + Cx + D = 0}
+function Cubic( var S1,S2,S3: double; A,B,C,D: double):boolean;
+var
+  ErrorMsg            : array[0..MAXERRORLENGTH-1] of char;
+  ErrorUnit           : array[0..MAXERRORLENGTH-1] of char;
+  ErrorAnd            : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption        : array[0..MAXERRORLENGTH-1] of char;
+  IsThereAnError      : boolean;
+  T1,
+  T2,
+  T3,
+  T4,
+  T5,
+  T6,
+  T7,
+  T8 : real;
+  Button              : integer;
+begin
+  Cubic := false;
+  IsThereAnError := false;
+  {T1}
+  try
+    T1 := (27.0*Sqr(A)*Sqr(D) - 2.0*A*C*(9.0*B*D - 2.0*Sqr(C)) + Sqr(B)*(4.0*B*D - Sqr(C)));
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  {T2}
+  try
+    T2 := Cube(3.0*A*C - Sqr(B));
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  if T2 = 0.0 then begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    IsThereAnError := true;
+    exit;
+  end;
+  if T1/T2 <0.0 then begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    IsThereAnError := true;
+    exit;
+  end;
+  {T3}
+  try
+    T3 := Sqrt(T1/T2);
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  {T4}
+  try
+    T4 := Sqr(B) - 3.0 * A * C;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  if T4 <= 0.0 then begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    IsThereAnError := true;
+    exit;
+  end;
+  try
+    T4 := 9.0 * A *  Cube(Sqrt(T4));
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  if T3 * T4 = 0.0 then begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    IsThereAnError := true;
+    exit;
+  end;
+  {T5}
+  try
+    T5 := Sqrt(3.0) * (27.0 * Sqr(A) * D - 9.0 * A * B * C + 2.0 * Cube(B));
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  {T6}
+  try
+    T6 := ArcTan((T5/(T4*T3)));
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  {T7}
+  if Sqr(B) - 3.0 * A * C <= 0.0 then begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+    exit;
+  end;
+  try
+    T7 := 2.0 * Sqrt(Sqr(B) - 3.0 * A * C);
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  {T8}
+  try
+    T8 := B /(3.0 * A);
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  { calculate three solutions}
+  try
+    S1 := (T7*Cos((T6/3.0) - pi/2.0))    / (3.0*Abs(A)) - T8;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  try
+    S2 := (T7*Cos((T6/3.0) + pi/6.0))    / (3.0*Abs(A)) - T8;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  try
+    S3 := (T7*Cos((T6/3.0) + 5.0*pi/6.0))/ (3.0*Abs(A)) - T8;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      IsThereAnError := true;
+      exit;
+    end;
+  end;
+  if IsThereAnError = false then begin
+    Cubic := true;
+  end;
+end;
+
+END.
+

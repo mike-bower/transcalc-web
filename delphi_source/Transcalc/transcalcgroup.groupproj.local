@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2023/02/15 17:49:02.000.653,D:\AFAB\Vishay\transcalc\Transcalc\transcalcgroup.groupproj=D:\AFAB\Vishay\transcalc\Transcalc\ProjectGroup1.groupproj</Transaction>
+  </Transactions>
+	<Default.Personality>
+		<Projects ActiveProject="D:\AFAB\Vishay\transcalc\Transcalc\XCALCPRO.dproj"/>
+	</Default.Personality>
+</BorlandProject>

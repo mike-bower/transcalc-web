@@ -1,0 +1,50 @@
+unit Splash;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms;
+
+type
+  TSplashScreen = class(TForm)
+    Timer1: TTimer;
+    Image1: TImage;
+    procedure Timer1Timer(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormCreate(Sender: TObject);
+  end;
+
+var
+  SplashScreen: TSplashScreen;
+
+implementation
+
+{$R *.DFM}
+
+
+(* ********************************************************************* *)
+{ TWireTableSpanForm.Timer1Timer }
+procedure TSplashScreen.Timer1Timer(Sender: TObject);
+begin
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TWireTableSpanForm.FormClose }
+procedure TSplashScreen.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Timer1.interval := 0;
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TWireTableSpanForm.FormCreate }
+procedure TSplashScreen.FormCreate(Sender: TObject);
+begin
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+end.

@@ -1,0 +1,1409 @@
+(***********************************************)
+(*  Round Shear S- Beam  Unit                  *)
+(***********************************************)
+unit Shearsb;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, acStream, acList, Log, LogItem, LogStrm,
+  Buttons, Printers;
+
+const
+  MAXTEXTLENGTH   = 40;
+  MAXERRORLENGTH  = 255;
+
+type
+  RealType = double;
+
+(***********************************************)
+(*  Round Shear S- Beam  Object                *)
+(***********************************************)
+type TRndSBeamShear = class(TLogItem)
+private
+  FAppliedLoad      : shortstring;
+  FWidth            : shortstring;
+  FHeight           : shortstring;
+  FDiameter         : shortstring;
+  FThickness        : shortstring;
+  FPoisson          : shortstring;
+  FModulus          : shortstring;
+  FGageLength       : shortstring;
+  FGageFactor       : shortstring;
+  FAvgStrain        : shortstring;
+  FGradient         : shortstring;
+  FFullSpan         : shortstring;
+  TheString         : shortstring;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+  procedure ShowTheForm; override;
+  procedure PrintTheForm; override;
+  function GetAsString: String; override;
+public
+  constructor create;
+  destructor destroy; override ;
+  property AppliedLoad: shortstring read FAppliedLoad write FAppliedLoad;
+  property Width: shortstring read FWidth write FWidth;
+  property Height: shortstring read FHeight write FHeight;
+  property Diameter: shortstring read FDiameter write FDiameter;
+  property Thickness: shortstring read FThickness write FThickness;
+  property Poisson: shortstring read FPoisson write FPoisson;
+  property Modulus: shortstring read FModulus write FModulus;
+  property GageLength: shortstring read FGageLength write FGageLength;
+  property GageFactor: shortstring read FGageFactor write FGageFactor;
+  property AvgStrain: shortstring read FAvgStrain write FAvgStrain;
+  property Gradient: shortstring read FGradient write FGradient;
+  property FullSpan: shortstring read FFullSpan write FFullSpan;
+  property TheStringText: shortstring read TheString write TheString;
+end;
+
+(***********************************************)
+(*  Round Shear S- Beam  Form Object           *)
+(***********************************************)
+type
+  TRndSBeamShrFrm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    GroupBox6: TGroupBox;
+    ST_LoadUnit: TLabel;
+    EB_AppliedLoad: TEdit;
+    GroupBox10: TGroupBox;
+    GroupBox8: TGroupBox;
+    EB_Poisson: TEdit;
+    GroupBox7: TGroupBox;
+    Label7: TLabel;
+    Label8: TLabel;
+    Label9: TLabel;
+    Label10: TLabel;
+    ST_WidthUnit: TLabel;
+    ST_DiameterUnit: TLabel;
+    ST_ThickUnit: TLabel;
+    ST_HeightUnit: TLabel;
+    EB_Width: TEdit;
+    EB_Diameter: TEdit;
+    EB_Thickness: TEdit;
+    EB_Height: TEdit;
+    Panel2: TPanel;
+    GroupBox1: TGroupBox;
+    Label18: TLabel;
+    Label3: TLabel;
+    ST_Average: TLabel;
+    Label14: TLabel;
+    Label15: TLabel;
+    ST_ModulusUnit: TLabel;
+    EB_Modulus: TEdit;
+    Label22: TLabel;
+    EB_GageFactor: TEdit;
+    Label23: TLabel;
+    ST_FullSpan: TLabel;
+    Label25: TLabel;
+    BN_Compute: TBitBtn;
+    BN_help: TBitBtn;
+    ST_KgfUnit: TLabel;
+    ST_KGF: TLabel;
+    BN_Print: TBitBtn;
+    Image1: TImage;
+ //   Sheet1: TSheet;
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+{    function Min_Strain : RealType;  ---Removed CSS 12/1/97}
+{    function Max_Strain : RealType;  ---Removed CSS 12/1/97}
+    function Avg_Strain : RealType;
+    function CalculateGradient : RealType;
+    function FullBridgeSensitivity : RealType;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure EB_AppliedLoadExit(Sender: TObject);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_helpClick(Sender: TObject);
+    function CalculateSpan: RealType;
+    function Power(Base: realtype; Exponent: realtype): double;
+  private
+    Old_AppliedLoad     : string;
+    Old_Width           : string;
+    Old_Height          : string;
+    Old_Thickness       : string;
+    Old_Diameter        : string;
+    Old_Poisson         : string;
+    Old_Modulus         : string;
+    Old_GageLength      : string;
+    Old_GageFactor      : string;
+    Old_AvgStrain       : string;
+    Old_Gradient        : string;
+    Old_FullSpan        : string;
+    AvgStrainText       : string;
+    GradientText        : string;
+    SensitiveText       : string;
+    ExceptionRaised     : boolean;
+    IsThereAnError      : boolean;
+    Load                : RealType;
+    ShrWidth            : RealType;
+    ShrHeight           : RealType;
+    ShrThickness        : RealType;
+    ShrDiameter         : RealType;
+    Ratio               : RealType;
+    Elasticity          : RealType;
+    Length              : RealType;
+    Factor              : RealType;
+    EMax                : RealType;
+    EMin                : RealType;
+    EAvg                : RealType;
+    TheGradient         : RealType;
+    FullSensitivity     : RealType;
+  public
+    RndSBeamShearObject  : TRndSBeamShear;
+    RndShrSBeamWebChosen : boolean;
+  end;
+
+var
+  RndSBeamShrFrm: TRndSBeamShrFrm;
+
+implementation
+
+uses MainMenu, Convert, Design;
+
+{$R *.DFM}
+
+(***********************************************)
+(*  Round S Beam Shear Web Object Methods      *)
+(***********************************************)
+
+(***********************************************************************)
+{TRndSBeamShear.create}
+constructor TRndSBeamShear.create;
+begin
+  {...creating object}
+  inherited create;
+  {...associating string with object}
+  TheString := 'Shear - Round S-Beam';
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.destroy}
+destructor TRndSBeamShear.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.GetAsString}
+function TRndSBeamShear.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.ShowTheForm}
+procedure TRndSBeamShear.ShowTheForm;
+begin
+  Application.CreateForm(TRndSBeamShrFrm, RndSBeamShrFrm);
+  RndSBeamShrFrm.showmodal;
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.PrintTheForm}
+procedure TRndSBeamShear.PrintTheForm;
+var
+  Sender : TObject;
+begin
+  Sender := self ;
+  Application.CreateForm(TRndSBeamShrFrm, RndSBeamShrFrm);
+  RndSBeamShrFrm.visible := false;
+  RndSBeamShrFrm.FormActivate(sender);
+  RndSBeamShrFrm.BN_PrintClick(sender);
+  RndSBeamShrFrm.BN_CancelClick(Sender);
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.AssignTo}
+procedure TRndSBeamShear.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TRndSBeamShear) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TRndSBeamShear do begin
+      FAppliedLoad := self.FAppliedLoad;
+      FWidth := self.FWidth;
+      FHeight := self.FHeight;
+      FThickness := self.FThickness;
+      FDiameter := self.FDiameter;
+      FPoisson := self.FPoisson;
+      FModulus := self.FModulus;
+      FGageLength := self.FGageLength;
+      FGageFactor := self.FGageFactor;
+      FAvgStrain :=  self.FAvgStrain;
+      FGradient  := self.FGradient;
+      FFullSpan := self.FFullSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.InitFields}
+procedure TRndSBeamShear.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.SaveToStream}
+procedure TRndSBeamShear.SaveToStream(Stream: TacObjStream);
+var
+  dummy: string;
+begin
+  inherited SaveToStream(Stream);
+  dummy := 'NO DATA';
+  Stream.SaveBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.SaveBuffer(FWidth, sizeof(shortstring));
+  Stream.SaveBuffer(FHeight, sizeof(shortstring));
+  Stream.SaveBuffer(FThickness, sizeof(shortstring));
+  Stream.SaveBuffer(FDiameter, sizeof(shortstring));
+  Stream.SaveBuffer(FPoisson, sizeof(shortstring));
+  Stream.SaveBuffer(FModulus, sizeof(shortstring));
+  Stream.SaveBuffer(dummy, sizeof(shortstring));
+  Stream.SaveBuffer(FGageFactor, sizeof(shortstring));
+  Stream.SaveBuffer(FAvgStrain, sizeof(shortstring));
+  Stream.SaveBuffer(dummy, sizeof(shortstring));
+  Stream.SaveBuffer(FFullSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************************************)
+{TRndSBeamShear.ReadFromStream}
+procedure TRndSBeamShear.ReadFromStream(Stream: TacObjStream);
+var
+  dummy: string;
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.ReadBuffer(FWidth, sizeof(shortstring));
+  Stream.ReadBuffer(FHeight, sizeof(shortstring));
+  Stream.ReadBuffer(FThickness, sizeof(shortstring));
+  Stream.ReadBuffer(FDiameter, sizeof(shortstring));
+  Stream.ReadBuffer(FPoisson, sizeof(shortstring));
+  Stream.ReadBuffer(FModulus, sizeof(shortstring));
+  Stream.ReadBuffer(dummy, sizeof(shortstring));
+  Stream.ReadBuffer(FGageFactor, sizeof(shortstring));
+  Stream.ReadBuffer(FAvgStrain, sizeof(shortstring));
+  Stream.ReadBuffer(dummy, sizeof(shortstring));
+  Stream.ReadBuffer(FFullSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************)
+(*  Round S Beam Shear Web Form Methods        *)
+(***********************************************)
+function TRndSBeamShrFrm.CalculateSpan: RealType; {new 12/1/97 CSS}
+var
+  w  : realtype;
+  F  : realtype;
+  h  : realtype;
+  d  : realtype;
+  t  : realtype;
+  E  : realtype;
+  v  : realtype;
+  Ao : realtype;
+  id : realtype;
+  x  : realtype;
+  Term1 : realtype;
+  Term2 : realtype;
+  dh    : realtype;
+  db    : realtype;
+  dt    : realtype;
+  dh2   : realtype;
+  db2   : realtype;
+  dt2   : realtype;
+  Output : realtype;
+  MaxStress : realtype;
+  MaxStrain : realtype;
+  GageFactor : realtype;
+  Factor1 : realtype;
+  Factor2 : realtype;
+  Flange : realtype;
+  i : realtype;
+begin
+  w  := shrWidth;
+  F  := Load;
+  h  := shrHeight;
+  id  := shrDiameter;
+  t  := shrThickness;
+  E  := Elasticity;
+  v  := Ratio;
+  GageFactor := Factor;
+  {...Calculate Area of Section, Added CSS 12/1/97}
+  d := id / 2;
+  x := h / 2;
+  Flange := (h - id) / 2;
+  Factor1 := Flange * w * (d - 2 * Flange / 2);
+  Factor2 := t * d * (d / 2);
+  i := (w * Power(2*x, 3)) / 12 - (((w - t) * Power(2*d, 3)) / 12);
+  MaxStress := (F * (Factor1 + Factor2)) / (i * t);
+  MaxStrain := MaxStress / E * (2 * (1 + v)) * 1000000 / 2;
+  Output := MaxStrain * GageFactor * 0.001;
+  Result := Output;
+end;
+
+{TRndShrWebfrm.Power}
+function TRndSBeamShrFrm.Power(Base: realtype; Exponent: realtype): double;
+var
+  i : integer;
+begin
+{Returns value calculated from Base^Exponent -- Added CSS 12/1/97}
+  try
+    Result := 0;
+    if (Base <> 0) then begin
+      if ((Base < 0) and (Exponent = Trunc(Exponent))) then begin
+        Result := 1;
+        for i := 1 to Abs(Trunc(Exponent)) do Result := Result * Base;
+        if (Exponent < 0) then Result := 1 / Result;
+      end
+      else Result := exp(ln(Base) * Exponent);
+    end;
+  except
+    Result := 0;
+  end;
+end;
+
+(***********************************************************************)
+(*--------------------------Removed MJB/CSS, 12/1/97
+{ TRndSBeamShrFrm.Min_Strain}
+function TRndSBeamShrFrm.Min_Strain : RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm      : RealType;
+  SecondTerm     : RealType;
+  ThirdTerm      : RealType;
+  StrainResult   : RealType;
+  Button         : integer;
+begin
+  ExceptionRaised := false;
+  try
+    FirstTerm := (3/2) * (Load/(ShrDiameter * ShrThickness)) * ((1 + Ratio)/Elasticity);
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    SecondTerm := (ShrWidth/ShrThickness) * (sqr(ShrHeight)/sqr(ShrDiameter)- 1) +
+                   1 - (4/(3 * sqr(ShrDiameter))) * ((0.7 * Length * length *length)/
+                   (0.7 * length));
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    ThirdTerm := (ShrWidth/ShrThickness) * (((ShrHeight * ShrHeight * ShrHeight)/
+                  (ShrDiameter * ShrDiameter * ShrDiameter)) - 1) + 1;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    StrainResult :=  (FirstTerm * (SecondTerm/ThirdTerm)) *1e6;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  Min_Strain := StrainResult;
+end;
+
+(***********************************************************************)
+(*--------------------------Removed MJB/CSS, 12/1/97
+{ TRndSBeamShrFrm.Max_Strain}
+function TRndSBeamShrFrm.Max_Strain : RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm      : RealType;
+  SecondTerm     : RealType;
+  ThirdTerm      : RealType;
+  StrainResult   : RealType;
+  Button         : integer;
+begin
+  ExceptionRaised := false;
+  try
+    FirstTerm := (3/2) * (Load/(ShrDiameter * ShrThickness)) * ((1 + Ratio)/Elasticity);
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    SecondTerm := (ShrWidth/ShrThickness) * (sqr(ShrHeight)/sqr(ShrDiameter)- 1) +
+                   1 ;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    ThirdTerm := (ShrWidth/ShrThickness) * (((ShrHeight * ShrHeight * ShrHeight)/
+                  (ShrDiameter * ShrDiameter * ShrDiameter)) - 1) + 1;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    StrainResult :=  (FirstTerm * (SecondTerm/ThirdTerm)) *1e6;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  Max_Strain := StrainResult;
+end;
+
+
+(***********************************************************************)
+{ TRndSBeamShrFrm.Avg_Strain}
+function TRndSBeamShrFrm.Avg_Strain : RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm      : RealType;
+  StrainResult   : RealType;
+  Button         : integer;
+begin
+  ExceptionRaised := false;
+(*--------------------------Removed MJB/CSS, 12/1/97
+  try
+    FirstTerm := EMax + EMin;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoAvgStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    StrainResult :=  FirstTerm / 2;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoAvgStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  Avg_Strain := StrainResult;
+-------------------------------------*)
+  Result := CalculateSpan; {Added MJB/CSS}
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.CalculateGradient}
+function TRndSBeamShrFrm.CalculateGradient: RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  GradientResult : RealType;
+  Button         : integer;
+begin
+  Result := 0.0 ;
+  ExceptionRaised := false;
+  try
+    GradientResult := ((EMax - EMin)/EMax) * 100;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoGradient, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  CalculateGradient := GradientResult;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.FullBridgeSensitivity}
+function TRndSBeamShrFrm.FullBridgeSensitivity: RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  SpanResult     : RealType;
+  Button         : integer;
+begin
+  result := 0.0 ;
+  ExceptionRaised := false;
+  try
+    SpanResult := EAvg * Factor * 1e-3;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoFullSpan, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  FullBridgeSensitivity := SpanResult;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.FormCreate}
+procedure TRndSBeamShrFrm.FormCreate(Sender: TObject);
+var
+  LoadUnit      : array[0..MAXTEXTLENGTH-1] of char;
+  DimensionUnit : array[0..MAXTEXTLENGTH-1] of char;
+  ModulusUnit   : array[0..MAXTEXTLENGTH-1] of char;
+begin
+  {...deciding whether to use Std or SI units}
+  if MainForm.UnitsAreUS = true then begin
+    LoadString(hinstance, ID_SZ_USLBF, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_Inches, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_PSI, ModulusUnit, sizeof(ModulusUnit));
+  end
+  else begin
+    LoadString(hinstance, ID_SZ_N, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_MM, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_GPa, ModulusUnit, sizeof(ModulusUnit));
+  end;
+  {...placing units on form}
+  ST_LoadUnit.caption := LoadUnit;
+  ST_WidthUnit.caption := DimensionUnit;
+  ST_HeightUnit.caption := DimensionUnit;
+  ST_ThickUnit.caption := DimensionUnit;
+  ST_DiameterUnit.caption := DimensionUnit;
+  ST_ModulusUnit.caption := ModulusUnit;
+  {ST_LengthUnit.caption := DimensionUnit;  --- Removed CSS 12/1/97}
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.BN_ComputeClick}
+procedure TRndSBeamShrFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINAPPLIEDLOAD_US        = 0.0000;
+  MAXAPPLIEDLOAD_US        = 50000;
+  MINWIDTH_US              = 0.20;
+  MAXWIDTH_US              = 10.0;
+  MINDIAMETER_US           = 0.20;
+  MAXDIAMETER_US           = 10.0;
+  MINTHICKNESS_US          = 0.010;
+  MAXTHICKNESS_US          = 1;
+  MINHEIGHT_US             = 0.20;
+  MAXHEIGHT_US             = 10.0;
+  MINPOISSON_US            = 0.1;
+  MAXPOISSON_US            = 0.4;
+  MINMODULUS_US            = 5000000;
+  MAXMODULUS_US            = 50000000;
+  MINGAGELENGTH_US         = 0.008;
+  MAXGAGELENGTH_US         = 1;
+  MINGAGEFACTOR_US         = 1.0;
+  MAXGAGEFACTOR_US         = 5.0;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH] of char;
+  ErrorUnit        : array[0..MAXERRORLENGTH] of char;
+  ErrorAnd         : array[0..MAXERRORLENGTH] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH] of char;
+  StrUnit          : string;
+  StrAnd           : string;
+  StrMsg           : string;
+  StrMin           : string;
+  strMax           : string;
+  EditStrings      : string;
+  MinAppliedLoad   : RealType;
+  MaxAppliedLoad   : RealType;
+  MinWidth         : RealType;
+  MaxWidth         : RealType;
+  MinDiameter      : RealType;
+  MaxDiameter      : RealType;
+  MinThickness     : RealType;
+  MaxThickness     : RealType;
+  MinHeight        : RealType;
+  MaxHeight        : RealType;
+  MinPoisson       : RealType;
+  MaxPoisson       : RealType;
+  MinModulus       : RealType;
+  MaxModulus       : RealType;
+(*------------Removed MJB/CSS, 12/1/97
+  MinGageLength    : RealType;
+  MaxGageLength    : RealType;
+*)
+  MinGageFactor    : RealType;
+  MaxGageFactor    : RealType;
+  ErrorCode        : integer;
+  Button           : integer;
+begin
+  {...Determining which units to use std. or si for min and max values}
+  if MainForm.UnitsAreUS = True then begin
+    MinAppliedLoad   := MINAPPLIEDLOAD_US;
+    MaxAppliedLoad   := MAXAPPLIEDLOAD_US;
+    MinWidth         := MINWIDTH_US;
+    MaxWidth         := MAXWIDTH_US;
+    MinDiameter      := MINDIAMETER_US;
+    MaxDiameter      := MAXDIAMETER_US;
+    MinThickness     := MINTHICKNESS_US;
+    MaxThickness     := MAXTHICKNESS_US;
+    MinHeight        := MINHEIGHT_US;
+    MaxHeight        := MAXHEIGHT_US;
+    MinPoisson       := MINPOISSON_US;
+    MaxPoisson       := MAXPOISSON_US;
+    MinModulus       := MINMODULUS_US;
+    MaxModulus       := MAXMODULUS_US;
+(*------------Removed MJB/CSS, 12/1/97
+    MinGageLength    := MINGAGELENGTH_US;
+    MaxGageLength    := MAXGAGELENGTH_US;
+*)
+    MinGageFactor    := MINGAGEFACTOR_US;
+    MaxGageFactor    := MAXGAGEFACTOR_US;
+  end
+  else begin
+    MinAppliedLoad   := Lbf_To_N(MINAPPLIEDLOAD_US);
+    MaxAppliedLoad   := Lbf_To_N(MAXAPPLIEDLOAD_US);
+    MinWidth         := Inches_To_mm(MINWIDTH_US);
+    MaxWidth         := Inches_To_mm(MAXWIDTH_US);
+    MinDiameter      := Inches_To_mm(MINDIAMETER_US);
+    MaxDiameter      := Inches_To_mm(MAXDIAMETER_US);
+    MinThickness     := Inches_To_mm(MINTHICKNESS_US);
+    MaxThickness     := Inches_To_mm(MAXTHICKNESS_US);
+    MinHeight        := Inches_To_mm(MINHEIGHT_US);
+    MaxHeight        := Inches_To_mm(MAXHEIGHT_US);
+    MinPoisson       := MINPOISSON_US;
+    MaxPoisson       := MAXPOISSON_US;
+    MinModulus       := PSI_To_GPa(MINMODULUS_US);
+    MaxModulus       := PSI_To_GPa(MAXMODULUS_US);
+(*------------Removed MJB/CSS, 12/1/97
+    MinGageLength    := Inches_To_mm(MINGAGELENGTH_US);
+    MaxGageLength    := Inches_To_mm(MAXGAGELENGTH_US);
+*)
+    MinGageFactor    := MINGAGEFACTOR_US;
+    MaxGageFactor    := MAXGAGEFACTOR_US;
+  end;
+  ST_Average.caption := '';
+  {ST_Gradient.caption := '';  ---Removed CSS 12/1/97}
+  ST_FullSpan.caption := '';
+  {...checking Applied Load to see if valid}
+  IsThereAnError := False;
+  EditStrings := EB_AppliedLoad.text;
+  val(EditStrings, load, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end
+  else if (Load < MinAppliedLoad) or (Load > MaxAppliedLoad) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_USlbf, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_N, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_AppliedLoad, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinAppliedLoad, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxAppliedLoad, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end;
+  {...checking to see if Width is valid}
+  EditStrings := EB_Width.text;
+  val(EditStrings, ShrWidth, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end
+  else if (ShrWidth < MinWidth) or (ShrWidth > MaxWidth) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Width, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinWidth, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxWidth, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end;
+  {...checking Diameter to see if valid}
+  EditStrings := EB_Diameter.text;
+  val(EditStrings, ShrDiameter, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Diameter.setfocus;
+    EB_Diameter.clearselection;
+    exit;
+  end
+  else if (ShrDiameter < MinDiameter) or (ShrDiameter > MaxDiameter) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Diameter, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinDiameter, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxDiameter, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Diameter.setfocus;
+    EB_Diameter.clearselection;
+    exit;
+  end;
+  {...checking Thickness to see if valid}
+  EditStrings := EB_Thickness.text;
+  val(EditStrings, ShrThickness, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Thickness.setfocus;
+    EB_Thickness.clearselection;
+    exit;
+  end
+  else if (ShrThickness < MinThickness) or (ShrThickness > MaxThickness) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_WebThickness, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinThickness, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxThickness, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Thickness.setfocus;
+    EB_Thickness.clearselection;
+    exit;
+  end;
+  {...checking Height to see if valid}
+  EditStrings := EB_Height.text;
+  val(EditStrings, ShrHeight, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Height.setfocus;
+    EB_Height.clearselection;
+    exit;
+  end
+  else if (ShrHeight < MinHeight) or (ShrHeight > MaxHeight) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Height, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinHeight, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxHeight, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Height.setfocus;
+    EB_Height.clearselection;
+    exit;
+  end;
+  {...checking to see if Poisson is valid}
+  EditStrings := EB_Poisson.text;
+  val(EditStrings, Ratio, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end
+  else if (Ratio < MinPoisson) or (Ratio > MaxPoisson) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_Poisson, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinPoisson, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxPoisson, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end;
+  {...checking to see if Modulus value is valid}
+  EditStrings := EB_Modulus.text;
+  val(EditStrings, elasticity, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end
+  else if (elasticity < MinModulus) or (elasticity > MaxModulus) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_PSI, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_GPA, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Modulus, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinModulus, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxModulus, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then begin
+    Elasticity := Elasticity * 1000;
+  end;
+(*------------Removed MJB/CSS, 12/1/97
+  {...checking to see if Gage Length is valid}
+  EditStrings := EB_GageLength.text;
+  val(EditStrings, length, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end
+  else if (length < MinGageLength) or (length > MaxGageLength) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_GageLength, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageLength, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxGageLength, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+------------------------------------------*)
+  {...checking to see if Gage Factor is valid}
+  EditStrings := EB_GageFactor.text;
+  val(EditStrings, Factor, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (Factor < MinGageFactor) or (Factor > MaxGageFactor) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageFactor, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxGageFactor, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  {...checking to ID does not exceed Height}
+  if (ShrDiameter) >= (ShrHeight) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_ShrDiamterBeamHeight, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Height.setfocus;
+    EB_Height.clearselection;
+    exit;
+  end;
+  {...checking to make sure Web Thickness does not exceed beam width}
+  if (ShrThickness) >= (ShrWidth) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_WEbTHickExceedWidth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Thickness.setfocus;
+    EB_Thickness.clearselection;
+    exit;
+  end;
+  (*------------Removed MJB/CSS, 12/1/97
+  {...checking to make sure GL is not greater than Diameter/2}
+  if (Length) > (ShrDiameter/2) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_GLBiggerThanID, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+------------------------------------------*)
+  {...checking to make sure Diameter is less than 75% of Height}
+  if (ShrDiameter/ShrHeight) < 0.70 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_WebDiameterBeamHeight, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Diameter.setfocus;
+    EB_Diameter.clearselection;
+    exit;
+  end;
+  {...doing calculations}
+  if IsThereAnError = False then begin
+(*------------Removed MJB/CSS, 12/1/97
+    {...Minimum Strain}
+    EMin := Min_Strain;
+    if abs(EMin) > 5000 then begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ST_Average.caption := '';
+      ST_Gradient.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    {...Maximum Strain}
+    EMax := Max_Strain;
+    if abs(EMin) > 5000 then begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ST_Average.caption := '';
+      ST_Gradient.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    {...Average Strain}
+    EAvg := Avg_Strain;
+    if ExceptionRaised = false then begin
+      AvgStrainText := floattostrf(EAvg, ffFixed, 4, 0);
+      ST_Average.caption := AvgStrainText;
+    end;
+    {...Gradient}
+    TheGradient := CalculateGradient;
+    if ExceptionRaised = false then begin
+      GradientText := floattostrf(TheGradient, ffFixed, 4, 1);
+      ST_Gradient.caption := GradientText;
+    end;
+-------------------------------------------*)
+
+    {...Full Bridge Sensitivity}
+    {FullSensitivity := FullBridgeSensitivity;  ---Removed CSS}
+    FullSensitivity := CalculateSpan;      {Added CSS, 12/1/97}
+    if ExceptionRaised = false then begin
+      SensitiveText := floattostrf(FullSensitivity, ffFixed, 4, 3);
+      ST_FullSpan.caption := SensitiveText;
+    end;
+    {...Average Strain}
+    EAvg := FullSensitivity / Factor * 1000;
+    if ExceptionRaised = false then begin
+      AvgStrainText := floattostrf(EAvg, ffFixed, 4, 0);
+      ST_Average.caption := AvgStrainText;
+    end;
+    if abs(EAvg) > 1700 then begin
+      LoadString(hinstance, ID_SZ_StrainExceeds1700, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ModalResult := 0;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.BN_CancelClick}
+procedure TRndSBeamShrFrm.BN_CancelClick(Sender: TObject);
+begin
+  {...placing initial values in edit boxes}
+  EB_AppliedLoad.text := Old_AppliedLoad;
+  EB_Width.text := Old_Width;
+  EB_Height.text := Old_Height;
+  EB_Thickness.text := Old_Thickness;
+  EB_Diameter.text := Old_Diameter;
+  EB_Poisson.text := Old_Poisson;
+  EB_Modulus.text := Old_Modulus;
+  {EB_GageLength.text := Old_GageLength;  --- Removed CSS 12/1/97}
+  EB_GageFactor.text := Old_GageFactor;
+  ST_Average.caption := Old_AvgStrain;
+  {ST_Gradient.caption := Old_Gradient;  --- Removed CSS 12/1/97}
+  ST_FullSpan.caption := Old_FullSpan;
+  close;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.FormActivate}
+procedure TRndSBeamShrFrm.FormActivate(Sender: TObject);
+var
+  EditStrings  : string;
+  i            : integer;
+  TheItem      : TacStreamable;
+begin
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TRndSBeamShear then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is an object, then placing values in edit boxes}
+  if TheItem <> nil then begin
+    EB_AppliedLoad.text := (TheItem as TRndSBeamShear).AppliedLoad;
+    EB_Width.text := (TheItem as TRndSBeamShear).Width;
+    EB_Height.text := (TheItem as TRndSBeamShear).Height;
+    EB_Thickness.text := (TheItem as TRndSBeamShear).Thickness;
+    EB_Diameter.text := (TheItem as TRndSBeamShear).Diameter;
+    EB_Poisson.text := (TheItem as TRndSBeamShear).Poisson;
+    EB_Modulus.text := (TheItem as TRndSBeamShear).Modulus;
+    {EB_GageLength.text := (TheItem as TRndSBeamShear).GageLength;  --- Removed CSS 12/1/97}
+    EB_GageFactor.text := (TheItem as TRndSBeamShear).GageFactor;
+    ST_Average.caption := (TheItem as TRndSBeamShear).AvgStrain;
+    {ST_Gradient.caption := (TheItem as TRndSBeamShear).Gradient;  --- Removed CSS 12/1/97}
+    ST_FullSpan.caption := (TheItem as TRndSBeamShear).FullSpan;
+  end;
+  {...placing inital values in old variables in case cancel clicked}
+  Old_AppliedLoad := EB_AppliedLoad.text;
+  Old_Width := EB_Width.text;
+  Old_Height := EB_Height.text;
+  Old_Thickness := EB_Thickness.text;
+  Old_Diameter := EB_Diameter.text;
+  Old_Poisson := EB_Poisson.text;
+  Old_Modulus := EB_Modulus.text;
+  {Old_GageLength := EB_GageLength.text;  --- Removed CSS 12/1/97}
+  Old_GageFactor := EB_GageFactor.text;
+  Old_AvgStrain := ST_Average.caption;
+  {Old_Gradient := ST_Gradient.caption;  --- Removed CSS 12/1/97}
+  Old_FullSpan := ST_FullSpan.caption;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.BN_OKClick}
+procedure TRndSBeamShrFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem : TacStreamable;
+  i       : integer;
+  j       : integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = True then begin
+    exit;
+  end;
+  MainForm.DesignChosen := true;
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TRndSBeamShear then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is an object, then placing values in edit boxes}
+  if TheItem = nil then begin
+    {...creating object and placing values in object}
+    RndSBeamShearObject := TRndSBeamShear.create;
+    RndSBeamShearObject.AppliedLoad := EB_AppliedLoad.text;
+    RndSBeamShearObject.Width := EB_Width.text;
+    RndSBeamShearObject.Height := EB_Height.text;
+    RndSBeamShearObject.Thickness := EB_Thickness.text;
+    RndSBeamShearObject.Diameter := EB_Diameter.text;
+    RndSBeamShearObject.Poisson := EB_Poisson.text;
+    RndSBeamShearObject.Modulus := EB_Modulus.text;
+    {RndSBeamShearObject.GageLength := EB_GageLength.text;  --- Removed CSS 12/1/97}
+    RndSBeamShearObject.GageFactor := EB_GageFactor.text;
+    RndSBeamShearObject.AvgStrain :=  ST_Average.caption;
+    {RndSBeamShearObject.Gradient := ST_Gradient.caption;  --- Removed CSS 12/1/97}
+    RndSBeamShearObject.FullSpan := ST_FullSpan.caption;
+    MainForm.AddToLog(RndSBeamShearObject);
+    j := 0;
+    {...placing string associated with object in outline}
+    repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Design Verification') or (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, RndSBeamShearObject.GetAsString);
+  end
+  else begin
+    (TheItem as TRndSBeamShear).AppliedLoad := EB_AppliedLoad.text;
+    (TheItem as TRndSBeamShear).Width := EB_Width.text;
+    (TheItem as TRndSBeamShear).Height := EB_Height.text;
+    (TheItem as TRndSBeamShear).Thickness := EB_Thickness.text;
+    (TheItem as TRndSBeamShear).Diameter := EB_Diameter.text;
+    (TheItem as TRndSBeamShear).Poisson := EB_Poisson.text;
+    (TheItem as TRndSBeamShear).Modulus := EB_Modulus.text;
+    {(TheItem as TRndSBeamShear).GageLength := EB_GageLength.text;  --- Removed CSS 12/1/97}
+    (TheItem as TRndSBeamShear).GageFactor := EB_GageFactor.text;
+    (TheItem as TRndSBeamShear).AvgStrain :=  ST_Average.caption;
+    {(TheItem as TRndSBeamShear).Gradient := ST_Gradient.caption;  --- Removed CSS 12/1/97}
+    (TheItem as TRndSBeamShear).FullSpan := ST_FullSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.DesignDlgShowing = True then begin
+    DesignDlg.close;
+  end;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.BN_OKClick}
+procedure TRndSBeamShrFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.EB_AppliedLoadExit}
+procedure TRndSBeamShrFrm.EB_AppliedLoadExit(Sender: TObject);
+var
+  ForceUnit  : array[0..MAXTEXTLENGTH-1] of char;
+  ForceText  : string;
+  ForceValue : double;
+  ErrorCode  : integer;
+begin
+  if MainForm.UnitsAreUS = false then begin
+    ForceText := EB_AppliedLoad.text;
+    val(ForceText, ForceValue, ErrorCode);
+    if ErrorCode <> 0 then begin
+      exit;
+    end;
+    ForceValue := ForceValue * 0.101971;
+//    str(ForceValue:4:3, ForceText);
+    ForceText := format('%4.3f',[ForceValue]) ;
+    ST_KGF.caption := ForceText;
+    Loadstring(hinstance, ID_SZ_MetricKg, ForceUnit, sizeof(ForceUnit));
+    ST_KGFUnit.caption := ForceUnit;
+  end
+  else begin
+    St_KGF.caption := '';
+    ST_KGFUnit.caption := '';
+  end;
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.BN_PrintClick}
+procedure TRndSBeamShrFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderPChar   : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderString  : string;
+  DateString    : string;
+  id            : longint;
+  MetaHandle    : Thandle;
+  sserror       : integer;
+begin
+  id := 0;
+  {...clearing sheet for new values}
+ (* SSClearRange(Sheet1.SS, 4, 5, 19, 5, 3);
+  {placing Units on sheet}
+  SSSetActiveCell(Sheet1.SS, 4, 6);
+  Sheet1.text := ST_LoadUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 6, 6);
+  Sheet1.text := ST_WidthUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 7, 6);
+  Sheet1.text := ST_DiameterUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 8, 6);
+  Sheet1.text := ST_ThickUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 9, 6);
+  Sheet1.text := ST_HeightUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 12, 6);
+  Sheet1.text := ST_ModulusUnit.caption;
+{  SSSetActiveCell(Sheet1.SS, 14, 6);  ---Removed CSS 12/1/97
+  Sheet1.text := ST_LengthUnit.caption;}
+  SSSetActiveCell(Sheet1.SS, 4, 5);
+  Sheet1.text := EB_AppliedLoad.text;
+  SSSetActiveCell(Sheet1.SS, 6, 5);
+  Sheet1.text := EB_Width.text;
+  SSSetActiveCell(Sheet1.SS, 7, 5);
+  Sheet1.text := EB_Diameter.text;
+  SSSetActiveCell(Sheet1.SS, 8, 5);
+  Sheet1.text := EB_Thickness.text;
+  SSSetActiveCell(Sheet1.SS, 9, 5);
+  Sheet1.text := EB_Height.text;
+  SSSetActiveCell(Sheet1.SS, 11, 5);
+  Sheet1.text := EB_Poisson.text;
+  SSSetActiveCell(Sheet1.SS, 12, 5);
+  Sheet1.text := EB_Modulus.text;
+{  SSSetActiveCell(Sheet1.SS, 14, 5);  ---Removed CSS 12/1/97
+  Sheet1.text := EB_GageLength.text;}
+  SSSetActiveCell(Sheet1.SS, 14, 5);
+  Sheet1.text := EB_GageFactor.text;
+  SSSetActiveCell(Sheet1.SS, 17, 5);
+  Sheet1.text := ST_Average.caption;
+{  SSSetActiveCell(Sheet1.SS, 19, 5);  ---Removed CSS 12/1/97
+  Sheet1.text := ST_Gradient.caption;}
+  SSSetActiveCell(Sheet1.SS, 18, 5);
+  Sheet1.text := ST_FullSpan.caption;
+  sserror := SSObjNewPicture(Sheet1.ss, 2, 21, 5.57, 30, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+  SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+  DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+  HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+  strpcopy(HeaderPChar, HeaderString);
+  SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+  SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+  SSFilePrint(Sheet1.ss, 0);    *)
+end;
+
+(***********************************************************************)
+{TRndSBeamShrFrm.BN_helpClick}
+procedure TRndSBeamShrFrm.BN_helpClick(Sender: TObject);
+begin
+  Application.HelpContext(1110);
+end;
+
+begin
+  {...registering object}
+  RegisterClasses([TRndSBeamShear]);
+end.
+

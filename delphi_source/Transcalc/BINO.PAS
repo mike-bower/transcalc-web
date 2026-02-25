@@ -1,0 +1,1901 @@
+(* ********************************************** *)
+(* Binocular Bending Beam Unit *)
+(* ********************************************** *)
+unit Bino;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, ExtCtrls, StdCtrls, Buttons, acStream, acList, Log, Logitem,
+  LogStrm, Printers, ShellAPI, ioUtils;
+
+const
+  MAXTEXTLENGTH = 40;
+  MAXERRORLENGTH = 255;
+  ITERATIONS = 1000;
+
+type
+  RealType = double;
+
+  (* ********************************************** *)
+  (* TBinocular Bending Beam Object *)
+  (* ********************************************** *)
+type
+  TBinocularBeam = class(TLogItem)
+  private
+    FAppliedLoad: shortstring;
+    FDistanceHoles: shortstring;
+    FRadius: shortstring;
+    FBeamWidth: shortstring;
+    FBeamHeight: shortstring;
+    FDistanceLoadHole: shortstring;
+    FMinimumThickness: shortstring;
+    FModulus: shortstring;
+    FGageLength: shortstring;
+    FGageFactor: shortstring;
+    FAverage: shortstring;
+    FGradient: shortstring;
+    FFullSpan: shortstring;
+    TheString: shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+    procedure ShowTheForm; override;
+    procedure PrintTheForm; override;
+    function GetAsString: String; override;
+  public
+    constructor create;
+    destructor destroy; override;
+    property AppliedLoad: shortstring read FAppliedLoad write FAppliedLoad;
+    property DistanceHoles: shortstring read FDistanceHoles
+      write FDistanceHoles;
+    property BeamWidth: shortstring read FBeamWidth write FBeamWidth;
+    property BeamHeight: shortstring read FBeamHeight write FBeamHeight;
+    property Radius: shortstring read FRadius write FRadius;
+    property DistanceLoadHole: shortstring read FDistanceLoadHole
+      write FDistanceLoadHole;
+    property MinThickness: shortstring read FMinimumThickness
+      write FMinimumThickness;
+    property Modulus: shortstring read FModulus write FModulus;
+    property GageLength: shortstring read FGageLength write FGageLength;
+    property GageFactor: shortstring read FGageFactor write FGageFactor;
+    property Average: shortstring read FAverage write FAverage;
+    property Gradient: shortstring read FGradient write FGradient;
+    property FullSpan: shortstring read FFullSpan write FFullSpan;
+    property TheStringText: shortstring read TheString write TheString;
+  end;
+
+  (* ********************************************** *)
+  (* Binocular Bending Beam Form Object *)
+  (* ********************************************** *)
+type
+  TBinocularBBFrm = class(TForm)
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    EB_AppliedLoad: TEdit;
+    GroupBox2: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    Label6: TLabel;
+    EB_Radius: TEdit;
+    EB_Width: TEdit;
+    EB_Height: TEdit;
+    EB_MinimumThickness: TEdit;
+    EB_DistanceHoles: TEdit;
+    ST_DistanceHolesUnit: TLabel;
+    ST_RadiusUnit: TLabel;
+    ST_WidthUnit: TLabel;
+    ST_HeightUnit: TLabel;
+    ST_DistanceBeamHoleUnit: TLabel;
+    ST_AppliedLoadUnit: TLabel;
+    GroupBox3: TGroupBox;
+    EB_GageLength: TEdit;
+    ST_GageLengthUnit: TLabel;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    BN_Compute: TBitBtn;
+    Label7: TLabel;
+    Label8: TLabel;
+    EB_GageFactor: TEdit;
+    GroupBox6: TGroupBox;
+    BN_Help: TBitBtn;
+    ST_KGF: TLabel;
+    ST_KGFUnit: TLabel;
+    BN_Print: TBitBtn;
+    Label5: TLabel;
+    ST_ModulusUnits: TLabel;
+    EB_Modulus: TEdit;
+    Image1: TImage;
+    // Sheet1: TSheet;
+    Label9: TLabel;
+    ST_Z: TLabel;
+    ST_ZUnit: TLabel;
+    Label12: TLabel;
+    Bevel1: TBevel;
+    Label17: TLabel;
+    Label18: TLabel;
+    ST_AvgStrain: TLabel;
+    ST_Gradient: TLabel;
+    Label21: TLabel;
+    Label22: TLabel;
+    Label31: TLabel;
+    ST_FullSpan: TLabel;
+    Label32: TLabel;
+    SaveDialogPrint: TSaveDialog;
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function StrainA(var MinA: RealType; var MaxA: RealType; var AvgA: RealType;
+      var Z_Offset: RealType): Boolean;
+    { function StrainA(var MinA: RealType; var MaxA:RealType; var AvgA: RealType): Boolean; }
+    { function StrainB(var MinB: RealType; var MaxB:RealType; var AvgB: RealType): Boolean; }
+    { function StrainC(var MinC: RealType; var MaxC:RealType; var AvgC: RealType): Boolean; }
+    { function StrainD(var MinD: RealType; var MaxD:RealType; var AvgD: RealType): Boolean; }
+    { function CalculateGradientB: RealType; }
+    { function CalculateGradientC: RealType; }
+    { function CalculateGradientD: RealType; }
+    function CalculateGradientA: RealType;
+    function FullBridgeSensitivity: RealType;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure EB_AppliedLoadExit(Sender: TObject);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    { Private declarations }
+    Old_AppliedLoad: string;
+    Old_BeamWidth: string;
+    Old_BeamHeight: string;
+    Old_Radius: string;
+    Old_HoleDistance: string;
+    Old_MinThick: string;
+    Old_LoadHoleDis: string;
+    Old_Modulus: string;
+    Old_GageLength: string;
+    Old_GageFactor: string;
+    Old_AvgStrain: string;
+    Old_Gradient: string;
+    Old_FullSpan: string;
+    AvgStrainText: string;
+    GradientText: string;
+    SensitiveText: string;
+    IsThereAnError: Boolean;
+    ExceptionRaised: Boolean;
+    Load: RealType;
+    HoleDistance: RealType;
+    Width: RealType;
+    Height: RealType;
+    HoleRadius: RealType;
+    LoadHoleDist: RealType;
+    BeamHoleDist: RealType;
+    MinThick: RealType;
+    Elasticity: RealType;
+    Length: RealType;
+    Factor: RealType;
+    GageLengthRange: RealType;
+    K1Value: RealType;
+    K2Value: RealType;
+    XMinValue: RealType;
+    XMaxValue: RealType;
+    EMinA: RealType;
+    EMinB: RealType;
+    EMinC: RealType;
+    EMinD: RealType;
+    EMaxA: RealType;
+    EMaxB: RealType;
+    EMaxC: RealType;
+    EMaxD: RealType;
+    EAvgA: RealType;
+    EAvgB: RealType;
+    EAvgC: RealType;
+    EAvgD: RealType;
+    EAvg: RealType;
+    TheGradientA: RealType;
+    TheGradientB: RealType;
+    TheGradientC: RealType;
+    TheGradientD: RealType;
+    TheGradient: RealType;
+    FullSensitivity: RealType;
+  public
+    { Public declarations }
+    BinocularBeamObject: TBinocularBeam;
+    BinocularChosen: Boolean;
+  end;
+
+var
+  BinocularBBFrm: TBinocularBBFrm;
+
+implementation
+
+uses MainMenu, Convert, Design;
+{$R *.DFM}
+
+(* ********************************************* *)
+(* BinocularBeam Object Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TBinocularBeam.create }
+constructor TBinocularBeam.create;
+begin
+  { ...creating object }
+  inherited create;
+  { ...setting the objects stream so know what kind of object it is when save }
+  TheString := 'Bending - Binocular';
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.create }
+destructor TBinocularBeam.destroy;
+begin
+  { ...destroying object }
+  inherited destroy;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.GetAsString }
+function TBinocularBeam.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.ShowTheForm }
+procedure TBinocularBeam.ShowTheForm;
+begin
+  Application.CreateForm(TBinocularBBFrm, BinocularBBFrm);
+  BinocularBBFrm.showmodal;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.PrintTheForm }
+procedure TBinocularBeam.PrintTheForm;
+var
+  Sender: TObject;
+begin
+  Sender := self;
+  Application.CreateForm(TBinocularBBFrm, BinocularBBFrm);
+  BinocularBBFrm.visible := false;
+  BinocularBBFrm.FormActivate(Sender);
+  BinocularBBFrm.BN_PrintClick(Sender);
+  BinocularBBFrm.BN_CancelClick(Sender);
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.AssignTo }
+procedure TBinocularBeam.AssignTo(Dest: TPersistent);
+begin
+  { ...assigning the object to itself }
+  if (Dest is TBinocularBeam) and (self is Dest.ClassType) then
+  begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TBinocularBeam do
+    begin
+      FAppliedLoad := self.FAppliedLoad;
+      FDistanceHoles := self.FDistanceHoles;
+      FRadius := self.FRadius;
+      FBeamWidth := self.FBeamWidth;
+      FBeamHeight := self.FBeamHeight;
+      FDistanceLoadHole := self.FDistanceLoadHole;
+      FMinimumThickness := self.FMinimumThickness;
+      FModulus := self.FModulus;
+      FGageLength := self.FGageLength;
+      FGageFactor := self.FGageFactor;
+      FAverage := self.FAverage;
+      FGradient := self.FGradient;
+      FFullSpan := self.FFullSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else
+  begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.InitFields }
+procedure TBinocularBeam.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.SaveToStream }
+procedure TBinocularBeam.SaveToStream(Stream: TacObjStream);
+begin
+  { ...procedure for Saving the object the the stream }
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.SaveBuffer(FDistanceHoles, sizeof(shortstring));
+  Stream.SaveBuffer(FRadius, sizeof(shortstring));
+  Stream.SaveBuffer(FBeamWidth, sizeof(shortstring));
+  Stream.SaveBuffer(FBeamHeight, sizeof(shortstring));
+  Stream.SaveBuffer(FDistanceLoadHole, sizeof(shortstring));
+  Stream.SaveBuffer(FMinimumThickness, sizeof(shortstring));
+  Stream.SaveBuffer(FModulus, sizeof(shortstring));
+  Stream.SaveBuffer(FGageLength, sizeof(shortstring));
+  Stream.SaveBuffer(FGageFactor, sizeof(shortstring));
+  Stream.SaveBuffer(FAverage, sizeof(shortstring));
+  Stream.SaveBuffer(FGradient, sizeof(shortstring));
+  Stream.SaveBuffer(FFullSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBeam.ReadFromStream }
+procedure TBinocularBeam.ReadFromStream(Stream: TacObjStream);
+begin
+  { ...Reading object from stream }
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.ReadBuffer(FDistanceHoles, sizeof(shortstring));
+  Stream.ReadBuffer(FRadius, sizeof(shortstring));
+  Stream.ReadBuffer(FBeamWidth, sizeof(shortstring));
+  Stream.ReadBuffer(FBeamHeight, sizeof(shortstring));
+  Stream.ReadBuffer(FDistanceLoadHole, sizeof(shortstring));
+  Stream.ReadBuffer(FMinimumThickness, sizeof(shortstring));
+  Stream.ReadBuffer(FModulus, sizeof(shortstring));
+  Stream.ReadBuffer(FGageLength, sizeof(shortstring));
+  Stream.ReadBuffer(FGageFactor, sizeof(shortstring));
+  Stream.ReadBuffer(FAverage, sizeof(shortstring));
+  Stream.ReadBuffer(FGradient, sizeof(shortstring));
+  Stream.ReadBuffer(FFullSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************* *)
+(* BinocularBeam Form Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.StrainA }
+function TBinocularBBFrm.StrainA(var MinA: RealType; var MaxA: RealType;
+  var AvgA: RealType; var Z_Offset: RealType): Boolean;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  FirstTerm: RealType;
+  SecondTerm: RealType;
+  ThirdTerm: RealType;
+  MinStrainResult: RealType;
+  MaxStrainResult: RealType;
+  AvgStrainResult: RealType;
+  StrainResult: RealType;
+  StrainSum: RealType; { new mjb/css }
+  CurrentXValue: RealType;
+  MinStrainValue: RealType;
+  MaxStrainValue: RealType;
+  Min_X_Strain_A: RealType; { new mjb/css }
+  Max_X_Strain_A: RealType; { new mjb/css }
+  IncrementValue: RealType;
+  IterationCount: integer;
+  Button: integer;
+begin
+  MinStrainResult := 0.0;
+  MaxStrainResult := 0.0;
+  AvgStrainResult := 0.0;
+  Max_X_Strain_A := 0.0;
+  IterationCount := 0;
+  IncrementValue := (XMaxValue - XMinValue) / ITERATIONS;
+  try
+    FirstTerm := Load / (Elasticity * Width);
+    CurrentXValue := XMinValue;
+    { Iterate to find max points }
+    while CurrentXValue <= XMaxValue do
+    begin
+      SecondTerm :=
+        (K1Value / (K2Value - (sqrt(sqr(HoleRadius)) - sqr(CurrentXValue))));
+      ThirdTerm := 3 * ((HoleDistance / 2) + (CurrentXValue)) /
+        sqr(K2Value - sqrt(sqr(HoleRadius) - sqr(CurrentXValue)));
+      StrainResult := (FirstTerm * (SecondTerm + ThirdTerm)) * 1E6;
+      if (StrainResult > MaxStrainResult) or (IterationCount = 0) then
+      begin
+        MaxStrainResult := StrainResult;
+        Max_X_Strain_A := CurrentXValue;
+      end;
+      if (StrainResult < MinStrainResult) or (IterationCount = 0) then
+      begin
+        MinStrainResult := StrainResult;
+        Min_X_Strain_A := CurrentXValue;
+      end;
+      IterationCount := IterationCount + 1;
+      CurrentXValue := CurrentXValue + IncrementValue;
+    end; { while }
+    { ----- }
+    { Iterate second time to find min, max, avg strain }
+    XMinValue := XMinValue + Max_X_Strain_A;
+    XMaxValue := XMaxValue + Max_X_Strain_A;
+    MinStrainResult := 0.0;
+    MaxStrainResult := 0.0;
+    StrainSum := 0;
+    CurrentXValue := XMinValue;
+    IterationCount := 0;
+    while CurrentXValue <= XMaxValue do
+    begin
+      SecondTerm :=
+        (K1Value / (K2Value - (sqrt(sqr(HoleRadius)) - sqr(CurrentXValue))));
+      ThirdTerm := 3 * ((HoleDistance / 2) + (CurrentXValue)) /
+        sqr(K2Value - sqrt(sqr(HoleRadius) - sqr(CurrentXValue)));
+      StrainResult := (FirstTerm * (SecondTerm + ThirdTerm)) * 1E6;
+      StrainSum := StrainSum + StrainResult;
+      if (StrainResult > MaxStrainResult) or (IterationCount = 0) then
+      begin
+        MaxStrainResult := StrainResult;
+      end;
+      if (StrainResult < MinStrainResult) or (IterationCount = 0) then
+      begin
+        MinStrainResult := StrainResult;
+      end;
+      IterationCount := IterationCount + 1;
+      CurrentXValue := CurrentXValue + IncrementValue;
+    end; { while }
+    { ----- }
+    Z_Offset := Max_X_Strain_A;
+    AvgStrainResult := (StrainSum) / ITERATIONS;
+    MinA := MinStrainResult;
+    MaxA := MaxStrainResult;
+    AvgA := abs(AvgStrainResult);
+    Result := false;
+  except
+    on EMathError do
+    begin
+      Result := true;
+      exit;
+    end;
+  end;
+end;
+
+(* ********************************************************************* *)
+
+(* removed CSS, MJB
+
+  { TBinocularBBFrm.StrainB}
+  function TBinocularBBFrm.StrainB(var MinB: RealType; var MaxB:RealType; var AvgB: RealType): Boolean;
+  var
+  ErrorMsg        : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption    : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm       : RealType;
+  SecondTerm      : RealType;
+  ThirdTerm       : RealType;
+  MinStrainResult : RealType;
+  MaxStrainResult : RealType;
+  AvgStrainResult : RealType;
+  StrainResult    : RealType;
+  CurrentXValue   : RealType;
+  MinStrainValue  : RealType;
+  MaxStrainValue  : RealType;
+  Min_X_Strain_B  : RealType;
+  Max_X_Strain_B  : RealType;
+  IncrementValue  : RealType;
+  IterationCount  : integer;
+  Button          : integer;
+  begin
+  MinStrainResult := 0.0;
+  MaxStrainResult := 0.0;
+  AvgStrainResult := 0.0;
+  IterationCount := 0;
+  IncrementValue := (XMaxValue - XMinValue) / ITERATIONS;
+  try
+  FirstTerm := Load /(Elasticity * Width);
+  CurrentXValue := XMinValue;
+  while CurrentXValue <= XMaxValue do begin
+  SecondTerm := (K1Value / (K2Value - (sqrt(sqr(HoleRadius)) - sqr(CurrentXValue))));
+  ThirdTerm := 3 * ((HoleDistance / 2) + (CurrentXValue))/
+  sqr(K2Value - sqrt(sqr(HoleRadius) - sqr(CurrentXValue)));
+  StrainResult :=  (FirstTerm * (SecondTerm - ThirdTerm)) * 1e6;
+  if (StrainResult > MaxStrainResult) or (IterationCount = 0) then begin
+  MaxStrainResult := StrainResult;
+  Max_X_Strain_B := CurrentXValue;
+  end;
+  if (StrainResult < MinStrainResult) or (IterationCount = 0) then begin
+  MinStrainResult := StrainResult;
+  Min_X_Strain_B := CurrentXValue;
+  end;
+  IterationCount := IterationCount + 1;
+  CurrentXValue := CurrentXValue + IncrementValue;
+  end;
+  AvgStrainResult := (MinStrainResult + MaxStrainResult)/2;
+  MinB := MinStrainResult;
+  MaxB := MaxStrainResult;
+  AvgB := abs(AvgStrainResult);
+  Result := false;
+  except
+  on EMathError do begin
+  Result := true;
+  exit;
+  end;
+  end;
+  end;
+*)
+(* ********************************************************************* *)
+{ TBinocularBBFrm.StrainC }
+(* removed mjb
+  function TBinocularBBFrm.StrainC(var MinC: RealType; var MaxC:RealType; var AvgC: RealType): Boolean;
+  var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm      : RealType;
+  SecondTerm     : RealType;
+  ThirdTerm      : RealType;
+  MinStrainResult: RealType;
+  MaxStrainResult: RealType;
+  AvgStrainResult: RealType;
+  StrainResult   : RealType;
+  CurrentXValue  : RealType;
+  MinStrainValue : RealType;
+  MaxStrainValue : RealType;
+  Min_X_Strain_C : RealType;
+  Max_X_Strain_C : RealType;
+  IncrementValue : RealType;
+  IterationCount : integer;
+  Button         : integer;
+  begin
+  MinStrainResult := 0.0;
+  MaxStrainResult := 0.0;
+  AvgStrainResult := 0.0;
+  IterationCount := 0;
+  IncrementValue := (XMaxValue - XMinValue) / ITERATIONS;
+  try
+  FirstTerm := Load / (Elasticity * Width);
+  CurrentXValue := XMinValue;
+  while CurrentXValue <= XMaxValue do begin
+  SecondTerm := (K1Value / (K2Value - (sqrt(sqr(HoleRadius)) - sqr(CurrentXValue))));
+  ThirdTerm := 3 * ((HoleDistance / 2) + (CurrentXValue))/
+  sqr(K2Value - sqrt(sqr(HoleRadius) - sqr(CurrentXValue)));
+  StrainResult :=  (FirstTerm * ((-SecondTerm) - ThirdTerm)) * 1e6;
+  if (StrainResult > MaxStrainResult) or (IterationCount = 0) then begin
+  MaxStrainResult := StrainResult;
+  Max_X_Strain_C := CurrentXValue;
+  end;
+  if (StrainResult < MinStrainResult) or (IterationCount = 0) then begin
+  MinStrainResult := StrainResult;
+  Min_X_Strain_C := CurrentXValue;
+  end;
+  IterationCount := IterationCount + 1;
+  CurrentXValue := CurrentXValue + IncrementValue;
+  end;
+  AvgStrainResult := (MinStrainResult + MaxStrainResult)/2;
+  MinC := MinStrainResult;
+  MaxC := MaxStrainResult;
+  AvgC := abs(AvgStrainResult);
+  Result := false;
+  except
+  on EMathError do begin
+  Result := true;
+  exit;
+  end;
+  end;
+  end;
+*)
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.StrainD }
+(* removed mjb
+  function TBinocularBBFrm.StrainD(var MinD: RealType; var MaxD:RealType; var AvgD: RealType): Boolean;
+  var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm      : RealType;
+  SecondTerm     : RealType;
+  ThirdTerm      : RealType;
+  MinStrainResult: RealType;
+  MaxStrainResult: RealType;
+  AvgStrainResult: RealType;
+  StrainResult   : RealType;
+  CurrentXValue  : RealType;
+  MinStrainValue : RealType;
+  MaxStrainValue : RealType;
+  Min_X_Strain_D : RealType;
+  Max_X_Strain_D : RealType;
+  IncrementValue : RealType;
+  IterationCount : integer;
+  Button         : integer;
+  begin
+  MinStrainResult := 0.0;
+  MaxStrainResult := 0.0;
+  AvgStrainResult := 0.0;
+  IterationCount := 0;
+  IncrementValue := (XMaxValue - XMinValue) / ITERATIONS;
+  try
+  FirstTerm := Load / (Elasticity * Width);
+  CurrentXValue := XMinValue;
+  while CurrentXValue <= XMaxValue do begin
+  SecondTerm := (K1Value / (K2Value - (sqrt(sqr(HoleRadius)) - sqr(CurrentXValue))));
+  ThirdTerm := 3 * ((HoleDistance / 2) + (CurrentXValue))/
+  sqr(K2Value - sqrt(sqr(HoleRadius) - sqr(CurrentXValue)));
+  StrainResult :=  (FirstTerm * ((-SecondTerm) + ThirdTerm)) * 1e6;
+  if (StrainResult > MaxStrainResult) or (IterationCount = 0) then begin
+  MaxStrainResult := StrainResult;
+  Max_X_Strain_D := CurrentXValue;
+  end;
+  if (StrainResult < MinStrainResult) or (IterationCount = 0) then begin
+  MinStrainResult := StrainResult;
+  Min_X_Strain_D := CurrentXValue;
+  end;
+  IterationCount := IterationCount + 1;
+  CurrentXValue := CurrentXValue + IncrementValue;
+  end;
+  AvgStrainResult := (MinStrainResult + MaxStrainResult)/2;
+  MinD := MinStrainResult;
+  MaxD := MaxStrainResult;
+  AvgD := abs(AvgStrainResult);
+  Result := false;
+  except
+  on EMathError do begin
+  Result := true;
+  exit;
+  end;
+  end;
+  end;
+*)
+(* ********************************************************************* *)
+{ TBinocularBBFrm.CalculateGradientA }
+function TBinocularBBFrm.CalculateGradientA: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  Numerator: RealType;
+  Denominator: RealType;
+  GradientResult: RealType;
+  Button: integer;
+begin
+  GradientResult := 0;
+  ExceptionRaised := false;
+  Numerator := EMaxA - EMinA;
+  Denominator := EMaxA;
+  try
+    GradientResult := (Numerator / Denominator);
+  except
+    on EMathError do
+    begin
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateGradientA := abs(GradientResult) * 100;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.CalculateGradientB }
+(* Removed mjb
+  function TBinocularBBFrm.CalculateGradientB: RealType;
+  var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  GradientResult : RealType;
+  Button         : integer;
+  begin
+  ExceptionRaised := false;
+  Numerator := EMaxB - EMinB;
+  Denominator := EMaxB;
+  try
+  GradientResult :=  (Numerator / Denominator);
+  except
+  on EMathError do begin
+  ExceptionRaised := true;
+  end;
+  end;
+  CalculateGradientB := abs(GradientResult) * 100;
+  end;
+
+*)
+(* ********************************************************************* *)
+{ TBinocularBBFrm.CalculateGradientC }
+(* Removed mjb
+  function TBinocularBBFrm.CalculateGradientC: RealType;
+  var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  GradientResult : RealType;
+  Button         : integer;
+  begin
+  ExceptionRaised := false;
+  Numerator := EMaxC - EMinC;
+  Denominator := EMaxC;
+  try
+  GradientResult :=  (Numerator / Denominator);
+  except
+  on EMathError do begin
+  ExceptionRaised := true;
+  end;
+  end;
+  CalculateGradientC := abs(GradientResult) * 100;
+  end;
+*)
+(* ********************************************************************* *)
+{ TBinocularBBFrm.CalculateGradientD }
+(* Removed mjb
+  function TBinocularBBFrm.CalculateGradientD: RealType;
+  var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  GradientResult : RealType;
+  Button         : integer;
+  begin
+  ExceptionRaised := false;
+  Numerator := EMaxD - EMinD;
+  Denominator := EMaxD;
+  try
+  GradientResult :=  (Numerator / Denominator);
+  except
+  on EMathError do begin
+  ExceptionRaised := true;
+  end;
+  end;
+  CalculateGradientD := abs(GradientResult) * 100;
+  end;
+*)
+(* ********************************************************************* *)
+{ TBinocularBBFrm.FullBridgeSensitivity }
+function TBinocularBBFrm.FullBridgeSensitivity: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  Answer: RealType;
+  SpanResult: RealType;
+  Button: integer;
+begin
+  SpanResult := 0;
+  ExceptionRaised := false;
+  try
+    SpanResult := EAvg * Factor * 1E-3;
+    (* removed mjb
+      SpanResult := ((abs(EAvgA) + abs(EAvgB) + abs(EAvgC) + abs(EAvgD))/4) * Factor * 1e-3;}
+    *)
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_NoFullSpan, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  FullBridgeSensitivity := SpanResult;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.FormCreate }
+procedure TBinocularBBFrm.FormCreate(Sender: TObject);
+var
+  LoadUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  DimensionUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  ModulusUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+begin
+  { ...determining whether to place STd or SI values in the Form's units }
+  // Sheet1.visible := false;
+  if MainForm.UnitsAreUS = true then
+  begin
+    LoadString(hinstance, ID_SZ_USLBF, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_Inches, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_PSI, ModulusUnit, sizeof(ModulusUnit));
+  end
+  else
+  begin
+    LoadString(hinstance, ID_SZ_N, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_MM, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_GPa, ModulusUnit, sizeof(ModulusUnit));
+  end;
+  { ...placing the units on the form }
+  ST_AppliedLoadUnit.caption := LoadUnit;
+  ST_DistanceHolesUnit.caption := DimensionUnit;
+  ST_RadiusUnit.caption := DimensionUnit;
+  ST_WidthUnit.caption := DimensionUnit;
+  ST_HeightUnit.caption := DimensionUnit;
+  ST_DistanceBeamHoleUnit.caption := DimensionUnit;
+  ST_ModulusUnits.caption := ModulusUnit;
+  ST_GageLengthUnit.caption := DimensionUnit;
+  ST_ZUnit.caption := DimensionUnit;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.BN_ComputeClick }
+procedure TBinocularBBFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINAPPLIEDLOAD_US = 0.0000;
+  MAXAPPLIEDLOAD_US = 10000;
+  MINDISTBTHOLES_US = 0.10;
+  MAXDISTBTHOLES_US = 50.0;
+  MINRADIUS_US = 0.015;
+  MAXRADIUS_US = 10;
+  MINBEAMWIDTH_US = 0.020;
+  MAXBEAMWIDTH_US = 10;
+  MINBEAMHEIGHT_US = 0.10;
+  MAXBEAMHEIGHT_US = 10;
+  MINTHICKNESS_US = 0.003;
+  MAXTHICKNESS_US = 5.0;
+  MINMODULUS_US = 5000000;
+  MAXMODULUS_US = 50000000;
+  MINGAGELENGTH_US = 0.008;
+  MAXGAGELENGTH_US = 1;
+  MINGAGEFACTOR_US = 1.0;
+  MAXGAGEFACTOR_US = 5.0;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH] of char;
+  ErrorUnit: array [0 .. MAXERRORLENGTH] of char;
+  ErrorAnd: array [0 .. MAXERRORLENGTH] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH] of char;
+  StrUnit: string;
+  StrAnd: string;
+  StrMsg: string;
+  StrMin: string;
+  strMax: string;
+  EditStrings: string;
+  MinAppliedLoad: RealType;
+  MaxAppliedLoad: RealType;
+  MinDistBtHoles: RealType;
+  MaxDistBtHoles: RealType;
+  MinRadius: RealType;
+  MaxRadius: RealType;
+  MinBeamWidth: RealType;
+  MaxBeamWidth: RealType;
+  MinBeamHeight: RealType;
+  MaxBeamHeight: RealType;
+  MinLoadDist: RealType;
+  MaxLoadDist: RealType;
+  MinThickness: RealType;
+  MaxThickness: RealType;
+  MinModulus: RealType;
+  MaxModulus: RealType;
+  MinGageLength: RealType;
+  MaxGageLength: RealType;
+  MinGageFactor: RealType;
+  MaxGageFactor: RealType;
+  MinA: RealType;
+  MaxA: RealType;
+  AvgA: RealType;
+  ZOffset: RealType; { new mjb/css }
+  MinB: RealType;
+  MaxB: RealType;
+  AvgB: RealType;
+  MinC: RealType;
+  MaxC: RealType;
+  AvgC: RealType;
+  MinD: RealType;
+  MaxD: RealType;
+  AvgD: RealType;
+  ErrorCode: integer;
+  Button: integer;
+begin
+  MinA := 0.0;
+  MaxA := 0.0;
+  AvgA := 0.0;
+  MinB := 0.0;
+  MaxB := 0.0;
+  AvgB := 0.0;
+  MinC := 0.0;
+  MaxC := 0.0;
+  AvgC := 0.0;
+  MinD := 0.0;
+  MaxD := 0.0;
+  AvgD := 0.0;
+  { ...Determining which min and max to use std. or si for error checking }
+  if MainForm.UnitsAreUS = true then
+  begin
+    { ...Setting min and max to Standard units }
+    MinAppliedLoad := MINAPPLIEDLOAD_US;
+    MaxAppliedLoad := MAXAPPLIEDLOAD_US;
+    MinDistBtHoles := MINDISTBTHOLES_US;
+    MaxDistBtHoles := MAXDISTBTHOLES_US;
+    MinRadius := MINRADIUS_US;
+    MaxRadius := MAXRADIUS_US;
+    MinBeamWidth := MINBEAMWIDTH_US;
+    MaxBeamWidth := MAXBEAMWIDTH_US;
+    MinBeamHeight := MINBEAMHEIGHT_US;
+    MaxBeamHeight := MAXBEAMHEIGHT_US;
+    MinThickness := MINTHICKNESS_US;
+    MaxThickness := MAXTHICKNESS_US;
+    MinModulus := MINMODULUS_US;
+    MaxModulus := MAXMODULUS_US;
+    MinGageLength := MINGAGELENGTH_US;
+    MaxGageLength := MAXGAGELENGTH_US;
+    MinGageFactor := MINGAGEFACTOR_US;
+    MaxGageFactor := MAXGAGEFACTOR_US;
+  end
+  else
+  begin
+    { ...setting min and max to Metric units(SI) }
+    MinAppliedLoad := Lbf_To_N(MINAPPLIEDLOAD_US);
+    MaxAppliedLoad := Lbf_To_N(MAXAPPLIEDLOAD_US);
+    MinDistBtHoles := Inches_To_mm(MINDISTBTHOLES_US);
+    MaxDistBtHoles := Inches_To_mm(MAXDISTBTHOLES_US);
+    MinRadius := Inches_To_mm(MINRADIUS_US);
+    MaxRadius := Inches_To_mm(MAXRADIUS_US);
+    MinBeamWidth := Inches_To_mm(MINBEAMWIDTH_US);
+    MaxBeamWidth := Inches_To_mm(MAXBEAMWIDTH_US);
+    MinBeamHeight := Inches_To_mm(MINBEAMHEIGHT_US);
+    MaxBeamHeight := Inches_To_mm(MAXBEAMHEIGHT_US);
+    MinThickness := Inches_To_mm(MINTHICKNESS_US);
+    MaxThickness := Inches_To_mm(MAXTHICKNESS_US);
+    MinModulus := PSI_To_GPa(MINMODULUS_US);
+    MaxModulus := PSI_To_GPa(MAXMODULUS_US);
+    MinGageLength := Inches_To_mm(MINGAGELENGTH_US);
+    MaxGageLength := Inches_To_mm(MAXGAGELENGTH_US);
+    MinGageFactor := MINGAGEFACTOR_US;
+    MaxGageFactor := MAXGAGEFACTOR_US;
+  end;
+  ST_AvgStrain.caption := '';
+  ST_Gradient.caption := '';
+  ST_FullSpan.caption := '';
+  IsThereAnError := false;
+  { ...checking Applied Load to see if valid }
+  EditStrings := EB_AppliedLoad.text;
+  StrVal(EditStrings, Load, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end
+  else if (Load < MinAppliedLoad) or (Load > MaxAppliedLoad) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_USLBF, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_N, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_AppliedLoad, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinAppliedLoad, ffFixed, 8, 3);
+    strMax := floattostrf(MaxAppliedLoad, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end;
+  { ...checking Distance between Gage CLs to see if valid }
+  EditStrings := EB_DistanceHoles.text;
+  StrVal(EditStrings, HoleDistance, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_DistanceHoles.setfocus;
+    EB_DistanceHoles.clearselection;
+    exit;
+  end
+  else if (HoleDistance < MinDistBtHoles) or (HoleDistance > MaxDistBtHoles)
+  then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_DistBtHoles, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinDistBtHoles, ffFixed, 8, 3);
+    strMax := floattostrf(MaxDistBtHoles, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_DistanceHoles.setfocus;
+    EB_DistanceHoles.clearselection;
+    exit;
+  end;
+  { ..checking Radius to see if valid }
+  EditStrings := EB_Radius.text;
+  StrVal(EditStrings, HoleRadius, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Radius.setfocus;
+    EB_Radius.clearselection;
+    exit;
+  end
+  else if (HoleRadius < MinRadius) or (HoleRadius > MaxRadius) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Radius, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRadius, ffFixed, 8, 3);
+    strMax := floattostrf(MaxRadius, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Radius.setfocus;
+    EB_Radius.clearselection;
+    exit;
+  end;
+  { ..checking Beam Width to see if valid }
+  EditStrings := EB_Width.text;
+  StrVal(EditStrings, Width, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end
+  else if (Width < MinBeamWidth) or (Width > MaxBeamWidth) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_BeamWidth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinBeamWidth, ffFixed, 8, 3);
+    strMax := floattostrf(MaxBeamWidth, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end;
+  { ..checking Beam Height to see if valid }
+  EditStrings := EB_Height.text;
+  StrVal(EditStrings, Height, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Height.setfocus;
+    EB_Height.clearselection;
+    exit;
+  end
+  else if (Height < MinBeamHeight) or (Height > MaxBeamHeight) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_BeamHeight, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinBeamHeight, ffFixed, 8, 3);
+    strMax := floattostrf(MaxBeamHeight, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Height.setfocus;
+    EB_Height.clearselection;
+    exit;
+  end;
+  { ..checking Load to Hole Distance to see if valid }
+  { Set this value to Zero per JRW }
+  LoadHoleDist := 0.0;
+  { ..checking Minimum Thickness to see if valid }
+  EditStrings := EB_MinimumThickness.text;
+  StrVal(EditStrings, MinThick, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_MinimumThickness.setfocus;
+    EB_MinimumThickness.clearselection;
+    exit;
+  end
+  else if (MinThick < MinThickness) or (MinThick > MaxThickness) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_MinThickness, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinThickness, ffFixed, 8, 3);
+    strMax := floattostrf(MaxThickness, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_MinimumThickness.setfocus;
+    EB_MinimumThickness.clearselection;
+    exit;
+  end;
+  { ...checking to see if Modulus value is valid }
+  EditStrings := EB_Modulus.text;
+  StrVal(EditStrings, Elasticity, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end
+  else if (Elasticity < MinModulus) or (Elasticity > MaxModulus) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_PSI, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_GPa, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Modulus, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinModulus, ffFixed, 8, 3);
+    strMax := floattostrf(MaxModulus, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then
+  begin
+    Elasticity := Elasticity * 1000;
+  end;
+  { ...checking to see if Gage Length is valid }
+  EditStrings := EB_GageLength.text;
+  StrVal(EditStrings, Length, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end
+  else if (Length < MinGageLength) or (Length > MaxGageLength) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_GageLength, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageLength, ffFixed, 8, 3);
+    strMax := floattostrf(MaxGageLength, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+  { ...checking to see if Gage Factor is valid }
+  EditStrings := EB_GageFactor.text;
+  StrVal(EditStrings, Factor, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (Factor < MinGageFactor) or (Factor > MaxGageFactor) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageFactor, ffFixed, 8, 1);
+    strMax := floattostrf(MaxGageFactor, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  GageLengthRange := Length / 2;
+  { ...checking to make sure Height is not less than 2r + 2t }
+  if Height < (2 * HoleRadius + 2 * MinThick) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_HeightRadiusThick, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Height.setfocus;
+    EB_Height.clearselection;
+    exit;
+  end;
+  { ...checking to make sure Gage Length squared is not greater than Radius squared }
+  if sqr(GageLengthRange) > sqr(HoleRadius) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageLengthVsRadius, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+  { ...calculating g (Beam Hole Distance) for the calculations }
+  BeamHoleDist := (Height / 2) - (HoleRadius + MinThick);
+  { ...checking to make sure 2G + 2R is not greater than Height }
+  if (2 * BeamHoleDist + 2 * HoleRadius) >= Height then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_HoleExceedsHeight, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_MinimumThickness.setfocus;
+    EB_MinimumThickness.clearselection;
+    exit;
+  end;
+  { ...checking to make sure Length/Width > 2 }
+  if (HoleDistance / Width) < 2 then
+  begin
+    LoadString(hinstance, ID_SZ_LDivWLessThan2, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+  end;
+  { ...checking to make sure Height/Width is not less than 5 }
+  if (Height / Width) > 5 then
+  begin
+    LoadString(hinstance, ID_SZ_HDivWLessThan5, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+  end;
+  { ...finding Min and Max value of gage length for iteration range }
+  XMinValue := -(GageLengthRange);
+  XMaxValue := GageLengthRange;
+  { ...Calculating K1 and K2 values for equations }
+  try
+    K1Value :=
+      (LoadHoleDist / (Height - ((Height - (2 * HoleRadius) -
+      (2 * BeamHoleDist)) / 2)));
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    K2Value := ((Height / 2) - (BeamHoleDist));
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  { ...doing calculations }
+  if IsThereAnError = false then
+  begin
+    { ...Strains A }
+    ExceptionRaised := StrainA(MinA, MaxA, AvgA, ZOffset);
+    if ExceptionRaised = false then
+    begin
+      EMinA := MinA;
+      EMaxA := MaxA;
+      EAvgA := AvgA;
+    end;
+    (* removed mjb
+      {...Strains B}
+      ExceptionRaised := StrainB(MinB, MaxB, AvgB);
+      if ExceptionRaised = false then begin
+      EMinB := MinB;
+      EMaxB := MaxB;
+      EAvgB := AvgB;
+      end;
+      {...Strains C}
+      ExceptionRaised := StrainC(MinC, MaxC, AvgC);
+      if ExceptionRaised = false then begin
+      EMinC := MinC;
+      EMaxC := MaxC;
+      EAvgC := AvgC;
+      end;
+      {...Strains D}
+      ExceptionRaised := StrainD(MinD, MaxD, AvgD);
+      if ExceptionRaised = false then begin
+      EMinD := MinD;
+      EMaxD := MaxD;
+      EAvgD := AvgD;
+      end;
+    *)
+    if ExceptionRaised = false then
+    begin
+      try
+        EAvg := EAvgA;
+        (* removed mjb
+          EAvg := (EAvgA + EAvgB + EAvgC + EAvgD) / 4;
+        *)
+      except
+        on EMathError do
+        begin
+          LoadString(hinstance, ID_SZ_NoAvgStrain, ErrorMsg, sizeof(ErrorMsg));
+          LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+            sizeof(ErrorCaption));
+          Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+            mb_OK or mb_IconExclamation);
+          exit;
+        end;
+      end;
+      if abs(EAvg) > 5000 then
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ST_AvgStrain.caption := '';
+        ST_Gradient.caption := '';
+        ST_FullSpan.caption := '';
+        exit;
+      end
+      else
+      begin
+        AvgStrainText := floattostrf(EAvg, ffFixed, 4, 0);
+        ST_AvgStrain.caption := AvgStrainText;
+      end;
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ST_AvgStrain.caption := '';
+    end;
+    { ...Gradient A }
+    TheGradientA := CalculateGradientA;
+    (* removed mjb
+      {...Gradient B}
+      TheGradientB := CalculateGradientB;
+      {...Gradient C}
+      TheGradientC := CalculateGradientC;
+      {...Gradient D}
+      TheGradientD := CalculateGradientD;
+    *)
+    if ExceptionRaised = false then
+    begin
+      try
+        (*
+          TheGradient := (TheGradientA + TheGradientB + TheGradientC + TheGradientD)/4;
+        *)
+        TheGradient := TheGradientA;
+      except
+        on EMathError do
+        begin
+          LoadString(hinstance, ID_SZ_NoGradient, ErrorMsg, sizeof(ErrorMsg));
+          LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+            sizeof(ErrorCaption));
+          Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+            mb_OK or mb_IconExclamation);
+          exit;
+        end;
+      end;
+      GradientText := floattostrf(TheGradient, ffFixed, 4, 1);
+      ST_Gradient.caption := GradientText;
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_NoGradient, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ST_Gradient.caption := '';
+    end;
+    { ...Full Bridge Sensitivity }
+    FullSensitivity := FullBridgeSensitivity;
+    if ExceptionRaised = false then
+    begin
+      SensitiveText := floattostrf(FullSensitivity, ffFixed, 4, 3);
+      ST_FullSpan.caption := SensitiveText;
+    end
+    else
+    begin
+      ST_FullSpan.caption := '';
+    end;
+    if abs(EAvg) > 1700 then
+    begin
+      LoadString(hinstance, ID_SZ_StrainExceeds1700, ErrorMsg,
+        sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ModalResult := 0;
+    end;
+    ST_Z.caption := floattostrf(HoleDistance + (ZOffset * 2), ffFixed, 10, 2);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.BN_CancelClick }
+procedure TBinocularBBFrm.BN_CancelClick(Sender: TObject);
+begin
+  EB_AppliedLoad.text := Old_AppliedLoad;
+  EB_DistanceHoles.text := Old_HoleDistance;
+  EB_Radius.text := Old_Radius;
+  EB_Width.text := Old_BeamWidth;
+  EB_Height.text := Old_BeamHeight;
+  EB_MinimumThickness.text := Old_MinThick;
+  EB_Modulus.text := Old_Modulus;
+  EB_GageLength.text := Old_GageLength;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_AvgStrain.caption := Old_AvgStrain;
+  ST_Gradient.caption := Old_Gradient;
+  ST_FullSpan.caption := Old_FullSpan;
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.FormActivate }
+procedure TBinocularBBFrm.FormActivate(Sender: TObject);
+var
+  EditStrings: string;
+  i: integer;
+  TheItem: TacStreamable;
+begin
+  { ...getting item from object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TBinocularBeam then
+    begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  { ...putting the item in the edit boxes if there is one }
+  if TheItem <> nil then
+  begin
+    EB_AppliedLoad.text := (TheItem as TBinocularBeam).AppliedLoad;
+    EB_DistanceHoles.text := (TheItem as TBinocularBeam).DistanceHoles;
+    EB_Radius.text := (TheItem as TBinocularBeam).Radius;
+    EB_Width.text := (TheItem as TBinocularBeam).BeamWidth;
+    EB_Height.text := (TheItem as TBinocularBeam).BeamHeight;
+    { EB_DistanceLoadHole.text := (TheItem as TBinocularBeam).DistanceLoadHole; }
+    EB_MinimumThickness.text := (TheItem as TBinocularBeam).MinThickness;
+    EB_Modulus.text := (TheItem as TBinocularBeam).Modulus;
+    EB_GageLength.text := (TheItem as TBinocularBeam).GageLength;
+    EB_GageFactor.text := (TheItem as TBinocularBeam).GageFactor;
+    (* Removed CSS
+      ST_AvgStrain.caption := (TheItem as TBinocularBeam).Average;
+      ST_Gradient.caption := (TheItem as TBinocularBeam).Gradient;
+      ST_FullSpan.caption := (TheItem as TBinocularBeam).FullSpan;
+    *)
+    BN_ComputeClick(Sender); { Added CSS -- calculates Z for compatibility }
+  end;
+  { ...Placing values in the other old values in case the cancel button is clicked then
+    the old values are placed in the edit boxes }
+  Old_AppliedLoad := EB_AppliedLoad.text;
+  Old_HoleDistance := EB_DistanceHoles.text;
+  Old_Radius := EB_Radius.text;
+  Old_BeamWidth := EB_Width.text;
+  Old_BeamHeight := EB_Height.text;
+  Old_MinThick := EB_MinimumThickness.text;
+  Old_Modulus := EB_Modulus.text;
+  Old_GageLength := EB_GageLength.text;
+  Old_GageLength := EB_GageLength.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_AvgStrain := ST_AvgStrain.caption;
+  Old_Gradient := ST_Gradient.caption;
+  Old_FullSpan := ST_FullSpan.caption;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.BN_OKClick }
+procedure TBinocularBBFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem: TacStreamable;
+  i: integer;
+  j: integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = true then
+  begin
+    exit;
+  end;
+  MainForm.DesignChosen := true;
+  { ...getting item from object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TBinocularBeam then
+    begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  { ...putting the item in the edit boxes if there is one }
+  if TheItem = nil then
+  begin
+    { ...placing the values in the object when the OK button is clicked }
+    BinocularBeamObject := TBinocularBeam.create;
+    BinocularBeamObject.AppliedLoad := EB_AppliedLoad.text;
+    BinocularBeamObject.DistanceHoles := EB_DistanceHoles.text;
+    BinocularBeamObject.Radius := EB_Radius.text;
+    BinocularBeamObject.BeamWidth := EB_Width.text;
+    BinocularBeamObject.BeamHeight := EB_Height.text;
+    BinocularBeamObject.MinThickness := EB_MinimumThickness.text;
+    BinocularBeamObject.Modulus := EB_Modulus.text;
+    BinocularBeamObject.GageLength := EB_GageLength.text;
+    BinocularBeamObject.GageFactor := EB_GageFactor.text;
+    BinocularBeamObject.Average := ST_AvgStrain.caption;
+    BinocularBeamObject.Gradient := ST_Gradient.caption;
+    BinocularBeamObject.FullSpan := ST_FullSpan.caption;
+    MainForm.AddToLog(BinocularBeamObject);
+    { ...placing the Binocular beam string in the outline }
+    i := 0;
+    repeat
+      inc(i);
+    until (MainForm.XCalcOutline.Items[i].text = 'Design Verification') or
+      (i > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(i, BinocularBeamObject.GetAsString);
+  end
+  else
+  begin
+    (TheItem as TBinocularBeam).AppliedLoad := EB_AppliedLoad.text;
+    (TheItem as TBinocularBeam).DistanceHoles := EB_DistanceHoles.text;
+    (TheItem as TBinocularBeam).Radius := EB_Radius.text;
+    (TheItem as TBinocularBeam).BeamWidth := EB_Width.text;
+    (TheItem as TBinocularBeam).BeamHeight := EB_Height.text;
+    (TheItem as TBinocularBeam).MinThickness := EB_MinimumThickness.text;
+    (TheItem as TBinocularBeam).Modulus := EB_Modulus.text;
+    (TheItem as TBinocularBeam).GageLength := EB_GageLength.text;
+    (TheItem as TBinocularBeam).GageFactor := EB_GageFactor.text;
+    (TheItem as TBinocularBeam).Average := ST_AvgStrain.caption;
+    (TheItem as TBinocularBeam).Gradient := ST_Gradient.caption;
+    (TheItem as TBinocularBeam).FullSpan := ST_FullSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.DesignDlgShowing = true then
+  begin
+    DesignDlg.close;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.FormClose }
+procedure TBinocularBBFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.EB_AppliedLoadExit }
+procedure TBinocularBBFrm.EB_AppliedLoadExit(Sender: TObject);
+var
+  ForceUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  ForceText: string;
+  ForceValue: double;
+  ErrorCode: integer;
+begin
+  if MainForm.UnitsAreUS = false then
+  begin
+    ForceText := EB_AppliedLoad.text;
+
+    StrVal(ForceText, ForceValue, ErrorCode);
+    if ErrorCode <> 0 then
+    begin
+      exit;
+    end;
+    ForceValue := ForceValue * 0.101971;
+    // str(ForceValue:4:3, ForceText);
+    ForceText := format('%4.3f', [ForceValue]);
+    ST_KGF.caption := ForceText;
+    LoadString(hinstance, ID_SZ_MetricKg, ForceUnit, sizeof(ForceUnit));
+    ST_KGFUnit.caption := ForceUnit;
+  end
+  else
+  begin
+    ST_KGF.caption := '';
+    ST_KGFUnit.caption := '';
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.BN_PrintClick }
+procedure TBinocularBBFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderPChar: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderString: string;
+  DateString: string;
+  id: longint;
+  MetaHandle: Thandle;
+  sserror: integer;
+  htmlText: string;
+  Stream: tResourceStream;
+  strstream: tStringStream;
+
+begin
+  Stream := tResourceStream.create(hinstance, 'Bino', RT_RCDATA);
+  strstream := tStringStream.create();
+
+  try
+    strstream.LoadFromStream(Stream);
+    htmlText := strstream.DataString;
+  finally
+    strstream.Free();
+    Stream.Free();
+  end;
+
+  htmlText := StringReplace(htmlText, '$af2', ST_AppliedLoadUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$cl2', ST_DistanceHolesUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rad2', ST_RadiusUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bw2', ST_WidthUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bh2', ST_HeightUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$mt2', ST_DistanceBeamHoleUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$me2', ST_ModulusUnits.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gl2', ST_GageLengthUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+
+  htmlText := StringReplace(htmlText, '$af1', EB_AppliedLoad.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$cl1', EB_DistanceHoles.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rad1', EB_Radius.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bw1', EB_Width.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bh1', EB_Height.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$mt1', EB_MinimumThickness.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$me1', EB_Modulus.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gl1', EB_GageLength.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gf1', EB_GageFactor.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gs1', ST_AvgStrain.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gc1', ST_Z.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gcu1', ST_ZUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sv1', ST_Gradient.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sf1', ST_FullSpan.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  SaveDialogPrint.FileName := '';
+  SaveDialogPrint.InitialDir := tPath.GetDocumentsPath;
+  if SaveDialogPrint.Execute
+  then
+  begin
+    tfile.writeAllText(SaveDialogPrint.FileName, htmlText);
+    ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName), nil, nil,
+      SW_SHOWNORMAL);
+  end;
+
+  { ...clearing sheet for new values }
+  (* SSClearRange(Sheet1.SS, 4, 5, 19, 5, 3);
+    {placing Units on sheet}
+    SSSetActiveCell(Sheet1.SS, 4, 6);
+    Sheet1.text := ST_AppliedLoadUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 6, 6);
+    Sheet1.text := ST_DistanceHolesUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 7, 6);
+    Sheet1.text := ST_RadiusUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 8, 6);
+    Sheet1.text := ST_WidthUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 9, 6);
+    Sheet1.text := ST_HeightUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 10, 6);
+    Sheet1.text := ST_DistanceBeamHoleUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 11, 6);
+    Sheet1.text := ST_ModulusUnits.caption;
+    SSSetActiveCell(Sheet1.SS, 13, 6);
+    Sheet1.text := ST_GageLengthUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 18, 6);
+    Sheet1.text := ST_ZUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 4, 5);
+    Sheet1.text := EB_AppliedLoad.text;
+    SSSetActiveCell(Sheet1.SS, 6, 5);
+    Sheet1.text := EB_DistanceHoles.text;
+    SSSetActiveCell(Sheet1.SS, 7, 5);
+    Sheet1.text := EB_Radius.text;
+    SSSetActiveCell(Sheet1.SS, 8, 5);
+    Sheet1.text := EB_Width.text;
+    SSSetActiveCell(Sheet1.SS, 9, 5);
+    Sheet1.text := EB_Height.text;
+    SSSetActiveCell(Sheet1.SS, 10, 5);
+    Sheet1.text := EB_MinimumThickness.text;
+    SSSetActiveCell(Sheet1.SS, 11, 5);
+    Sheet1.text := EB_Modulus.text;
+    SSSetActiveCell(Sheet1.SS, 13, 5);
+    Sheet1.text := EB_GageLength.text;
+    SSSetActiveCell(Sheet1.SS, 14, 5);
+    Sheet1.text := EB_GageFactor.text;
+    SSSetActiveCell(Sheet1.SS, 18, 5);
+    Sheet1.text := ST_Z.caption;
+    SSSetActiveCell(Sheet1.SS, 19, 5);
+    Sheet1.text := ST_AvgStrain.caption;
+    SSSetActiveCell(Sheet1.SS, 20, 5);
+    Sheet1.text := ST_Gradient.caption;
+    SSSetActiveCell(Sheet1.SS, 21, 5);
+    Sheet1.text := ST_FullSpan.caption;
+    sserror := SSObjNewPicture(Sheet1.ss, 2, 22, 5.57, 30, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+    SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+    DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+    HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+    strpcopy(HeaderPChar, HeaderString);
+    SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+    SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+    SSFilePrint(Sheet1.ss, 0); *)
+end;
+
+(* ********************************************************************* *)
+{ TBinocularBBFrm.BN_HelpClick }
+procedure TBinocularBBFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(1040);
+end;
+
+begin
+  { ...Registering the object }
+  RegisterClasses([TBinocularBeam]);
+
+end.

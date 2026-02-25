@@ -1,0 +1,1365 @@
+(* *********************************************************************** *)
+(* S Bending Beam Unit *)
+(* 5/21/97 Fixed Error In Print Function- putting units on Gage Factor *)
+(* instead of Gage Length. *)
+(* *********************************************************************** *)
+unit Sbbeam;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons, acStream, acList, Log, Logitem, LogStrm,
+  Printers, ShellAPI, ioUtils, Vcl.Dialogs;
+
+const
+  MAXTEXTLENGTH = 40;
+  MAXERRORLENGTH = 255;
+
+type
+  RealType = double;
+
+  (* ********************************************* *)
+  (* S Bending Beam Object *)
+  (* ********************************************* *)
+type
+  TSBendingBeam = class(TLogItem)
+  private
+    FAppliedLoad: shortstring;
+    FRadius: shortstring;
+    FBeamWidth: shortstring;
+    FThickness: shortstring;
+    FGageDistance: shortstring;
+    FModulus: shortstring;
+    FGageLength: shortstring;
+    FGageFactor: shortstring;
+    FAvgStrain: shortstring;
+    FGradient: shortstring;
+    FFullSpan: shortstring;
+    TheString: shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+    procedure ShowTheForm; override;
+    procedure PrintTheForm; override;
+    function GetAsString: String; override;
+  public
+    constructor create;
+    destructor destroy; override;
+    property AppliedLoad: shortstring read FAppliedLoad write FAppliedLoad;
+    property Radius: shortstring read FRadius write FRadius;
+    property BeamWidth: shortstring read FBeamWidth write FBeamWidth;
+    property Thickness: shortstring read FThickness write FThickness;
+    property GageDistance: shortstring read FGageDistance write FGageDistance;
+    property Modulus: shortstring read FModulus write FModulus;
+    property GageLength: shortstring read FGageLength write FGageLength;
+    property GageFactor: shortstring read FGageFactor write FGageFactor;
+    property AvgStrain: shortstring read FAvgStrain write FAvgStrain;
+    property Gradient: shortstring read FGradient write FGradient;
+    property FullSpan: shortstring read FFullSpan write FFullSpan;
+    property TheStringText: shortstring read TheString write TheString;
+  end;
+
+  (* ********************************************* *)
+  (* S Bending Beam Form Object *)
+  (* ********************************************* *)
+type
+  TSBeamBBFrm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    EB_AppliedLoad: TEdit;
+    GroupBox2: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    EB_Radius: TEdit;
+    EB_Thickness: TEdit;
+    EB_GageDistance: TEdit;
+    Panel3: TPanel;
+    GroupBox5: TGroupBox;
+    Label7: TLabel;
+    Label8: TLabel;
+    ST_Average: TLabel;
+    ST_Gradient: TLabel;
+    Label11: TLabel;
+    Label12: TLabel;
+    ST_LoadUnit: TLabel;
+    ST_RadiusUnit: TLabel;
+    ST_WidthUnit: TLabel;
+    ST_ThicknessUnit: TLabel;
+    ST_DistanceUnit: TLabel;
+    EB_BeamWidth: TEdit;
+    GroupBox4: TGroupBox;
+    ST_LengthUnit: TLabel;
+    EB_GageLength: TEdit;
+    Label16: TLabel;
+    Label17: TLabel;
+    Label18: TLabel;
+    ST_FullSpan: TLabel;
+    Label20: TLabel;
+    EB_GageFactor: TEdit;
+    BN_Compute: TBitBtn;
+    BN_Help: TBitBtn;
+    ST_KGF: TLabel;
+    ST_KGFUnit: TLabel;
+    BN_Print: TBitBtn;
+    Label5: TLabel;
+    ST_ModulusUnits: TLabel;
+    EB_Modulus: TEdit;
+    Image1: TImage;
+    SaveDialogPrint: TSaveDialog;
+    // Sheet1: TSheet;
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function TheStrain(var Min: RealType; var Max: RealType;
+      var Avg: RealType): Boolean;
+    function Gradient: RealType;
+    function FullSpan: RealType;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure EB_AppliedLoadExit(Sender: TObject);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    Old_AppliedLoad: string;
+    Old_Radius: string;
+    Old_BeamWidth: string;
+    Old_Thickness: string;
+    Old_GageDistance: string;
+    Old_Modulus: string;
+    Old_GageLength: string;
+    Old_GageFactor: string;
+    Old_AvgStrain: string;
+    Old_Gradient: string;
+    Old_FullSpan: string;
+    AvgStrainText: string;
+    GradientText: string;
+    SensitiveText: string;
+    IsThereAnError: Boolean;
+    ExceptionRaised: Boolean;
+    K1Value: RealType;
+    K2Value: RealType;
+    XMinValue: RealType;
+    XMaxValue: RealType;
+    Load: RealType;
+    HoleRadius: RealType;
+    Width: RealType;
+    Thick: RealType;
+    GageDist: RealType;
+    Elasticity: RealType;
+    Length: RealType;
+    Factor: RealType;
+    EMax: RealType;
+    EMin: RealType;
+    EAvg: RealType;
+    TheGradient: RealType;
+    FullSensitivity: RealType;
+  public
+    SBBeamObject: TSBendingBeam;
+    SBBeamChosen: Boolean;
+  end;
+
+var
+  SBeamBBFrm: TSBeamBBFrm;
+
+implementation
+
+uses MainMenu, Convert, Design;
+{$R *.DFM}
+
+(* ********************************************* *)
+(* Bending S Beam Object Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TSBendingBeam.create }
+constructor TSBendingBeam.create;
+begin
+  { ...creating object }
+  inherited create;
+  { ...associating string with object }
+  TheString := 'Bending -  S-Beam';
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.destroy }
+destructor TSBendingBeam.destroy;
+begin
+  { ...destroying object }
+  inherited destroy;
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.GetAsString }
+function TSBendingBeam.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.ShowTheForm }
+procedure TSBendingBeam.ShowTheForm;
+begin
+  Application.CreateForm(TSBeamBBFrm, SBeamBBFrm);
+  SBeamBBFrm.showmodal;
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.PrintTheForm }
+procedure TSBendingBeam.PrintTheForm;
+var
+  Sender: TObject;
+begin
+  Sender := self;
+  Application.CreateForm(TSBeamBBFrm, SBeamBBFrm);
+  SBeamBBFrm.visible := false;
+  SBeamBBFrm.FormActivate(Sender);
+  SBeamBBFrm.BN_PrintClick(Sender);
+  SBeamBBFrm.BN_CancelClick(Sender);
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.AssignTo }
+procedure TSBendingBeam.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TSBendingBeam) and (self is Dest.ClassType) then
+  begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TSBendingBeam do
+    begin
+      FAppliedLoad := self.FAppliedLoad;
+      FRadius := self.FRadius;
+      FBeamWidth := self.FBeamWidth;
+      FThickness := self.FThickness;
+      FGageDistance := self.FGageDistance;
+      FModulus := self.FModulus;
+      FGageLength := self.FGageLength;
+      FGageFactor := self.GageFactor;
+      FAvgStrain := self.FAvgStrain;
+      FGradient := self.FGradient;
+      FFullSpan := self.FFullSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else
+  begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.InitFields }
+procedure TSBendingBeam.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.SaveToStream }
+procedure TSBendingBeam.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.SaveBuffer(FRadius, sizeof(shortstring));
+  Stream.SaveBuffer(FBeamWidth, sizeof(shortstring));
+  Stream.SaveBuffer(FThickness, sizeof(shortstring));
+  Stream.SaveBuffer(FGageDistance, sizeof(shortstring));
+  Stream.SaveBuffer(FModulus, sizeof(shortstring));
+  Stream.SaveBuffer(FGageLength, sizeof(shortstring));
+  Stream.SaveBuffer(FGageFactor, sizeof(shortstring));
+  Stream.SaveBuffer(FAvgStrain, sizeof(shortstring));
+  Stream.SaveBuffer(FGradient, sizeof(shortstring));
+  Stream.SaveBuffer(FFullSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************************************* *)
+{ TSBendingBeam.ReadFromStream }
+procedure TSBendingBeam.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.ReadBuffer(FRadius, sizeof(shortstring));
+  Stream.ReadBuffer(FBeamWidth, sizeof(shortstring));
+  Stream.ReadBuffer(FThickness, sizeof(shortstring));
+  Stream.ReadBuffer(FGageDistance, sizeof(shortstring));
+  Stream.ReadBuffer(FModulus, sizeof(shortstring));
+  Stream.ReadBuffer(FGageLength, sizeof(shortstring));
+  Stream.ReadBuffer(FGageFactor, sizeof(shortstring));
+  Stream.ReadBuffer(FAvgStrain, sizeof(shortstring));
+  Stream.ReadBuffer(FGradient, sizeof(shortstring));
+  Stream.ReadBuffer(FFullSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************* *)
+(* S Bending Beam Form Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.TheStrain }
+function TSBeamBBFrm.TheStrain(var Min: RealType; var Max: RealType;
+  var Avg: RealType): Boolean;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  FirstTerm: RealType;
+  SecondTerm: RealType;
+  ThirdTerm: RealType;
+  MinStrainResult: RealType;
+  MaxStrainResult: RealType;
+  AvgStrainResult: RealType;
+  StrainResult: RealType;
+  CurrentXValue: RealType;
+  MinStrainValue: RealType;
+  MaxStrainValue: RealType;
+  AvgStrainValue: RealType;
+  IncrementValue: RealType;
+  IterationCount: integer;
+  Button: integer;
+begin
+  Result := false;
+  { ...finding Min and Max value of gage length for iteration range }
+  XMinValue := (GageDist / 2) - (Length / 2);
+  XMaxValue := (GageDist / 2) + (Length / 2);
+  ExceptionRaised := false;
+  { ..initializing variables }
+  MinStrainResult := 0.0;
+  MaxStrainResult := 0.0;
+  AvgStrainResult := 0.0;
+  IterationCount := 0;
+  IncrementValue := (XMaxValue - XMinValue) / 500;
+  CurrentXValue := XMinValue;
+  while CurrentXValue <= XMaxValue do
+  begin
+    { ...Calculating K1 and K2 values for equations }
+    try
+      K1Value := HoleRadius * sin((CurrentXValue * 360) / (Pi * 2 * HoleRadius)
+        * Pi / 180);
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      K2Value := sqr(Thick + HoleRadius - sqrt(sqr(HoleRadius) - sqr(K1Value)));
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      FirstTerm := 6 * (Load / 2) * K1Value;
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      SecondTerm := Elasticity * Width * K2Value;
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      StrainResult := (FirstTerm / SecondTerm) * 1E6;
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    if (StrainResult > MaxStrainResult) or (IterationCount = 0) then
+    begin
+      MaxStrainResult := StrainResult;
+    end;
+    if (StrainResult < MinStrainResult) or (IterationCount = 0) then
+    begin
+      MinStrainResult := StrainResult;
+    end;
+    AvgStrainResult := AvgStrainResult + StrainResult;
+    IterationCount := IterationCount + 1;
+    CurrentXValue := CurrentXValue + IncrementValue;
+  end;
+  AvgStrainResult := AvgStrainResult / IterationCount;
+  Min := MinStrainResult;
+  Max := MaxStrainResult;
+  Avg := AvgStrainResult;
+  TheStrain := ExceptionRaised;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.Gradient }
+function TSBeamBBFrm.Gradient: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  GradientResult: RealType;
+  Button: integer;
+begin
+  Result := 0.0;
+  ExceptionRaised := false;
+  try
+    GradientResult := ((EMax - EMin) / EAvg) * 100;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  Gradient := GradientResult;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.FullSpan }
+function TSBeamBBFrm.FullSpan: RealType;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  SpanResult: RealType;
+  Button: integer;
+begin
+  Result := 0.0;
+  ExceptionRaised := false;
+  try
+    SpanResult := EAvg * Factor * 1E-3;
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  FullSpan := SpanResult;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.FormCreate }
+procedure TSBeamBBFrm.FormCreate(Sender: TObject);
+var
+  LoadUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  DimensionUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  ModulusUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+begin
+  { ...determing whether to use Std. or SI units on form }
+  if MainForm.UnitsAreUS = true then
+  begin
+    LoadString(hinstance, ID_SZ_USLBF, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_Inches, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_PSI, ModulusUnit, sizeof(ModulusUnit));
+  end
+  else
+  begin
+    LoadString(hinstance, ID_SZ_N, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_MM, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_GPa, ModulusUnit, sizeof(ModulusUnit));
+  end;
+  { ...placing units on form }
+  ST_LoadUnit.caption := LoadUnit;
+  ST_RadiusUnit.caption := DimensionUnit;
+  ST_WidthUnit.caption := DimensionUnit;
+  ST_ThicknessUnit.caption := DimensionUnit;
+  ST_DistanceUnit.caption := DimensionUnit;
+  ST_ModulusUnits.caption := ModulusUnit;
+  ST_LengthUnit.caption := DimensionUnit;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.BN_ComputeClick }
+procedure TSBeamBBFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINAPPLIEDLOAD_US = 0.000;
+  MAXAPPLIEDLOAD_US = 20000;
+  MINRADIUS_US = 0.10;
+  MAXRADIUS_US = 5.0;
+  MINBEAMWIDTH_US = 0.050;
+  MAXBEAMWIDTH_US = 10.0;
+  MINTHICKNESS_US = 0.003;
+  MAXTHICKNESS_US = 5.0;
+  MINDISTHOLES_US = 0.040;
+  MAXDISTHOLES_US = 10;
+  MINMODULUS_US = 5000000;
+  MAXMODULUS_US = 50000000;
+  MINGAGELENGTH_US = 0.008;
+  MAXGAGELENGTH_US = 1;
+  MINGAGEFACTOR_US = 1.0;
+  MAXGAGEFACTOR_US = 5.0;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH] of char;
+  ErrorUnit: array [0 .. MAXERRORLENGTH] of char;
+  ErrorAnd: array [0 .. MAXERRORLENGTH] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH] of char;
+  StrUnit: string;
+  StrAnd: string;
+  StrMsg: string;
+  StrMin: string;
+  strMax: string;
+  EditStrings: string;
+  Min: RealType;
+  Max: RealType;
+  Avg: RealType;
+  MinAppliedLoad: RealType;
+  MaxAppliedLoad: RealType;
+  MinRadius: RealType;
+  MaxRadius: RealType;
+  MinBeamWidth: RealType;
+  MaxBeamWidth: RealType;
+  MinThickness: RealType;
+  MaxThickness: RealType;
+  MinDistHoles: RealType;
+  MaxDistHoles: RealType;
+  MinModulus: RealType;
+  MaxModulus: RealType;
+  MinGageLength: RealType;
+  MaxGageLength: RealType;
+  MinGageFactor: RealType;
+  MaxGageFactor: RealType;
+  ErrorCode: integer;
+  Button: integer;
+begin
+  { ...Determining which units to use std. or si for min and max values }
+  if MainForm.UnitsAreUS = true then
+  begin
+    MinAppliedLoad := MINAPPLIEDLOAD_US;
+    MaxAppliedLoad := MAXAPPLIEDLOAD_US;
+    MinRadius := MINRADIUS_US;
+    MaxRadius := MAXRADIUS_US;
+    MinBeamWidth := MINBEAMWIDTH_US;
+    MaxBeamWidth := MAXBEAMWIDTH_US;
+    MinThickness := MINTHICKNESS_US;
+    MaxThickness := MAXTHICKNESS_US;
+    MinDistHoles := MINDISTHOLES_US;
+    MaxDistHoles := MAXDISTHOLES_US;
+    MinModulus := MINMODULUS_US;
+    MaxModulus := MAXMODULUS_US;
+    MinGageLength := MINGAGELENGTH_US;
+    MaxGageLength := MAXGAGELENGTH_US;
+    MinGageFactor := MINGAGEFACTOR_US;
+    MaxGageFactor := MAXGAGEFACTOR_US;
+  end
+  else
+  begin
+    MinAppliedLoad := Lbf_To_N(MINAPPLIEDLOAD_US);
+    MaxAppliedLoad := Lbf_To_N(MAXAPPLIEDLOAD_US);
+    MinRadius := Inches_To_mm(MINRADIUS_US);
+    MaxRadius := Inches_To_mm(MAXRADIUS_US);
+    MinBeamWidth := Inches_To_mm(MINBEAMWIDTH_US);
+    MaxBeamWidth := Inches_To_mm(MAXBEAMWIDTH_US);
+    MinThickness := Inches_To_mm(MINTHICKNESS_US);
+    MaxThickness := Inches_To_mm(MAXTHICKNESS_US);
+    MinDistHoles := Inches_To_mm(MINDISTHOLES_US);
+    MaxDistHoles := Inches_To_mm(MAXDISTHOLES_US);
+    MinModulus := PSI_To_GPa(MINMODULUS_US);
+    MaxModulus := PSI_To_GPa(MAXMODULUS_US);
+    MinGageLength := Inches_To_mm(MINGAGELENGTH_US);
+    MaxGageLength := Inches_To_mm(MAXGAGELENGTH_US);
+    MinGageFactor := MINGAGEFACTOR_US;
+    MaxGageFactor := MAXGAGEFACTOR_US;
+  end;
+  ST_Average.caption := '';
+  ST_Gradient.caption := '';
+  ST_FullSpan.caption := '';
+  { ...checking Applied Load to see if valid }
+  IsThereAnError := false;
+  EditStrings := EB_AppliedLoad.text;
+  StrVal(EditStrings, Load, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end
+  else if (Load < MinAppliedLoad) or (Load > MaxAppliedLoad) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_USLBF, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_N, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_AppliedLoad, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinAppliedLoad, ffFixed, 8, 3);
+    strMax := floattostrf(MaxAppliedLoad, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end;
+  { ..checking Radius to see if valid }
+  EditStrings := EB_Radius.text;
+  StrVal(EditStrings, HoleRadius, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Radius.setfocus;
+    EB_Radius.clearselection;
+    exit;
+  end
+  else if (HoleRadius < MinRadius) or (HoleRadius > MaxRadius) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Radius, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRadius, ffFixed, 8, 3);
+    strMax := floattostrf(MaxRadius, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Radius.setfocus;
+    EB_Radius.clearselection;
+    exit;
+  end;
+  { ..checking Beam Width to see if valid }
+  EditStrings := EB_BeamWidth.text;
+  StrVal(EditStrings, Width, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_BeamWidth.setfocus;
+    EB_BeamWidth.clearselection;
+    exit;
+  end
+  else if (Width < MinBeamWidth) or (Width > MaxBeamWidth) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_BeamWidth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinBeamWidth, ffFixed, 8, 3);
+    strMax := floattostrf(MaxBeamWidth, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_BeamWidth.setfocus;
+    EB_BeamWidth.clearselection;
+    exit;
+  end;
+  { ...checking to see if Thickness is valid }
+  EditStrings := EB_Thickness.text;
+  StrVal(EditStrings, Thick, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Thickness.setfocus;
+    EB_Thickness.clearselection;
+    exit;
+  end
+  else if (Thick < MinThickness) or (Thick > MaxThickness) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Thickness, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinThickness, ffFixed, 8, 3);
+    strMax := floattostrf(MaxThickness, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Thickness.setfocus;
+    EB_Thickness.clearselection;
+    exit;
+  end;
+  { ...checking to see if Distance between gages is valid }
+  EditStrings := EB_GageDistance.text;
+  StrVal(EditStrings, GageDist, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageDistance.setfocus;
+    EB_GageDistance.clearselection;
+    exit;
+  end
+  else if (GageDist < MinDistHoles) or (GageDist > MaxDistHoles) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_DistBtHoles, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinDistHoles, ffFixed, 8, 3);
+    strMax := floattostrf(MaxDistHoles, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageDistance.setfocus;
+    EB_GageDistance.clearselection;
+    exit;
+  end;
+  { ...checking to see if Modulus value is valid }
+  EditStrings := EB_Modulus.text;
+  StrVal(EditStrings, Elasticity, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end
+  else if (Elasticity < MinModulus) or (Elasticity > MaxModulus) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_PSI, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_GPa, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Modulus, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinModulus, ffFixed, 8, 3);
+    strMax := floattostrf(MaxModulus, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then
+  begin
+    Elasticity := Elasticity * 1000;
+  end;
+  { ...checking to see if Gage Length is valid }
+  EditStrings := EB_GageLength.text;
+  StrVal(EditStrings, Length, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end
+  else if (Length < MinGageLength) or (Length > MaxGageLength) then
+  begin
+    IsThereAnError := true;
+    if MainForm.UnitsAreUS = true then
+    begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_GageLength, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageLength, ffFixed, 8, 3);
+    strMax := floattostrf(MaxGageLength, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+  { ...checking to see if Gage Factor is valid }
+  EditStrings := EB_GageFactor.text;
+  StrVal(EditStrings, Factor, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (Factor < MinGageFactor) or (Factor > MaxGageFactor) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageFactor, ffFixed, 8, 3);
+    strMax := floattostrf(MaxGageFactor, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + strMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  { ...checking to make sure Gage Length is not greater than Radius }
+  if Length > HoleRadius then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageLengthVsRadius, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageLength.setfocus;
+    EB_GageLength.clearselection;
+    exit;
+  end;
+  { ...checking to make sure Gage Length is not greater than Radius }
+  if (GageDist) > (2 * HoleRadius) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_GageDistVsRadius, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageDistance.setfocus;
+    EB_GageDistance.clearselection;
+    exit;
+  end;
+  { ...checking to make sure Height/Width is not less than 5 }
+  if (2 * (HoleRadius + Thick)) > (5 * Width) then
+  begin
+    LoadString(hinstance, ID_SZ_GreaterThan5W, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+  end;
+  { ...doing calculations }
+  if IsThereAnError = false then
+  begin
+    { ...Min, Max, and Avg Strains }
+    ExceptionRaised := TheStrain(Min, Max, Avg);
+    if ExceptionRaised = false then
+    begin
+      EMin := Min;
+      EMax := Max;
+      EAvg := Avg;
+      if abs(EAvg) < 5000 then
+      begin
+        if ExceptionRaised = false then
+        begin
+          AvgStrainText := floattostrf(abs(EAvg), ffFixed, 4, 0);
+          ST_Average.caption := AvgStrainText;
+        end;
+      end
+      else
+      begin
+        LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ST_Average.caption := '';
+        ST_Gradient.caption := '';
+        ST_FullSpan.caption := '';
+        ModalResult := 0;
+        exit;
+      end;
+    end;
+    { ...Gradient }
+    TheGradient := Gradient;
+    if ExceptionRaised = false then
+    begin
+      GradientText := floattostrf(TheGradient, ffFixed, 4, 1);
+      ST_Gradient.caption := GradientText;
+    end;
+    { ...Full Bridge Sensitivity }
+    FullSensitivity := FullSpan;
+    if ExceptionRaised = false then
+    begin
+      SensitiveText := floattostrf(FullSensitivity, ffFixed, 4, 3);
+      ST_FullSpan.caption := SensitiveText;
+    end;
+    if abs(EAvg) > 1700 then
+    begin
+      LoadString(hinstance, ID_SZ_StrainExceeds1700, ErrorMsg,
+        sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ModalResult := 0;
+    end;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.BN_CancelClick }
+procedure TSBeamBBFrm.BN_CancelClick(Sender: TObject);
+begin
+  { ...placing initial values in edit boxes }
+  EB_AppliedLoad.text := Old_AppliedLoad;
+  EB_Radius.text := Old_Radius;
+  EB_BeamWidth.text := Old_BeamWidth;
+  EB_Thickness.text := Old_Thickness;
+  EB_GageDistance.text := Old_GageDistance;
+  EB_Modulus.text := Old_Modulus;
+  EB_GageLength.text := Old_GageLength;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_Average.caption := Old_AvgStrain;
+  ST_Gradient.caption := Old_Gradient;
+  ST_FullSpan.caption := Old_FullSpan;
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.FormActivate }
+procedure TSBeamBBFrm.FormActivate(Sender: TObject);
+var
+  EditStrings: string;
+  i: integer;
+  TheItem: TacStreamable;
+begin
+  { ...getting item from object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TSBendingBeam then
+    begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  { ...if there is an object, then placing values in edit boxes }
+  if TheItem <> nil then
+  begin
+    EB_AppliedLoad.text := (TheItem as TSBendingBeam).AppliedLoad;
+    EB_Radius.text := (TheItem as TSBendingBeam).Radius;
+    EB_BeamWidth.text := (TheItem as TSBendingBeam).BeamWidth;
+    EB_Thickness.text := (TheItem as TSBendingBeam).Thickness;
+    EB_GageDistance.text := (TheItem as TSBendingBeam).GageDistance;
+    EB_Modulus.text := (TheItem as TSBendingBeam).Modulus;
+    EB_GageLength.text := (TheItem as TSBendingBeam).GageLength;
+    EB_GageFactor.text := (TheItem as TSBendingBeam).GageFactor;
+    ST_Average.caption := (TheItem as TSBendingBeam).AvgStrain;
+    ST_Gradient.caption := (TheItem as TSBendingBeam).Gradient;
+    ST_FullSpan.caption := (TheItem as TSBendingBeam).FullSpan;
+  end;
+  { ...placing initial values in old variables }
+  Old_AppliedLoad := EB_AppliedLoad.text;
+  Old_Radius := EB_Radius.text;
+  Old_BeamWidth := EB_BeamWidth.text;
+  Old_Thickness := EB_Thickness.text;
+  Old_GageDistance := EB_GageDistance.text;
+  Old_Modulus := EB_Modulus.text;
+  Old_GageLength := EB_GageLength.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_AvgStrain := ST_Average.caption;
+  Old_Gradient := ST_Gradient.caption;
+  Old_FullSpan := ST_FullSpan.caption;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.BN_OKClick }
+procedure TSBeamBBFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem: TacStreamable;
+  i: integer;
+  j: integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = true then
+  begin
+    exit;
+  end;
+  MainForm.DesignChosen := true;
+  { ...getting item from object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TSBendingBeam then
+    begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  { ...if there is an object, then placing values in edit boxes }
+  if TheItem = nil then
+  begin
+    { ...creating and placing values in object }
+    SBBeamObject := TSBendingBeam.create;
+    SBBeamObject.AppliedLoad := EB_AppliedLoad.text;
+    SBBeamObject.Radius := EB_Radius.text;
+    SBBeamObject.BeamWidth := EB_BeamWidth.text;
+    SBBeamObject.Thickness := EB_Thickness.text;
+    SBBeamObject.GageDistance := EB_GageDistance.text;
+    SBBeamObject.Modulus := EB_Modulus.text;
+    SBBeamObject.GageLength := EB_GageLength.text;
+    SBBeamObject.GageFactor := EB_GageFactor.text;
+    SBBeamObject.AvgStrain := ST_Average.caption;
+    SBBeamObject.Gradient := ST_Gradient.caption;
+    SBBeamObject.FullSpan := ST_FullSpan.caption;
+    MainForm.AddToLog(SBBeamObject);
+    j := 0;
+    { ...placing string associated with object in outline }
+    repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Design Verification') or
+      (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, SBBeamObject.GetAsString);
+  end
+  else
+  begin
+    (TheItem as TSBendingBeam).AppliedLoad := EB_AppliedLoad.text;
+    (TheItem as TSBendingBeam).Radius := EB_Radius.text;
+    (TheItem as TSBendingBeam).BeamWidth := EB_BeamWidth.text;
+    (TheItem as TSBendingBeam).Thickness := EB_Thickness.text;
+    (TheItem as TSBendingBeam).GageDistance := EB_GageDistance.text;
+    (TheItem as TSBendingBeam).Modulus := EB_Modulus.text;
+    (TheItem as TSBendingBeam).GageLength := EB_GageLength.text;
+    (TheItem as TSBendingBeam).GageFactor := EB_GageFactor.text;
+    (TheItem as TSBendingBeam).AvgStrain := ST_Average.caption;
+    (TheItem as TSBendingBeam).Gradient := ST_Gradient.caption;
+    (TheItem as TSBendingBeam).FullSpan := ST_FullSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.DesignDlgShowing = true then
+  begin
+    DesignDlg.close;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.FormClose }
+procedure TSBeamBBFrm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.EB_AppliedLoadExit }
+procedure TSBeamBBFrm.EB_AppliedLoadExit(Sender: TObject);
+var
+  ForceUnit: array [0 .. MAXTEXTLENGTH - 1] of char;
+  ForceText: string;
+  ForceValue: double;
+  ErrorCode: integer;
+begin
+  if MainForm.UnitsAreUS = false then
+  begin
+    ForceText := EB_AppliedLoad.text;
+    StrVal(ForceText, ForceValue, ErrorCode);
+    if ErrorCode <> 0 then
+    begin
+      exit;
+    end;
+    ForceValue := ForceValue * 0.101971;
+    // str(ForceValue:4:3, ForceText);
+    ForceText := format('%4.3f', [ForceValue]);
+    ST_KGF.caption := ForceText;
+    LoadString(hinstance, ID_SZ_MetricKg, ForceUnit, sizeof(ForceUnit));
+    ST_KGFUnit.caption := ForceUnit;
+  end
+  else
+  begin
+    ST_KGF.caption := '';
+    ST_KGFUnit.caption := '';
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.BN_PrintClick }
+procedure TSBeamBBFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderPChar: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderString: string;
+  DateString: string;
+  id: longint;
+  MetaHandle: Thandle;
+  sserror: integer;
+  htmlText: string;
+  Stream: tResourceStream;
+  strstream: tStringStream;
+
+begin
+  Stream := tResourceStream.create(hinstance, 'SBBeam', RT_RCDATA);
+  strstream := tStringStream.create();
+
+  try
+    strstream.LoadFromStream(Stream);
+    htmlText := strstream.DataString;
+  finally
+    strstream.Free();
+    Stream.Free();
+  end;
+
+  htmlText := StringReplace(htmlText, '$af2', ST_LoadUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$cl2', ST_DistanceUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rad2', ST_RadiusUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bw2', ST_WidthUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$mt2', ST_ThicknessUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$me2', ST_ModulusUnits.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gl2', ST_LengthUnit.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+
+  htmlText := StringReplace(htmlText, '$af1', EB_AppliedLoad.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$cl1', EB_GageDistance.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$rad1', EB_Radius.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$bw1', EB_BeamWidth.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$mt1', EB_Thickness.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$me1', EB_Modulus.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gl1', EB_GageLength.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gf1', EB_GageFactor.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$gs1', ST_Average.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sv1', ST_Gradient.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sf1', ST_FullSpan.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  SaveDialogPrint.FileName := '';
+  SaveDialogPrint.InitialDir := tPath.GetDocumentsPath;
+  if SaveDialogPrint.Execute
+  then
+  begin
+    tfile.writeAllText(SaveDialogPrint.FileName, htmlText);
+    ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName), nil, nil,
+      SW_SHOWNORMAL);
+  end;
+
+  { ...clearing sheet for new values }
+  (* SSClearRange(Sheet1.SS, 4, 5, 18, 5, 3);
+    {placing Units on sheet}
+    SSSetActiveCell(Sheet1.SS, 4, 6);
+    Sheet1.text := ST_LoadUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 6, 6);
+    Sheet1.text := ST_RadiusUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 7, 6);
+    Sheet1.text := ST_WidthUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 8, 6);
+    Sheet1.text := ST_ThicknessUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 9, 6);
+    Sheet1.text := ST_DistanceUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 10, 6);
+    Sheet1.text := ST_ModulusUnits.caption;
+    SSSetActiveCell(Sheet1.SS, 12, 6);
+    Sheet1.text := ST_LengthUnit.caption;
+    SSSetActiveCell(Sheet1.SS, 4, 5);
+    Sheet1.text := EB_AppliedLoad.text;
+    SSSetActiveCell(Sheet1.SS, 6, 5);
+    Sheet1.text := EB_Radius.text;
+    SSSetActiveCell(Sheet1.SS, 7, 5);
+    Sheet1.text := EB_BeamWidth.text;
+    SSSetActiveCell(Sheet1.SS, 8, 5);
+    Sheet1.text := EB_Thickness.text;
+    SSSetActiveCell(Sheet1.SS, 9, 5);
+    Sheet1.text := EB_GageDistance.text;
+    SSSetActiveCell(Sheet1.SS, 10, 5);
+    Sheet1.text := EB_Modulus.text;
+    SSSetActiveCell(Sheet1.SS, 12, 5);
+    Sheet1.text := EB_GageLength.text;
+    SSSetActiveCell(Sheet1.SS, 13, 5);
+    Sheet1.text := EB_GageFactor.text;
+    SSSetActiveCell(Sheet1.SS, 16, 5);
+    Sheet1.text := ST_Average.caption;
+    SSSetActiveCell(Sheet1.SS, 17, 5);
+    Sheet1.text := ST_Gradient.caption;
+    SSSetActiveCell(Sheet1.SS, 18, 5);
+    Sheet1.text := ST_FullSpan.caption;
+    sserror := SSObjNewPicture(Sheet1.ss, 2, 20, 5.57, 29, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+    SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+    DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+    HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+    strpcopy(HeaderPChar, HeaderString);
+    SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+    SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+    SSFilePrint(Sheet1.ss, 0); *)
+end;
+
+(* ********************************************************************* *)
+{ TSBeamBBFrm.BN_HelpClick }
+procedure TSBeamBBFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(1050);
+end;
+
+begin
+  { ...registering object }
+  RegisterClasses([TSBendingBeam]);
+
+end.

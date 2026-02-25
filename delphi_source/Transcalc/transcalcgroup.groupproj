@@ -1,0 +1,84 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{6DC3A1E2-7484-4A07-8357-DD9482974FAA}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="XCALCPRO.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="TCRcalc.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="xconfig.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Bridge\BridgeAp.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="wire\table.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="XCALCPRO">
+        <MSBuild Projects="XCALCPRO.dproj"/>
+    </Target>
+    <Target Name="XCALCPRO:Clean">
+        <MSBuild Projects="XCALCPRO.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="XCALCPRO:Make">
+        <MSBuild Projects="XCALCPRO.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="TCRcalc">
+        <MSBuild Projects="TCRcalc.dproj"/>
+    </Target>
+    <Target Name="TCRcalc:Clean">
+        <MSBuild Projects="TCRcalc.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="TCRcalc:Make">
+        <MSBuild Projects="TCRcalc.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="xconfig">
+        <MSBuild Projects="xconfig.dproj"/>
+    </Target>
+    <Target Name="xconfig:Clean">
+        <MSBuild Projects="xconfig.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="xconfig:Make">
+        <MSBuild Projects="xconfig.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="BridgeAp">
+        <MSBuild Projects="Bridge\BridgeAp.dproj"/>
+    </Target>
+    <Target Name="BridgeAp:Clean">
+        <MSBuild Projects="Bridge\BridgeAp.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="BridgeAp:Make">
+        <MSBuild Projects="Bridge\BridgeAp.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="table">
+        <MSBuild Projects="wire\table.dproj"/>
+    </Target>
+    <Target Name="table:Clean">
+        <MSBuild Projects="wire\table.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="table:Make">
+        <MSBuild Projects="wire\table.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="XCALCPRO;TCRcalc;xconfig;BridgeAp;table"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="XCALCPRO:Clean;TCRcalc:Clean;xconfig:Clean;BridgeAp:Clean;table:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="XCALCPRO:Make;TCRcalc:Make;xconfig:Make;BridgeAp:Make;table:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

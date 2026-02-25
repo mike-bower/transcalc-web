@@ -1,0 +1,41 @@
+unit log;
+
+interface
+
+uses ACStream, ACList, SysUtils, Classes, LogItem;
+
+type
+  TLog = class(TacObjStringList)
+  private
+    function GetLogItem(const Idx: TacObjListIndex): TLogItem;
+  public
+    property Items[const Idx: TacObjListIndex]: TLogItem
+      read GetLogItem; default;
+    procedure ShowTheForm; override;
+    procedure PrintTheForm; override;
+
+  end;
+
+implementation
+
+function TLog.GetLogItem(const Idx: TacObjListIndex): TLogItem;
+begin
+  Result := AtIndex(Idx) as TLogItem;
+end;
+
+procedure TLog.PrintTheForm;
+begin
+  inherited;
+
+end;
+
+procedure TLog.ShowTheForm;
+begin
+  inherited;
+
+end;
+
+begin
+  RegisterClasses([TLog]);
+
+end.

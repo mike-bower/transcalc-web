@@ -1,0 +1,129 @@
+{-------------------------------------------------------}
+{  Functions to convert between English and SI units    }
+{-------------------------------------------------------}
+unit Convert;
+interface
+  function F_to_C(DegreesF: real): Real;
+  function C_to_F(DegreesC: real): Real;
+
+  function mm_to_inches(mm:real):real;
+  function inches_to_mm(inches:real):real;
+
+  function cm_to_inches(cm:real):real;
+  function inches_to_cm(inches:real):real;
+
+  function Kg_to_lbs(Kg:real):real;
+  function Lbs_to_Kg(lbs:real):real;
+
+  function N_to_lbf(N:real):real;
+  function lbf_to_N(lbf:real):real;
+
+  function Psi_to_Pa(psi:real):real;
+  function Pa_to_psi(Pa:real):real;
+
+  function Psi_to_GPa(psi:real):real;
+  function GPa_to_psi(GPa:real):real;
+
+  function Psi_to_MPa(psi:real):real;
+  function MPa_to_psi(MPa:real):real;
+{-------------------------------------------------------}
+implementation
+
+{ Convert Fahrenheit to Celsius}
+function F_to_C(DegreesF: real): Real;
+begin
+  F_to_C := (DegreesF-32) * (5.0/9.0);
+end;
+
+{ Convert Celsius to Fahrenheit}
+function C_to_F(DegreesC: real): Real;
+begin
+  C_to_F := ((9.0/5.0)* DegreesC) + 32;
+end;
+
+{ Convert millimeters to inches}
+function mm_to_inches(mm:real):real;
+begin
+  mm_to_inches := mm * 0.039370078;
+end;
+
+{ Convert inches to mm}
+function inches_to_mm(inches:real):real;
+begin
+  inches_to_mm := inches * 25.4;
+end;
+
+{ Convert centimeters to inches}
+function cm_to_inches(cm:real):real;
+begin
+  cm_to_inches := cm * 0.39370078;
+end;
+
+{ Convert inches to mm}
+function inches_to_cm(inches:real):real;
+begin
+  inches_to_cm := inches * 2.54;
+end;
+
+
+{ Convert Kilograms to lbs}
+function Kg_to_lbs(Kg:real):real;
+begin
+  Kg_to_lbs := Kg * 2.20462;
+end;
+
+{ Convert lbs to Kg }
+function lbs_to_Kg(lbs:real):real;
+begin
+  Lbs_to_Kg := lbs * 0.45359237;
+end;
+
+{ Convert Newtons to Lbf}
+function N_to_lbf(N:real):real;
+begin
+  N_to_lbf := N * 0.224809;
+end;
+
+{ Convert lbsf to Newtons}
+function lbf_to_N(lbf:real):real;
+begin
+  Lbf_to_N := lbf * 4.44822;
+end;
+
+{ Convert PSI to Pascals}
+function Psi_to_Pa(psi:real):real;
+begin
+  Psi_to_Pa := psi * 6894.76;
+end;
+
+{ Convert Pascals to PSI}
+function Pa_to_psi(Pa:real):real;
+begin
+  pa_to_psi := pa * 0.145038e-3;
+end;
+
+{ Convert PSI to GPa }
+function Psi_to_GPa(psi:real):real;
+begin
+  Psi_to_GPa := psi * 6894.76 * 1.0E-9;
+end;
+
+{ Convert psi to GPa}
+function GPa_to_psi(GPa:real):real;
+begin
+  Gpa_to_psi := Gpa * 0.145038 * 1e6;
+end;
+
+{ Convert from PSI to MPa}
+function Psi_to_MPa(psi:real):real;
+begin
+  Psi_to_MPa := psi * 6894.76 * 1E-6;
+end;
+{ Convert from MPa to PSI}
+function MPa_to_psi(MPa:real):real;
+begin
+  Mpa_to_psi := Mpa * 0.145038 * 1e-9;
+end;
+
+{--- End of Unit ---}
+end.

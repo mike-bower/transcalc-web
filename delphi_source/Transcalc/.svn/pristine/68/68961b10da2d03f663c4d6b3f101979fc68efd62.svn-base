@@ -1,0 +1,53 @@
+unit Warning;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, StdCtrls, Buttons;
+
+type
+  TWarningForm = class(TForm)
+    Label1: TLabel;
+    Label2: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    Label7: TLabel;
+    Label8: TLabel;
+    BN_OK: TBitBtn;
+    Label10: TLabel;
+    Label11: TLabel;
+    Label12: TLabel;
+    Label13: TLabel;
+    procedure BN_OKClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  WarningForm: TWarningForm;
+
+implementation
+
+{$R *.DFM}
+
+
+(* ********************************************************************* *)
+{ TWarningForm.BN_OKClick }
+procedure TWarningForm.BN_OKClick(Sender: TObject);
+begin
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TWarningForm.FormClose }
+procedure TWarningForm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+end.

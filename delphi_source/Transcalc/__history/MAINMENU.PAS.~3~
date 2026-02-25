@@ -1,0 +1,1189 @@
+(************************************)
+(*  Main Menu Unit                  *)
+(************************************)
+unit Mainmenu;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, Buttons, Menus, ExtCtrls, acStream, acList, Log, LogStrm,
+  LogItem, Grids, IniFiles, Vcl.Outline;
+
+const
+  MAXTEXTLENGTH = 40;
+  MAXERRORLENGTH = 255;
+  MAXDIRLENGTH = 150;
+
+{$R Strings.res}
+{$I Strings.inc}
+
+(***********************************************)
+(*  TMainObject Object                         *)
+(***********************************************)
+type TMainObject = class(TLogItem)
+private
+  FUnitString   : Int16;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+public
+  constructor create;
+  destructor destroy;  override ;
+  property UnitString: Int16 read FUnitString write FUnitString;
+end;
+
+(***********************************************)
+(*  Main Menu Form Object                      *)
+(***********************************************)
+type
+  TMainForm = class(TForm)
+    MainMenu1: TMainMenu;
+    StatusLine: TPanel;
+    File1: TMenuItem;
+    NewProject1: TMenuItem;
+    OpenProject1: TMenuItem;
+    SaveProject1: TMenuItem;
+    SaveProjectAs1: TMenuItem;
+    N1: TMenuItem;
+    Exit1: TMenuItem;
+    Help1: TMenuItem;
+    contents1: TMenuItem;
+    HowtoUseHelp1: TMenuItem;
+    N3: TMenuItem;
+    Usernotice1: TMenuItem;
+    About1: TMenuItem;
+    Panel2: TPanel;
+    HelpSpeedBtn: TSpeedButton;
+    ExitSpeedBtn: TSpeedButton;
+    NewButton: TSpeedButton;
+    OpenButton: TSpeedButton;
+    SaveButton: TSpeedButton;
+    OpenDialog1: TOpenDialog;
+    SaveDialog1: TSaveDialog;
+    PrintDialog1: TPrintDialog;
+    XCalcOutline: TOutline;
+    Functions1: TMenuItem;
+    Design1: TMenuItem;
+    Compensation1: TMenuItem;
+    CompensationButton: TSpeedButton;
+    DesignButton: TSpeedButton;
+    Print1: TMenuItem;
+    N2: TMenuItem;
+    PrintButton: TSpeedButton;
+    procedure ShowHint(Sender: TObject);
+    procedure Design1Click(Sender: TObject);
+    procedure Exit1Click(Sender: TObject);
+    procedure Compensation1Click(Sender: TObject);
+    procedure ExitSpeedBtnClick(Sender: TObject);
+    procedure SaveProjectAs1Click(Sender: TObject);
+    procedure OpenProject1Click(Sender: TObject);
+    procedure NewProject1Click(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure XCalcOutlineDblClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure About1Click(Sender: TObject);
+    procedure SaveProject1Click(Sender: TObject);
+    procedure NewButtonClick(Sender: TObject);
+    procedure OpenButtonClick(Sender: TObject);
+    procedure SaveButtonClick(Sender: TObject);
+    procedure XCalcOutlineKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure DesignButtonClick(Sender: TObject);
+    procedure CompensationButtonClick(Sender: TObject);
+    procedure Usernotice1Click(Sender: TObject);
+    procedure Print1Click(Sender: TObject);
+    procedure contents1Click(Sender: TObject);
+    procedure HowtoUseHelp1Click(Sender: TObject);
+    procedure HelpSpeedBtnClick(Sender: TObject);
+    procedure PrintButtonClick(Sender: TObject);
+  private
+    { Private declarations }
+    FLogStream     : TLogStream;
+    TheItems       : TStrings;
+    IsNewFile      : boolean;
+    procedure ReadLog;
+    procedure SaveLog;
+  public
+    { Public declarations }
+    MainObject       : TMainObject;
+    FLog             : TLog;
+    Stream           : TStream;
+    UnitsAreUS       : boolean;
+    IsDirty          : boolean;
+    DesignDlgShowing : boolean;
+    DesignChosen     : boolean;
+    CompDlgShowing   : boolean;
+    IllegalUse       : boolean;
+    TheIniFile       : TIniFile;
+    SaveFileName     : string;
+    procedure AddToLog(const LogItem: TLogItem);
+    procedure DeleteFromLog(const LogItem: TacStreamable);
+ end;
+
+var
+  MainForm: TMainForm;
+
+implementation
+uses Design, Compenst, Resistor, BBCant, RevBB, Bino, About, DualBB,
+     SbBeam, SqrCol, RndHlwC, RndSldC, SherRnd1, ShearSB, ShearSqr,
+     Pressure, SqTorque, RndHlwTq, RndSldTq, OptShunt, SpanSet, Span3pt,
+     Span2pt, ZeroBal, ZvsTemp, Warning, SimSpan;
+{$R *.DFM}
+
+(***********************************************)
+(* Main Form Object Methods                    *)
+(***********************************************)
+
+(***********************************************************************)
+{TMainObject.create}
+constructor TMainObject.create;
+begin
+  {...create object}
+  inherited create;
+end;
+
+(***********************************************************************)
+{TMainObject.destroy}
+destructor TMainObject.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TMainObject.AssignTo}
+procedure TMainObject.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TMainObject) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TMainObject do begin
+      FUnitString := self.FUnitString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{TMainObject.InitFields}
+procedure TMainObject.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(***********************************************************************)
+{TMainObject.SaveToStream}
+procedure TMainObject.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FUnitString, sizeof(Int16));
+end;
+
+(***********************************************************************)
+{TMainObject.ReadFromStream}
+procedure TMainObject.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FUnitString, sizeof(Int16));
+end;
+
+
+(***********************************************************************)
+{TMainForm.ReadLog}
+procedure TMainForm.ReadLog;
+begin
+  if (FileExists(FLogStream.FileName)) then begin
+    with FLogStream do begin
+      OpenForInput;
+      ReadObject(FLog);
+      Close;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.SaveLog}
+procedure TMainForm.SaveLog;
+begin
+  with FLogStream do begin
+    OpenForOutput;
+    SaveObject(FLog);
+    Close;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.AddToLog}
+procedure TMainForm.AddToLog(const LogItem: TLogItem);
+begin
+  FLog.Add(LogItem);
+end;
+
+(***********************************************************************)
+{TMainForm.DeleteFromLog}
+procedure TMainForm.DeleteFromLog(const LogItem: TAcStreamable);
+begin
+  FLog.DeleteObj(LogItem);
+end;
+
+(***********************************************************************)
+{TMainForm.FormCreate}
+procedure TMainForm.FormCreate(Sender: TObject);
+var
+  Cs            : array[0..MAXERRORLENGTH-1] of char;
+  Msg           : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption  : array[0..MAXERRORLENGTH-1] of char;
+  WindowsBuffer : array[0..MAXDIRLENGTH-1] of char;
+  WindowsString : string;
+  MsgStr        : string;
+  Button        : integer;
+begin
+  Application.OnHint:= ShowHint;
+  {...geting units from INI file}
+  GetPrivateProfileString('Units', 'Units', 'US', Cs, sizeof(Cs), 'XCALC.INI');
+  if (strlicomp(Cs, 'US', sizeof(Cs)) = 0) then begin
+    UnitsAreUS := true;
+  end
+  else begin
+    UnitsAreUS := false;
+  end;
+  IsNewFile := true;
+  {...placing filename on title bar of mainform}
+  IsDirty := false;
+  MainForm.Caption := 'TransCalc  ';
+  FLog := TLog.create(TheItems, true);
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+  DesignChosen := false;
+  DesignDlgShowing := false;
+  CompDlgShowing := false;
+end;
+
+(***********************************************************************)
+{TMainForm.ShowHint}
+procedure TMainForm.ShowHint(Sender: TObject);
+begin
+  StatusLine.Caption:= Application.Hint;
+end;
+
+(***********************************************************************)
+{TMainForm.Design1Click}
+procedure TMainForm.Design1Click(Sender: TObject);
+var
+  ErrorMsg     : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption : array[0..MAXERRORLENGTH-1] of char;
+  QuestionMark : array[0..MAXTEXTLENGTH-1] of char;
+  EditStrings  : string;
+  TheText      : string;
+  StrMsg       : string;
+  StrUnit      : string;
+  TheObject    : TacStreamable;
+  Button       : integer;
+  ChildIndex   : integer;
+begin
+  TheObject := nil;
+  if XCalcOutline.items[1].HasItems = true then begin
+    ChildIndex := XCalcOutline.Items[1].GetFirstChild;
+    TheText := XCalcOutline.items[ChildIndex].Text;
+    LoadString(hinstance, ID_SZ_DeleteDesign, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_Question, QuestionMark, sizeof(QuestionMark));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(QuestionMark);
+    EditStrings := StrMsg + ' ' + TheText + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    Button := Application.MessageBox(Errormsg, ErrorCaption, mb_YesNo or MB_ICONQUESTION);
+    if Button = idYes then begin
+      TheObject := MainForm.FLog.AtName(TheText);
+      XCalcOutline.Items[ChildIndex].destroy;
+      DeleteFromLog(TheObject);
+      Application.CreateForm(TDesignDlg, DesignDlg);
+      DesignDlg.showmodal;
+    end
+    else begin
+      TheObject := MainForm.FLog.AtName(TheText);
+      if TheObject is TacStreamable then begin
+        TheObject.ShowTheForm;
+      end
+    end;
+  end
+  else begin
+    Application.CreateForm(TDesignDlg, DesignDlg);
+    DesignDlg.showmodal;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.Exit1Click}
+procedure TMainForm.Exit1Click(Sender: TObject);
+var
+  Action : TCloseAction;
+begin
+  Close;
+end;
+
+(***********************************************************************)
+{TMainForm.Compensation1Click}
+procedure TMainForm.Compensation1Click(Sender: TObject);
+begin
+  Application.CreateForm(TCompensationDlg, CompensationDlg);
+  CompensationDlg.showmodal;
+end;
+
+(***********************************************************************)
+{TMainForm.ExitSpeedBtnClick}
+procedure TMainForm.ExitSpeedBtnClick(Sender: TObject);
+begin
+  Exit1Click(Sender);
+end;
+
+(***********************************************************************)
+{TMainForm.SaveProjectAs1Click}
+procedure TMainForm.SaveProjectAs1Click(Sender: TObject);
+begin
+  SaveDialog1.Filename := '';
+  If SaveDialog1.execute then begin
+    if Length(SaveDialog1.FileName) <> 0 then begin
+      IsNewFile := false;
+      SaveFileName := SaveDialog1.FileName;
+      SaveProject1Click(Sender);
+      IsDirty := false;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.OpenProject1Click}
+procedure TMainForm.OpenProject1Click(Sender: TObject);
+var
+  ErrorMsg     : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption : array[0..MAXERRORLENGTH-1] of char;
+  TheItem      : TACStreamable;
+  TheWindow    : HWnd;
+  Msg          : String;
+  i            : integer;
+  j            : integer;
+  Button       : integer;
+  ChildIndex   : integer;
+  USUnits      : boolean;
+  TheUnit      : integer;
+begin
+  if IsDirty = true then begin
+    LoadString(hinstance, ID_SZ_DoYouWantToSave, ErrorMsg, sizeof(ErrorMsg));
+    Msg := strpas(ErrorMsg);
+    Msg := Msg + ' ' + SaveFileName + '?';
+    strpcopy(ErrorMsg, Msg);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_YesNoCancel or MB_IconQuestion);
+    if Button = idYes then begin
+      if IsNewFile = true then begin
+        SaveProjectAs1Click(Sender);
+      end
+      else begin
+        SaveProject1Click(Sender);
+      end;
+    end
+    else if Button = IdCancel then begin
+      exit;
+    end;
+  end;
+  if OpenDialog1.Execute then begin
+    if Length(OpenDialog1.FileName) <> 0 then begin
+      SaveFileName :=  OpenDialog1.FileName;
+      with XCalcOutline do begin
+        ChildIndex := Items[1].GetFirstChild;
+        if ChildIndex <> -1 then begin
+          Items[ChildIndex].destroy;
+        end;
+        repeat
+        ChildIndex := Items[2].GetFirstChild;
+        if ChildIndex <> -1 then begin
+          Items[ChildIndex].destroy;
+        end;
+        until (ChildIndex = -1);
+      end;
+      FLogStream.Free;
+      FLog.Free;
+      FLog := TLog.create(TheItems, true);
+      FLogStream := TLogStream.Create(SaveFileName);
+      ReadLog;
+      {..getting Units from file}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TMainObject then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+        end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        TheUnit := (TheItem as TMainObject).UnitString;
+        if TheUnit = 1 then begin
+          USUnits := true;
+        end
+        else begin
+          USUnits := false;
+        end;
+        if (UnitsAreUS <> USUnits) then begin
+          LoadString(hinstance, ID_SZ_WrongUnits, ErrorMsg, sizeof(ErrorMsg));
+          LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+          Button := Application.MessageBox(Errormsg, ErrorCaption, mb_OK or MB_ICONExclamation);
+          IsDirty := false;
+          NewProject1Click(sender);
+          exit;
+        end;
+      end;
+      {getting item from object if there is one}
+      {Placing Cantilever Beam in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TCantileverBeam then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+        end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TCantileverBeam).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Binocular Beam in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TBinocularBeam then begin
+          TheItem := MainForm.FLog.AtIndex(i);
+        end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TBinocularBeam).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Dual Bending Beam in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TDualBendingBeam then begin
+          TheItem := MainForm.FLog.AtIndex(i);
+        end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TDualBendingBeam).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Reverse Bending Beam in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TReverseBendingBeam then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TReverseBendingBeam).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing S-Beam Bending in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSBendingBeam then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSBendingBeam).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Square Column in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSquareColumn then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSquareColumn).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Round Hollow Column in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TRoundHollowCol then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TRoundHollowCol).TheStringtext);
+        DesignChosen := true;
+     end;
+      {Placing Round Solid Column in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TRoundSolidCol then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TRoundSolidCol).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Square Shear in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSqrShear then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSqrShear).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Round Shear in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TRndShear then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TRndShear).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Round Shear S-Beam in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TRndSBeamShear then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TRndSBeamShear).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Square Torque in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSqrTorque then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSqrTorque).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Round Solid Torque in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TRndSolidTorque then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TRndSolidTorque).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Round Hollow Torque in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TRndHollowTorque then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TRndHollowTorque).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Pressure in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TPressure then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Design Verification') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TPressure).TheStringtext);
+        DesignChosen := true;
+      end;
+      {Placing Zero vs Temp Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TZeroVsTemp then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TZeroVsTemp).TheStringtext);
+      end;
+      {Placing Zero Balance Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TZeroBalance then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TZeroBalance).TheStringtext);
+      end;
+      {Placing Span vs. Temperature 2 pt. Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSpanvsTemp2pt then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, string((TheItem as TSpanvsTemp2pt).TheStringtext));
+      end;
+      {Placing Span vs. Temperature 3 pt. Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSpanvsTemp3pt then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSpanvsTemp3pt).TheStringtext);
+      end;
+      {Placing Span vs. Temperature Optimum Shunt Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TOptimumShunt then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TOptimumShunt).TheStringtext);
+      end;
+      {Placing Span Set Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSpanSet then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSpanSet).TheStringtext);
+      end;
+      {Placing Simultaneous Span and 3pt. Compensation in Outline}
+      TheItem := nil;
+      i := 0;
+      Repeat
+        if MainForm.FLog.AtIndex(i) is TSimultaneousSpan then begin
+         TheItem := MainForm.FLog.AtIndex(i);
+       end;
+        inc(i);
+      until (TheItem <> nil) or (i > MainForm.Flog.Count);
+      if TheItem <> nil then begin
+        j := 0;
+        repeat
+          inc(j);
+        until (XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > XCalcOutline.ItemCount);
+        XCalcOutline.AddChild(j, (TheItem as TSimultaneousSpan).TheStringtext);
+      end;
+      IsNewFile := false;
+      IsDirty := false;
+      SaveProject1.enabled := true;
+      SaveProjectAs1.enabled := true;
+      SaveButton.enabled := true;
+      MainForm.Caption := 'TransCalc  ' + SaveFileName;
+      XCalcOutline.Items[1].expand;
+      if XCalcOutline.items[1].HasItems = true then begin
+        XCalcOutline.Items[3].expand;
+      end
+      else begin
+        XCalcOutline.Items[2].expand;
+      end;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.NewProject1Click}
+procedure TMainForm.NewProject1Click(Sender: TObject);
+var
+  ErrorMsg     : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption : array[0..MAXERRORLENGTH-1] of char;
+  Msg          : string;
+  Button       : integer;
+  ChildIndex   : integer;
+begin
+  if IsDirty = true then begin
+    if IsNewFile = false then begin
+      LoadString(hinstance, ID_SZ_DoYouWantToSave, ErrorMsg, sizeof(ErrorMsg));
+      Msg := strpas(ErrorMsg);
+      Msg := Msg + ' ' + SaveFileName + '?';
+      strpcopy(ErrorMsg, Msg);
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_DoYouWantToSave, ErrorMsg, sizeof(ErrorMsg));
+      Msg := strpas(ErrorMsg);
+      Msg := Msg + '?';
+      strpcopy(ErrorMsg, Msg);
+    end;
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(Errormsg, ErrorCaption, mb_YesNoCancel or MB_ICONQUESTION);
+    if Button = idYes then begin
+      if IsNewFile = true then begin
+        SaveProjectAs1Click(Sender);
+        {...if filename is blank then do nothing}
+        if Length(SaveDialog1.FileName) = 0 then begin
+          exit;
+        end;
+      end
+      else begin
+        SaveProject1Click(Sender);
+        {...if filename is blank then do nothing}
+        if Length(SaveDialog1.FileName) = 0 then begin
+          exit;
+        end;
+      end;
+    end
+    else if Button = idCancel then begin
+      exit;
+    end;
+  end;
+  with XCalcOutline do begin
+    ChildIndex := Items[1].GetFirstChild;
+    if ChildIndex <> -1 then begin
+      Items[ChildIndex].destroy;
+    end;
+    repeat
+    ChildIndex := Items[2].GetFirstChild;
+    if ChildIndex <> -1 then begin
+       Items[ChildIndex].destroy;
+    end;
+    until (ChildIndex = -1);
+  end;
+  FLogStream.Free;
+  FLog.Free;
+  FLog := TLog.create(TheItems, true);
+  FLogStream := TLogStream.Create('');
+  IsDirty := false;
+  IsNewFile := true;
+  SaveDialog1.Filename := '';
+  SaveFileName := '';
+  MainForm.Caption := 'TransCalc  ';
+  DesignChosen := false;
+  Refresh;
+end;
+
+(***********************************************************************)
+{TMainForm.FormDestroy}
+procedure TMainForm.FormDestroy(Sender: TObject);
+begin
+  FLogStream.Free;
+  FLog.Free;
+end;
+
+(***********************************************************************)
+{TMainForm.XCalcOutlineDblClick}
+procedure TMainForm.XCalcOutlineDblClick(Sender: TObject);
+var
+  TheText   : string;
+  TheObject : TacStreamable;
+  button    : integer;
+begin
+  TheObject := nil;
+  {if outline doubleclicked find string associated with object and show the form}
+  TheText := XCalcOutline.items[XCalcOutline.SelectedItem].Text;
+  {...Not getting object when open}
+  TheObject := MainForm.FLog.AtName(TheText);
+  if TheObject is TacStreamable then begin
+    TheObject.ShowTheForm;
+  end
+  else begin
+    if (TheText = 'Design Verification') and (XCalcOutline.items[XCalcOutline.SelectedItem].HasItems = false) then begin
+      Application.CreateForm(TDesignDlg, DesignDlg);
+      DesignDlg.showmodal;
+    end
+    else if (TheText = 'Circuit Refinements') and (XCalcOutline.items[XCalcOutline.SelectedItem].HasItems = false) then begin
+      Application.CreateForm(TCompensationDlg, CompensationDlg);
+      CompensationDlg.showmodal;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.About1Click}
+procedure TMainForm.About1Click(Sender: TObject);
+begin
+  Application.CreateForm(TAboutForm, AboutForm);
+  AboutForm.showmodal;
+end;
+
+(***********************************************************************)
+{TMainForm.SaveProject1Click}
+procedure TMainForm.SaveProject1Click(Sender: TObject);
+var
+  TheItem : TACStreamable;
+  i       : integer;
+begin
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if FLog.AtIndex(i) is TMainObject then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > Flog.Count);
+  {...if there is an object, then placing values in edit boxes}
+  if TheItem = nil then begin
+    {...creating and placing values in object}
+    if  UnitsAreUS = true then begin
+      MainObject := TMainObject.create;
+      MainObject.UnitString := 1;
+    end
+    else begin
+      MainObject := TMainObject.create;
+      MainObject.UnitString := 0;
+    end;
+    AddToLog(MainObject);
+  end
+  else begin
+    {...creating and placing values in object}
+    if  UnitsAreUS = true then begin
+      (TheItem as TMainObject).UnitString := 1;
+    end
+    else begin
+      (TheItem as TMainObject).UnitString := 0;
+    end;
+  end;
+  if IsNewFile = false then begin
+    FLogStream := TLogStream.Create(SaveFileName);
+    SaveLog;
+    IsNewFile := false;
+    IsDirty := false;
+  end
+  else begin
+    SaveProjectAs1Click(Sender);
+  end;
+  MainForm.Caption := 'TransCalc  ' + SaveFileName;
+end;
+
+(***********************************************************************)
+{TMainForm.NewButtonClick}
+procedure TMainForm.NewButtonClick(Sender: TObject);
+begin
+  NewProject1Click(Sender);
+end;
+
+(***********************************************************************)
+{TMainForm.OpenButtonClick}
+procedure TMainForm.OpenButtonClick(Sender: TObject);
+begin
+  OpenProject1Click(Sender);
+end;
+
+(***********************************************************************)
+{TMainForm.SaveButtonClick}
+procedure TMainForm.SaveButtonClick(Sender: TObject);
+begin
+  if IsDirty = true then begin
+    if IsNewFile = true then begin
+      SaveProjectAs1Click(Sender);
+    end
+    else begin
+      SaveProject1Click(Sender);
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.XCalcOutlineKeyDown}
+procedure TMainForm.XCalcOutlineKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+var
+  ErrorMsg     : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption : array[0..MAXERRORLENGTH-1] of char;
+  TheText      : string;
+  TheObject    : TacStreamable;
+  Button       : integer;
+begin
+  if (Key = VK_DELETE) then begin
+    TheObject := nil;
+    {if outline deleteclicked find string associated with object and delete the object}
+    TheText := XCalcOutline.items[XCalcOutline.SelectedItem].Text;
+    {...Not getting object when open}
+    TheObject := MainForm.FLog.AtName(TheText);
+    if TheObject is TacStreamable then begin
+      LoadString(hinstance, ID_SZ_Delete, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(Errormsg, ErrorCaption, mb_YesNo or MB_ICONQUESTION);
+      if Button = idYes then begin
+        {..if design then enable the menu item }
+        if XCalcOutline.Items[(XCalcOutline.SelectedItem-1)].text = 'Design Verification' then begin
+          DesignChosen := false;
+        end;
+        XCalcOutline.Items[XCalcOutline.SelectedItem].destroy;
+        DeleteFromLog(TheObject);
+      end;
+    end
+  end;
+end;
+
+(***********************************************************************)
+{TMainForm.FormClose}
+procedure TMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
+var
+  ErrorMsg        : array[0..MAXERRORLENGTH-1] of char;
+  ErrorBoxCaption : array[0..MAXERRORLENGTH-1] of char;
+  Msg             : string;
+  Button          : integer;
+begin
+  if IsDirty = true then begin
+    if IsNewFile = false then begin
+      LoadString(hinstance, ID_SZ_DoYouWantToSave, ErrorMsg, sizeof(ErrorMsg));
+      Msg := strpas(ErrorMsg);
+      Msg := Msg + ' ' + SaveFileName + '?';
+      strpcopy(ErrorMsg, Msg);
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_DoYouWantToSave, ErrorMsg, sizeof(ErrorMsg));
+      Msg := strpas(ErrorMsg);
+      Msg := Msg + '?';
+      strpcopy(ErrorMsg, Msg);
+    end;
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorBoxCaption, sizeof(ErrorBoxCaption));
+    Button := Application.MessageBox(Errormsg, ErrorBoxCaption, mb_YesNoCancel or MB_ICONQUESTION);
+    if Button = idYes then begin
+      if IsNewFile = true then begin
+        SaveProjectAs1Click(Sender);
+        {...if filename is blank then do nothing}
+        if Length(SaveDialog1.FileName) = 0 then begin
+          action := caNone;
+          exit;
+        end;
+      end
+      else begin
+        SaveProject1Click(Sender);
+        {...if filename is blank then do nothing}
+        if Length(SaveDialog1.FileName) = 0 then begin
+          action := caNone;
+          exit;
+        end;
+      end;
+    end
+    else if button = idNo then begin
+      Action := caFree;
+      exit;
+    end
+    else begin
+      action := caNone;
+      exit;
+    end;
+  end;
+  Release;
+end;
+
+(***********************************************************************)
+{TMainForm.DesignButtonClick}
+procedure TMainForm.DesignButtonClick(Sender: TObject);
+begin
+  Design1Click(Sender);
+end;
+
+(***********************************************************************)
+{TMainForm.CompensationButtonClick}
+procedure TMainForm.CompensationButtonClick(Sender: TObject);
+begin
+  Compensation1Click(Sender);
+end;
+
+(***********************************************************************)
+{TMainForm.Usernotice1Click}
+procedure TMainForm.Usernotice1Click(Sender: TObject);
+begin
+  Application.CreateForm(TWarningForm, WarningForm);
+  WarningForm.showmodal;
+end;
+
+(***********************************************************************)
+{TMainForm.Print1Click}
+procedure TMainForm.Print1Click(Sender: TObject);
+var
+  TheText   : string;
+  TheObject : TacStreamable;
+  ChildIndex : integer;
+  button    : integer;
+  OutlineCount : integer;
+begin
+  TheObject := nil;
+  OutlineCount := XCalcOutline.ItemCount;
+  MainForm.Cursor := crHourglass;
+  {if outline doubleclicked find string associated with object and show the form}
+  with XCalcOutline do begin
+    Cursor := crHourglass;
+    for ChildIndex := 1 to OutlineCount do begin
+      TheText := XCalcOutline.items[ChildIndex].Text;
+      {...Not getting object when open}
+      TheObject := MainForm.FLog.AtName(TheText);
+      if TheObject is TacStreamable then begin
+        TheObject.PrintTheForm;
+      end;
+    end;
+    Cursor := crDefault;
+  end;
+  MainForm.Cursor := crDefault;
+end;
+
+(***********************************************************************)
+{TMainForm.contents1Click}
+procedure TMainForm.contents1Click(Sender: TObject);
+begin
+ // Application.HelpJump('Contents');
+ //application.help
+  Application.HelpShowTableOfContents;
+end;
+
+(***********************************************************************)
+{TMainForm.HowtoUseHelp1Click}
+procedure TMainForm.HowtoUseHelp1Click(Sender: TObject);
+begin
+  Application.HelpCommand(Help_HelpOnHelp, 0);
+end;
+
+(***********************************************************************)
+{TMainForm.HelpSpeedBtnClick}
+procedure TMainForm.HelpSpeedBtnClick(Sender: TObject);
+begin
+  Contents1Click(Sender);
+end;
+
+(***********************************************************************)
+{TMainForm.PrintButtonClick}
+procedure TMainForm.PrintButtonClick(Sender: TObject);
+begin
+  Print1Click(Sender);
+end;
+
+begin
+  {...registering object}
+  RegisterClasses([TMainObject]);
+end.

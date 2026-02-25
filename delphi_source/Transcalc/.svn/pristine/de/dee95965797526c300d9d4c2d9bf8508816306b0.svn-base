@@ -1,0 +1,90 @@
+unit Config;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, StdCtrls, Buttons;
+
+const
+  MAXTEXTLENGTH = 60;
+  DISPLAYTRUE   = '1';
+  DISPLAYFALSE  = '0';
+
+type
+  TXCalcConfigFrm = class(TForm)
+    GroupBox1: TGroupBox;
+    RB_US: TRadioButton;
+    RB_Metric: TRadioButton;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    GroupBox2: TGroupBox;
+    CKB_Display: TCheckBox;
+    BN_Help: TBitBtn;
+    procedure BN_CancelClick(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  XCalcConfigFrm: TXCalcConfigFrm;
+
+implementation                
+
+{$R *.DFM}
+
+procedure TXCalcConfigFrm.BN_CancelClick(Sender: TObject);
+begin
+  Close;
+end;
+
+procedure TXCalcConfigFrm.BN_OKClick(Sender: TObject);
+begin
+  if RB_Us.checked = true then begin
+    WritePrivateProfileString('Units', 'Units', 'US', 'XCALC.INI');
+  end
+  else begin
+    WritePrivateProfileString('Units', 'Units', 'Metric', 'XCALC.INI');
+  end;
+  if CkB_Display.checked = True then begin
+    WritePrivateProfileString('StartUp', 'Warning', DISPLAYTRUE, 'XCALC.INI');
+  end
+  else begin
+    WritePrivateProfileString('StartUp', 'Warning', DISPLAYFALSE, 'XCALC.INI');
+  end;
+  close;
+end;
+
+procedure TXCalcConfigFrm.FormPaint(Sender: TObject);
+var
+  Cs             : array[0..MAXTEXTLENGTH-1] of char;
+  ShowTheMessage : integer;
+begin
+  {...getting Units from INI file}
+  GetPrivateProfileString('Units', 'Units', 'US', Cs, Sizeof(Cs), 'XCALC.INI');
+  if (strlicomp(Cs, 'US', sizeof(Cs)) = 0) then begin
+    RB_US.checked := true;
+  end
+  else begin
+    RB_Metric.checked := true;
+  end;
+  ShowTheMessage := GetPrivateProfileInt('StartUp', 'Warning', 1, 'XCALC.INI');
+  if ShowTheMessage = 1 then begin
+    CKB_Display.checked := true;
+  end
+  else begin
+    CKB_Display.checked := false;
+  end;
+end;
+
+procedure TXCalcConfigFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(10000);
+end;
+
+end.

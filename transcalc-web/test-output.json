@@ -1,0 +1,956 @@
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+{
+  "numTotalTestSuites": 28,
+  "numPassedTestSuites": 28,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 74,
+  "numPassedTests": 74,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "startTime": 1770402750707,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverStress",
+          "status": "passed",
+          "title": "calculateCantileverStress",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverDeflection",
+          "status": "passed",
+          "title": "calculateCantileverDeflection",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateSimpleSupportedStress",
+          "status": "passed",
+          "title": "calculateSimpleSupportedStress",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers stressToStrain",
+          "status": "passed",
+          "title": "stressToStrain",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverMinStrain (ported from bbcant.pas)",
+          "status": "passed",
+          "title": "calculateCantileverMinStrain (ported from bbcant.pas)",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverMaxStrain (ported from bbcant.pas)",
+          "status": "passed",
+          "title": "calculateCantileverMaxStrain (ported from bbcant.pas)",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverAvgStrain (ported from bbcant.pas)",
+          "status": "passed",
+          "title": "calculateCantileverAvgStrain (ported from bbcant.pas)",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverGradient (ported from bbcant.pas)",
+          "status": "passed",
+          "title": "calculateCantileverGradient (ported from bbcant.pas)",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "beam solvers"
+          ],
+          "fullName": " beam solvers calculateCantileverGradient throws on zero max strain",
+          "status": "passed",
+          "title": "calculateCantileverGradient throws on zero max strain",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751500,
+      "endTime": 1770402751504,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/beams.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "bridge solvers"
+          ],
+          "fullName": " bridge solvers calculateLinearBridge",
+          "status": "passed",
+          "title": "calculateLinearBridge",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "bridge solvers"
+          ],
+          "fullName": " bridge solvers calculateFullTwoBridge",
+          "status": "passed",
+          "title": "calculateFullTwoBridge",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "bridge solvers"
+          ],
+          "fullName": " bridge solvers calculateFullFourBridge",
+          "status": "passed",
+          "title": "calculateFullFourBridge",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "bridge solvers"
+          ],
+          "fullName": " bridge solvers calculateHalfBridge",
+          "status": "passed",
+          "title": "calculateHalfBridge",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751498,
+      "endTime": 1770402751501,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/bridges.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "convert"
+          ],
+          "fullName": " convert mm <-> inches",
+          "status": "passed",
+          "title": "mm <-> inches",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "convert"
+          ],
+          "fullName": " convert fToC",
+          "status": "passed",
+          "title": "fToC",
+          "duration": 0,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751498,
+      "endTime": 1770402751500,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/convert.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "computeCantileverStress"
+          ],
+          "fullName": " computeCantileverStress computes expected stress for a simple case",
+          "status": "passed",
+          "title": "computes expected stress for a simple case",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751505,
+      "endTime": 1770402751506,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/domain.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration returns infinite life below fatigue limit",
+          "status": "passed",
+          "title": "returns infinite life below fatigue limit",
+          "duration": 3,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates finite fatigue life above limit",
+          "status": "passed",
+          "title": "calculates finite fatigue life above limit",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates stress concentration for notch",
+          "status": "passed",
+          "title": "calculates stress concentration for notch",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates fatigue notch factor",
+          "status": "passed",
+          "title": "calculates fatigue notch factor",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates Von Mises equivalent stress",
+          "status": "passed",
+          "title": "calculates Von Mises equivalent stress",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates natural frequency of cantilever beam",
+          "status": "passed",
+          "title": "calculates natural frequency of cantilever beam",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates critical damping coefficient",
+          "status": "passed",
+          "title": "calculates critical damping coefficient",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates damping ratio",
+          "status": "passed",
+          "title": "calculates damping ratio",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates undamped resonance amplification",
+          "status": "passed",
+          "title": "calculates undamped resonance amplification",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates damped resonance amplification",
+          "status": "passed",
+          "title": "calculates damped resonance amplification",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Fatigue Analysis and Vibration"
+          ],
+          "fullName": " Fatigue Analysis and Vibration calculates impulse response displacement",
+          "status": "passed",
+          "title": "calculates impulse response displacement",
+          "duration": 0,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751513,
+      "endTime": 1770402751519,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/fatigue.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "math"
+          ],
+          "fullName": " math cube",
+          "status": "passed",
+          "title": "cube",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "math"
+          ],
+          "fullName": " math solve cubic (1, -6, 11, -6) -> roots 1,2,3",
+          "status": "passed",
+          "title": "solve cubic (1, -6, 11, -6) -> roots 1,2,3",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751497,
+      "endTime": 1770402751499,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/math.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "pressure solvers"
+          ],
+          "fullName": " pressure solvers calculateRadial matches expected",
+          "status": "passed",
+          "title": "calculateRadial matches expected",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "pressure solvers"
+          ],
+          "fullName": " pressure solvers calculateTangential matches expected",
+          "status": "passed",
+          "title": "calculateTangential matches expected",
+          "duration": 0,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751498,
+      "endTime": 1770402751500,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/pressure.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Ring Bending Beam Calculations"
+          ],
+          "fullName": " Ring Bending Beam Calculations calculates ring strain AD (ported from ringbb.pas)",
+          "status": "passed",
+          "title": "calculates ring strain AD (ported from ringbb.pas)",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Ring Bending Beam Calculations"
+          ],
+          "fullName": " Ring Bending Beam Calculations calculates ring strain BC (ported from ringbb.pas)",
+          "status": "passed",
+          "title": "calculates ring strain BC (ported from ringbb.pas)",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Ring Bending Beam Calculations"
+          ],
+          "fullName": " Ring Bending Beam Calculations ring strain AD should be approximately opposite sign to BC",
+          "status": "passed",
+          "title": "ring strain AD should be approximately opposite sign to BC",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Ring Bending Beam Calculations"
+          ],
+          "fullName": " Ring Bending Beam Calculations throws on invalid geometry (zero denominator)",
+          "status": "passed",
+          "title": "throws on invalid geometry (zero denominator)",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751498,
+      "endTime": 1770402751502,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/ringbeam.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Coefficient"
+          ],
+          "fullName": " Coefficient evaluates polynomial correctly",
+          "status": "passed",
+          "title": "evaluates polynomial correctly",
+          "duration": 2,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751498,
+      "endTime": 1770402751500,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/sensorCoeffs.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates shear stress correctly",
+          "status": "passed",
+          "title": "calculates shear stress correctly",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations throws error on zero area",
+          "status": "passed",
+          "title": "throws error on zero area",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates shear strain correctly",
+          "status": "passed",
+          "title": "calculates shear strain correctly",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates shear modulus from stress and strain",
+          "status": "passed",
+          "title": "calculates shear modulus from stress and strain",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates shear stress from modulus and strain",
+          "status": "passed",
+          "title": "calculates shear stress from modulus and strain",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates twist angle for solid shaft",
+          "status": "passed",
+          "title": "calculates twist angle for solid shaft",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates polar moment for solid circular shaft",
+          "status": "passed",
+          "title": "calculates polar moment for solid circular shaft",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates polar moment for hollow circular shaft",
+          "status": "passed",
+          "title": "calculates polar moment for hollow circular shaft",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates shear modulus from youngs modulus and poisson ratio",
+          "status": "passed",
+          "title": "calculates shear modulus from youngs modulus and poisson ratio",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations calculates torsional rigidity",
+          "status": "passed",
+          "title": "calculates torsional rigidity",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Shear Stress and Strain Calculations"
+          ],
+          "fullName": " Shear Stress and Strain Calculations throws on zero length for rigidity",
+          "status": "passed",
+          "title": "throws on zero length for rigidity",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751520,
+      "endTime": 1770402751523,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/shear.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Round Shear Web Calculations"
+          ],
+          "fullName": " Round Shear Web Calculations calculates effective shear span (ported from shearrnd.pas)",
+          "status": "passed",
+          "title": "calculates effective shear span (ported from shearrnd.pas)",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Round Shear Web Calculations"
+          ],
+          "fullName": " Round Shear Web Calculations throws on invalid geometry (zero area)",
+          "status": "passed",
+          "title": "throws on invalid geometry (zero area)",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Round Shear Web Calculations"
+          ],
+          "fullName": " Round Shear Web Calculations calculates different spans for different hole sizes",
+          "status": "passed",
+          "title": "calculates different spans for different hole sizes",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751498,
+      "endTime": 1770402751502,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/shearweb.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Bridge Shunt Optimization"
+          ],
+          "fullName": " Bridge Shunt Optimization calculates bridge output with shunt resistor",
+          "status": "passed",
+          "title": "calculates bridge output with shunt resistor",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Bridge Shunt Optimization"
+          ],
+          "fullName": " Bridge Shunt Optimization calculates span shift with temperature",
+          "status": "passed",
+          "title": "calculates span shift with temperature",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Bridge Shunt Optimization"
+          ],
+          "fullName": " Bridge Shunt Optimization calculates optimal shunt resistance",
+          "status": "passed",
+          "title": "calculates optimal shunt resistance",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Bridge Shunt Optimization"
+          ],
+          "fullName": " Bridge Shunt Optimization calculates three-point shunt matrix",
+          "status": "passed",
+          "title": "calculates three-point shunt matrix",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Bridge Shunt Optimization"
+          ],
+          "fullName": " Bridge Shunt Optimization throws on zero bridge resistance",
+          "status": "passed",
+          "title": "throws on zero bridge resistance",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Bridge Shunt Optimization"
+          ],
+          "fullName": " Bridge Shunt Optimization throws on invalid temperature range",
+          "status": "passed",
+          "title": "throws on invalid temperature range",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751499,
+      "endTime": 1770402751504,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/shuntoptim.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects calculates thermal strain for steel",
+          "status": "passed",
+          "title": "calculates thermal strain for steel",
+          "duration": 2,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects calculates thermal stress when constrained",
+          "status": "passed",
+          "title": "calculates thermal stress when constrained",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects adjusts material properties for temperature",
+          "status": "passed",
+          "title": "adjusts material properties for temperature",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects compensates measured strain for thermal effects",
+          "status": "passed",
+          "title": "compensates measured strain for thermal effects",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects calculates effective gauge factor with temperature",
+          "status": "passed",
+          "title": "calculates effective gauge factor with temperature",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects calculates gauge factor error at temperature",
+          "status": "passed",
+          "title": "calculates gauge factor error at temperature",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects calculates self-heating temperature rise in gauge",
+          "status": "passed",
+          "title": "calculates self-heating temperature rise in gauge",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects corrects for creep over time",
+          "status": "passed",
+          "title": "corrects for creep over time",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Temperature Compensation and Thermal Effects"
+          ],
+          "fullName": " Temperature Compensation and Thermal Effects returns correct CTE for common materials",
+          "status": "passed",
+          "title": "returns correct CTE for common materials",
+          "duration": 1,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751516,
+      "endTime": 1770402751520,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/temperature.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations calculates wire area in circular mils",
+          "status": "passed",
+          "title": "calculates wire area in circular mils",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations calculates wire area in mm┬▓",
+          "status": "passed",
+          "title": "calculates wire area in mm┬▓",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations calculates wire resistance for given length",
+          "status": "passed",
+          "title": "calculates wire resistance for given length",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations adjusts wire resistance for temperature",
+          "status": "passed",
+          "title": "adjusts wire resistance for temperature",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations calculates voltage drop across wire",
+          "status": "passed",
+          "title": "calculates voltage drop across wire",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations calculates power loss in wire",
+          "status": "passed",
+          "title": "calculates power loss in wire",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations retrieves wire gauge properties",
+          "status": "passed",
+          "title": "retrieves wire gauge properties",
+          "duration": 1,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations returns null for unknown gauge",
+          "status": "passed",
+          "title": "returns null for unknown gauge",
+          "duration": 0,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "Wire and Resistor Calculations"
+          ],
+          "fullName": " Wire and Resistor Calculations calculates skin effect factor",
+          "status": "passed",
+          "title": "calculates skin effect factor",
+          "duration": 0,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1770402751512,
+      "endTime": 1770402751516,
+      "status": "passed",
+      "message": "",
+      "name": "C:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/tests/wire.test.ts"
+    }
+  ]
+}

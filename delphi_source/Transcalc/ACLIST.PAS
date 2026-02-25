@@ -1,0 +1,510 @@
+unit acList;
+
+{
+  Project: Non-Component Persistent Object Streaming
+
+  Alan Ciemian
+  Copyright © 1995. All Rights Reserved
+
+
+  Overview
+  ========
+  Implements TacObjStringList class descended from TacStreamable.
+
+  TacObjStringList defines a container class for TacStreamable objects.
+
+}
+
+interface
+
+uses
+  Classes,
+  acStream;
+
+type
+  TacObjListIndex = Integer; { Indexing into lists }
+  TacObjListCount = LongInt; { For saving list count to stream. }
+
+type { for TacObjStringList notifications }
+  TacObjListNotifyEvent = procedure(Idx: TacObjListIndex) of object;
+
+type
+  TacObjStringList = class(TacStreamable)
+  private
+    FList: TStrings; { Ref to contained list }
+    FOwnList: Boolean; { Flag for list ownership }
+    FOwnObjects: Boolean; { Flag for list item ownership }
+    FOnDelete: TacObjListNotifyEvent; { Delete notification }
+    FOnInsert: TacObjListNotifyEvent; { Insert notification }
+    procedure ResetList
+      (
+      const Strings: TStrings;
+      const OwnObjs: Boolean
+      );
+    procedure CloneContents(const OtherList: TacObjStringList);
+    procedure FreeList;
+    procedure FreeObjects;
+    { Property access methods }
+    function GetCount: TacObjListIndex;
+  protected
+    { TPersistent overrides }
+    procedure AssignTo(Dest: TPersistent); override;
+    { TacStreamable overrides }
+    procedure InitFields; override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    { Protected properties }
+    property OnObjDelete: TacObjListNotifyEvent
+      read FOnDelete
+      write FOnDelete;
+    property OnObjInsert: TacObjListNotifyEvent
+      read FOnInsert
+      write FOnInsert;
+  public
+    { Construction/Destruction }
+    constructor Create
+      (
+      const Strings: TStrings;
+      const OwnObjects: Boolean
+      );
+    destructor Destroy; override;
+    { List object access }
+    function AtIndex(const Idx: TacObjListIndex): TacStreamable;
+    function AtName(const Name: String): TacStreamable;
+    { Standard list methods }
+    procedure BeginUpdate;
+    procedure EndUpdate;
+    function Add(const Obj: TacStreamable): TacObjListIndex;
+    procedure Insert(const Idx: TacObjListIndex; const Obj: TacStreamable);
+    procedure Move(const FromIdx: TacObjListIndex;
+      const ToIdx: TacObjListIndex);
+    { Delete's delete the objects if they are owned }
+    procedure DeleteIdx(const Idx: TacObjListIndex);
+    procedure DeleteObj(const Obj: TacStreamable);
+    procedure DeleteName(const Name: String);
+    procedure DeleteAll;
+    { Remove's NEVER delete the objects }
+    function RemoveIdx(const Idx: TacObjListIndex): TacStreamable;
+    function RemoveObj(const Obj: TacStreamable): TacStreamable;
+    function RemoveName(const Name: String): TacStreamable;
+    { ObjStringList specific methods }
+    procedure UpdateObjectName(const Idx: TacObjListIndex);
+    { Public properties }
+    property Strings: TStrings
+      read FList;
+    property Count: TacObjListIndex
+      read GetCount;
+    property OwnObjects: Boolean
+      read FOwnObjects
+      write FOwnObjects;
+    property OwnList: Boolean
+      read FOwnList
+      write FOwnList;
+  end;
+
+implementation
+
+
+{ TacObjStringList }
+
+{
+  Create creates a TacObjStringList tied to a specified TStrings instance.
+  If Strings parameter is nil, a new TStringList will be created.
+  If OwnObjects parameter is True, list will have responsibility for
+  deleting contained objects.
+}
+constructor TacObjStringList.Create
+  (
+  const Strings: TStrings;
+  const OwnObjects: Boolean
+  );
+begin
+  inherited Create;
+  ResetList(Strings, OwnObjects);
+end;
+
+{
+  Destroy frees the contained objects if they are owned and
+  frees the list if it is owned.
+}
+destructor TacObjStringList.Destroy;
+begin
+  FreeList;
+  inherited Destroy;
+end;
+
+{
+  InitFields sets default values for member fields.
+}
+procedure TacObjStringList.InitFields;
+begin
+  inherited InitFields;
+  FList := nil;
+  FOwnList := False;
+  FOwnObjects := False;
+end;
+
+{
+  AssignTo override allows assignment of TacObjStringList instances.
+  Destination list will be reset to contain and own copies of the items
+  currently in this list. The destination instance list and list
+  ownership will not otherwise be changed.
+}
+procedure TacObjStringList.AssignTo
+  (
+  Dest: TPersistent
+  );
+var
+  DestStringList: TacObjStringList;
+begin
+  if (Dest = self) then
+    Exit;
+
+  if ((Dest is TacObjStringList) and (self is Dest.ClassType)) then
+  begin { Assigning to same or superclass }
+    DestStringList := (Dest as TacObjStringList);
+    DestStringList.ResetList(DestStringList.FList, True);
+    DestStringList.CloneContents(self);
+  end
+  else
+  begin { TPersistent will process error }
+    inherited AssignTo(Dest);
+  end;
+end;
+
+{
+  ResetList sets the contained list and ownership flag.
+  If the Strings parameter is nil a new TStringList is created.
+  If the Strings parameter is assigned it becomes the contained list
+  and it is emptied.
+}
+procedure TacObjStringList.ResetList
+  (
+  const Strings: TStrings;
+  const OwnObjs: Boolean
+  );
+begin
+  { If changing list, free current list }
+  if (Strings <> FList) then
+    FreeList;
+
+  if (Assigned(Strings)) then
+  begin
+    FList := Strings;
+  end
+  else
+  begin { Create a new list }
+    FList := TStringList.Create;
+    FOwnList := True;
+  end;
+  DeleteAll;
+  OwnObjects := OwnObjs;
+end;
+
+{
+  CloneContents clones all the items in another list and adds them to this list.
+}
+procedure TacObjStringList.CloneContents
+  (
+  const OtherList: TacObjStringList
+  );
+var
+  Idx: TacObjListIndex;
+  Item: TacStreamable;
+  ItemClass: TacStreamableClass;
+begin
+  for Idx := 0 to (OtherList.Count - 1) do
+  begin
+    Item := OtherList.AtIndex(Idx);
+    ItemClass := TacStreamableClass(Item.ClassType);
+    Add(ItemClass.CreateClone(Item));
+  end;
+end;
+
+{
+  FreeList frees the list reference
+}
+procedure TacObjStringList.FreeList;
+begin
+  if (Assigned(FList)) then
+  begin
+    if (FOwnObjects) then
+      FreeObjects;
+    if (FOwnList) then
+    begin
+      FList.Free;
+      FList := nil;
+    end;
+  end;
+end;
+
+{
+  FreeObjects frees all the objects in the list.
+}
+procedure TacObjStringList.FreeObjects;
+var
+  Idx: TacObjListIndex;
+begin
+  for Idx := 0 to (Count - 1) do
+  begin
+    AtIndex(Idx).Free;
+  end;
+end;
+
+{
+  ReadFromStream override resets the list and fills it from a stream image.
+}
+procedure TacObjStringList.ReadFromStream
+  (
+  Stream: TacObjStream
+  );
+var
+  ReadCount: TacObjListCount;
+  ReadIdx: TacObjListIndex;
+begin
+  { Clear or create the list reference as needed }
+  ResetList(FList, True);
+
+  { Read contained object count }
+  Stream.ReadBuffer(ReadCount, sizeof(ReadCount));
+  { Read objects }
+  for ReadIdx := 1 to ReadCount do
+  begin
+    Add(Stream.ReadObject(nil));
+  end;
+end;
+
+{
+  SaveToStream override saves an image of the list to a stream.
+}
+procedure TacObjStringList.SaveToStream
+  (
+  Stream: TacObjStream
+  );
+var
+  SaveCount: TacObjListCount;
+  SaveIdx: TacObjListIndex;
+begin
+  { Save contained object count }
+  SaveCount := Count;
+  Stream.SaveBuffer(SaveCount, sizeof(SaveCount));
+  { Save objects }
+  for SaveIdx := 0 to (SaveCount - 1) do
+  begin
+    Stream.SaveObject(AtIndex(SaveIdx));
+  end;
+end;
+
+{
+  AtIndex returns a reference to the object at a specific index.
+}
+function TacObjStringList.AtIndex
+  (
+  const Idx: TacObjListIndex
+  ): TacStreamable;
+begin
+  Result := nil;
+  if ((0 <= Idx) and (Idx < Count)) then
+  begin
+    Result := FList.Objects[Idx] as TacStreamable;
+  end;
+end;
+
+{
+  AtName returns a reference to the object with a specific name.
+}
+function TacObjStringList.AtName
+  (
+  const Name: String
+  ): TacStreamable;
+begin
+  Result := AtIndex(FList.IndexOf(Name));
+end;
+
+procedure TacObjStringList.BeginUpdate;
+begin
+  FList.BeginUpdate;
+end;
+
+procedure TacObjStringList.EndUpdate;
+begin
+  FList.EndUpdate;
+end;
+
+{
+  Add adds an object to the list.
+  If Obj is added the OnInsert notification is fired.
+}
+function TacObjStringList.Add
+  (
+  const Obj: TacStreamable
+  ): TacObjListIndex;
+var
+  AddIdx: TacObjListIndex;
+begin
+  Result := -1;
+  if (Assigned(Obj)) then
+  begin
+    Result := FList.AddObject(Obj.AsString, Obj);
+    { Call notify event }
+    if (Assigned(FOnInsert)) then
+      FOnInsert(Result);
+  end;
+end;
+
+{
+  Inserts adds an object to the list at a specified position.
+  If Obj is added the OnInsert notification is fired.
+}
+procedure TacObjStringList.Insert
+  (
+  const Idx: TacObjListIndex;
+  const Obj: TacStreamable
+  );
+begin
+  if (Assigned(Obj)) then
+  begin
+    FList.InsertObject(Idx, Obj.AsString, Obj);
+    { Call notify event }
+    if (Assigned(FOnInsert)) then
+      FOnInsert(Idx);
+  end;
+end;
+
+{
+  Move moves a list object from one index to another.
+}
+procedure TacObjStringList.Move
+  (
+  const FromIdx: TacObjListIndex;
+  const ToIdx: TacObjListIndex
+  );
+begin
+  FList.Move(FromIdx, ToIdx);
+end;
+
+{
+  DeleteIdx
+  Removes the object at the specified index from the list and deletes it.
+  If an object is found at the index:
+  The OnDelete notification is fired.
+  The Object is removed from the list.
+  The Object is freed if the list owns the objects.
+}
+procedure TacObjStringList.DeleteIdx(const Idx: TacObjListIndex);
+var
+  Obj: TacStreamable;
+begin
+  Obj := AtIndex(Idx);
+
+  if (Assigned(Obj)) then
+  begin
+    { Call delete notify event }
+    if (Assigned(FOnDelete)) then
+      FOnDelete(Idx);
+
+    { Delete object if owned }
+    if (FOwnObjects) then
+      Obj.Free;
+  end;
+
+  { Remove item from list }
+  FList.Delete(Idx);
+end;
+
+{
+  DeleteObj
+  Removes the specified object from the list and deletes it.
+  Looks up the index of the object and forwards to DeleteIdx.
+}
+procedure TacObjStringList.DeleteObj(const Obj: TacStreamable);
+begin
+  DeleteIdx(FList.IndexOfObject(Obj));
+end;
+
+{
+  DeleteName
+  Removes the object with the specified name from the list and deletes it.
+  Looks up the index of the name and forwards to DeleteIdx.
+}
+procedure TacObjStringList.DeleteName(const Name: String);
+begin
+  DeleteIdx(FList.IndexOf(Name));
+end;
+
+{
+  DeleteAll
+  Removes all objects from the list and deletes them.
+}
+procedure TacObjStringList.DeleteAll;
+var
+  Idx: TacObjListIndex;
+begin
+  for Idx := (Count - 1) downto 0 do
+  begin
+    DeleteIdx(Idx);
+  end;
+end;
+
+{
+  RemoveIdx
+  Removes and returns the object at the specified index.
+}
+function TacObjStringList.RemoveIdx(const Idx: TacObjListIndex): TacStreamable;
+
+begin
+  Result := AtIndex(Idx);
+  FList.Delete(Idx);
+end;
+
+{
+  RemoveObj
+  Removes and returns the specified object.
+}
+function TacObjStringList.RemoveObj(const Obj: TacStreamable): TacStreamable;
+
+var
+  index: Integer;
+
+begin
+  index := FList.IndexOfObject(Obj);
+  if (index >= 0)
+  then
+    Result := RemoveIdx(index)
+  else
+    Result := nil
+end;
+
+{
+  RemoveName
+  Removes and returns the object with the specified name.
+}
+function TacObjStringList.RemoveName
+  (
+  const Name: String
+  ): TacStreamable;
+begin
+  Result := RemoveIdx(FList.IndexOf(Name));
+end;
+
+{
+  UpdateObjectName allows the object at a specified index to update its
+  reference name in the list.
+}
+procedure TacObjStringList.UpdateObjectName
+  (
+  const Idx: TacObjListIndex
+  );
+begin
+  FList.Strings[Idx] := AtIndex(Idx).AsString;
+end;
+
+{
+  GetCount returns the number of objects in the list.
+}
+function TacObjStringList.GetCount: TacObjListIndex;
+begin
+  Result := FList.Count;
+end;
+
+end.

@@ -1,0 +1,986 @@
+(***********************************************)
+(*  Round Hollow Column Unit                   *)
+(***********************************************)
+unit Rndhlwc;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, acStream, acList, Log, LogItem, LogStrm,
+  Buttons, Printers, Vcl.Dialogs, ioUtils, ShellAPI;
+
+const
+  MAXTEXTLENGTH   = 40;
+  MAXERRORLENGTH  = 255;
+
+type
+  RealType = double;
+
+(***********************************************)
+(*  Round Hollow Column Object                 *)
+(***********************************************)
+type TRoundHollowCol = class(TLogItem)
+private
+  FAppliedLoad      : shortstring;
+  FInsideDiameter   : shortstring;
+  FOutsideDiameter  : shortstring;
+  FPoisson          : shortstring;
+  FModulus          : shortstring;
+  FGageFactor       : shortstring;
+  FAxialStrain      : shortstring;
+  FTransverseStrain : shortstring;
+  FFullSpan         : shortstring;
+  TheString         : shortstring;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+  procedure ShowTheForm; override;
+  procedure PrintTheForm; override;
+  function GetAsString: String; override;
+public
+  constructor create;
+  destructor destroy; override ;
+  property AppliedLoad: shortstring read FAppliedLoad write FAppliedLoad;
+  property InsideDiameter: shortstring read FInsideDiameter write FInsideDiameter;
+  property OutsideDiameter: shortstring read FOutsideDiameter write FOutsideDiameter;
+  property Poisson: shortstring read FPoisson write FPoisson;
+  property Modulus: shortstring read FModulus write FModulus;
+  property GageFactor: shortstring read FGageFactor write FGageFactor;
+  property AxialStrain: shortstring read FAxialStrain write FAxialStrain;
+  property TransverseStrain: shortstring read FTransverseStrain write FTransverseStrain;
+  property FullSpan: shortstring read FFullSpan write FFullSpan;
+  property TheStringText: shortstring read TheString write TheString;
+end;
+
+(***********************************************)
+(*  Round Hollow Column Form Object            *)
+(***********************************************)
+type
+  TRndHollowColFrm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    EB_AppliedLoad: TEdit;
+    ST_LoadUnit: TLabel;
+    GroupBox2: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    EB_InsideDiameter: TEdit;
+    EB_OutsideDiameter: TEdit;
+    ST_InsideUnit: TLabel;
+    ST_OutsideUnit: TLabel;
+    GroupBox3: TGroupBox;
+    EB_Poisson: TEdit;
+    Panel2: TPanel;
+    GroupBox6: TGroupBox;
+    Label3: TLabel;
+    Label4: TLabel;
+    ST_Axial: TLabel;
+    ST_Transverse: TLabel;
+    Label10: TLabel;
+    Label11: TLabel;
+    Label7: TLabel;
+    Label8: TLabel;
+    ST_ModulusUnit: TLabel;
+    Label12: TLabel;
+    ST_FullSpan: TLabel;
+    Label14: TLabel;
+    EB_Modulus: TEdit;
+    GroupBox4: TGroupBox;
+    EB_GageFactor: TEdit;
+    BN_Compute: TBitBtn;
+    BN_help: TBitBtn;
+    ST_KGF: TLabel;
+    ST_KgfUnit: TLabel;
+    BN_Print: TBitBtn;
+    Image1: TImage;
+    SaveDialogPrint: TSaveDialog;
+//    Sheet1: TSheet;
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function CalculateAxialStrain: RealType;
+    function CalculateTransverseStrain: RealType;
+    function CalculateFullSpan: RealType;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure EB_AppliedLoadExit(Sender: TObject);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_helpClick(Sender: TObject);
+  private
+    Old_AppliedLoad     : string;
+    Old_InsideDiameter  : string;
+    Old_OutsideDiameter : string;
+    Old_Poisson         : string;
+    Old_Modulus         : string;
+    Old_GageFactor      : string;
+    Old_Axial           : string;
+    Old_Transverse      : string;
+    Old_FullSpan        : string;
+    AxialText           : string;
+    TransverseText      : string;
+    FullSpanText        : string;
+    IsThereAnError      : boolean;
+    ExceptionRaised     : boolean;
+    Load                : RealType;
+    Inside              : RealType;
+    Outside             : RealType;
+    Ratio               : RealType;
+    Elasticity          : RealType;
+    Factor              : RealType;
+    AxialE              : RealType;
+    TransverseE         : RealType;
+    FullSensitivity     : RealType;
+  public
+    RoundHollowColObject: TRoundHollowCol;
+    RndHlwColChosen     : boolean;
+  end;
+
+var
+  RndHollowColFrm: TRndHollowColFrm;
+
+implementation
+uses MainMenu, Convert, Design;
+{$R *.DFM}
+
+(***********************************************)
+(*  Round Holow Column Object Methods          *)
+(***********************************************)
+
+(***********************************************************************)
+{TRoundHollowCol.create}
+constructor TRoundHollowCol.create;
+begin
+  {...creating the object}
+  inherited create;
+  {...associating a string with the object}
+  TheString := 'Axial - Round Hollow';
+end;
+
+(***********************************************************************)
+{TRoundHollowCol.destroy}
+destructor TRoundHollowCol.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TRoundHollowCol.GetAsString}
+function TRoundHollowCol.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(***********************************************************************)
+{TRoundHollowCol.ShowTheForm}
+procedure TRoundHollowCol.ShowTheForm;
+begin
+  Application.CreateForm(TRndHollowColFrm, RndHollowColFrm);
+  RndHollowColFrm.showmodal;
+end;
+
+(***********************************************************************)
+{TRoundHollowCol.PrintTheForm}
+procedure TRoundHollowCol.PrintTheForm;
+var
+  Sender : TObject;
+begin
+  Sender := self ;
+  Application.CreateForm(TRndHollowColFrm, RndHollowColFrm);
+  RndHollowColFrm.visible := false;
+  RndHollowColFrm.FormActivate(sender);
+  RndHollowColFrm.BN_PrintClick(sender);
+  RndHollowColFrm.BN_CancelClick(Sender);
+end;
+
+(***********************************************************************)
+{ TRoundHollowCol.AssignTo}
+procedure TRoundHollowCol.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TRoundHollowCol) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TRoundHollowCol do begin
+      FAppliedLoad := self.FAppliedLoad;
+      FInsideDiameter := self.FInsideDiameter;
+      FOutsideDiameter := self.FOutsideDiameter;
+      FPoisson := self.FPoisson;
+      FModulus := self.FModulus;
+      FGageFactor := self.FGageFactor;
+      FAxialStrain := self.FAxialStrain;
+      FTransverseStrain := self.FTransverseStrain;
+      FFullSpan := self.FFullSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{ TRoundHollowCol.InitFields}
+procedure TRoundHollowCol.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(***********************************************************************)
+{ TRoundHollowCol.SaveToStream}
+procedure TRoundHollowCol.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.SaveBuffer(FInsideDiameter, sizeof(shortstring));
+  Stream.SaveBuffer(FOutsideDiameter, sizeof(shortstring));
+  Stream.SaveBuffer(FPoisson, sizeof(shortstring));
+  Stream.SaveBuffer(FModulus, sizeof(shortstring));
+  Stream.SaveBuffer(FGageFactor, sizeof(shortstring));
+  Stream.SaveBuffer(FAxialStrain, sizeof(shortstring));
+  Stream.SaveBuffer(FTransverseStrain, sizeof(shortstring));
+  Stream.SaveBuffer(FFullSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************************************)
+{ TRoundHollowCol.ReadFromStream}
+procedure TRoundHollowCol.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.ReadBuffer(FInsideDiameter, sizeof(shortstring));
+  Stream.ReadBuffer(FOutsideDiameter, sizeof(shortstring));
+  Stream.ReadBuffer(FPoisson, sizeof(shortstring));
+  Stream.ReadBuffer(FModulus, sizeof(shortstring));
+  Stream.ReadBuffer(FGageFactor, sizeof(shortstring));
+  Stream.ReadBuffer(FAxialStrain, sizeof(shortstring));
+  Stream.ReadBuffer(FTransverseStrain, sizeof(shortstring));
+  Stream.ReadBuffer(FFullSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************)
+(*  Round Hollow Column Form Methods           *)
+(***********************************************)
+
+(***********************************************************************)
+{TRndHollowColFrm.CalculateAxialStrain}
+function TRndHollowColFrm.CalculateAxialStrain: RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  AxialResult    : RealType;
+  Button         : integer;
+begin
+  AxialResult := 0.0 ;
+  ExceptionRaised := false;
+  Numerator := -(Load / ((Pi * sqr(Outside/2)) - (Pi * sqr(Inside/2))));
+  Denominator := Elasticity;
+  try
+    AxialResult := (Numerator/Denominator) * 1e6;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoAxialStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateAxialStrain := AxialResult;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.CalculateTransverseStrain}
+function TRndHollowColFrm.CalculateTransverseStrain: RealType;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm        : RealType;
+  SecondTerm       : RealType;
+  TransverseResult : RealType;
+  Button           : integer;
+begin
+  TransverseResult := 0.0 ;
+  ExceptionRaised := false;
+  FirstTerm := AxialE;
+  SecondTerm := -(Ratio);
+  try
+    TransverseResult := FirstTerm * SecondTerm;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoTransverseStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateTransverseStrain := TransverseResult;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.CalculateFullSpan}
+function TRndHollowColFrm.CalculateFullSpan: RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  SpanResult     : RealType;
+  Button         : integer;
+begin
+  SpanResult := 0.0 ;
+  ExceptionRaised := false;
+  Numerator := (-2 * AxialE) + (2 * TransverseE);
+  Denominator := 4;
+  try
+    SpanResult := (Factor * (Numerator/Denominator)) * 1e-3;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoFullSpan, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateFullSpan := SpanResult;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.FormCreate}
+procedure TRndHollowColFrm.FormCreate(Sender: TObject);
+var
+  LoadUnit      : array[0..MAXTEXTLENGTH-1] of char;
+  DimensionUnit : array[0..MAXTEXTLENGTH-1] of char;
+  ModulusUnit   : array[0..MAXTEXTLENGTH-1] of char;
+begin
+  {...deciding whether to use Std or SI units on form}
+  if MainForm.UnitsAreUS = true then begin
+    LoadString(hinstance, ID_SZ_USLBF, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_Inches, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_PSI, ModulusUnit, sizeof(ModulusUnit));
+  end
+  else begin
+    LoadString(hinstance, ID_SZ_N, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_MM, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_GPa, ModulusUnit, sizeof(ModulusUnit));
+  end;
+  {...placing units on the form}
+  ST_LoadUnit.caption := LoadUnit;
+  ST_InsideUnit.caption := DimensionUnit;
+  ST_OutsideUnit.caption := DimensionUnit;
+  ST_ModulusUnit.caption := ModulusUnit;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.BN_ComputeClick}
+procedure TRndHollowColFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINAPPLIEDLOAD_US        = 0.0000;
+  MAXAPPLIEDLOAD_US        = 500000;
+  MININSIDEDIAMETER_US     = 0.00;
+  MAXINSIDEDIAMETER_US     = 50.0;
+  MINOUTSIDEDIAMETER_US    = 0.020;
+  MAXOUTSIDEDIAMETER_US    = 50;
+  MINPOISSON_US            = 0.1;
+  MAXPOISSON_US            = 0.4;
+  MINMODULUS_US            = 5000000;
+  MAXMODULUS_US            = 50000000;
+  MINGAGEFACTOR_US         = 1.0;
+  MAXGAGEFACTOR_US         = 5.0;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH] of char;
+  ErrorUnit        : array[0..MAXERRORLENGTH] of char;
+  ErrorAnd         : array[0..MAXERRORLENGTH] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH] of char;
+  StrUnit          : string;
+  StrAnd           : string;
+  StrMsg           : string;
+  StrMin           : string;
+  strMax           : string;
+  EditStrings      : string;
+  MinAppliedLoad   : RealType;
+  MaxAppliedLoad   : RealType;
+  MinInside        : RealType;
+  MaxInside        : RealType;
+  MinOutside       : RealType;
+  MaxOutside       : RealType;
+  MinPoisson       : RealType;
+  MaxPoisson       : RealType;
+  MinModulus       : RealType;
+  MaxModulus       : RealType;
+  MinGageFactor    : RealType;
+  MaxGageFactor    : RealType;
+  ErrorCode        : integer;
+  Button           : integer;
+begin
+  {...Determining which units to use std. or si for min and max values}
+  if MainForm.UnitsAreUS = True then begin
+    MinAppliedLoad   := MINAPPLIEDLOAD_US;
+    MaxAppliedLoad   := MAXAPPLIEDLOAD_US;
+    MinInside        := MININSIDEDIAMETER_US;
+    MaxInside        := MAXINSIDEDIAMETER_US;
+    MinOutside       := MINOUTSIDEDIAMETER_US;
+    MaxOutside       := MAXOUTSIDEDIAMETER_US;
+    MinPoisson       := MINPOISSON_US;
+    MaxPoisson       := MAXPOISSON_US;
+    MinModulus       := MINMODULUS_US;
+    MaxModulus       := MAXMODULUS_US;
+    MinGageFactor    := MINGAGEFACTOR_US;
+    MaxGageFactor    := MAXGAGEFACTOR_US;
+  end
+  else begin
+    MinAppliedLoad   := Lbf_To_N(MINAPPLIEDLOAD_US);
+    MaxAppliedLoad   := Lbf_To_N(MAXAPPLIEDLOAD_US);
+    MinInside        := Inches_To_mm(MININSIDEDIAMETER_US);
+    MaxInside        := Inches_To_mm(MAXINSIDEDIAMETER_US);
+    MinOutside       := Inches_To_mm(MINOUTSIDEDIAMETER_US);
+    MaxOutside       := Inches_To_mm(MAXOUTSIDEDIAMETER_US);
+    MinPoisson       := MINPOISSON_US;
+    MaxPoisson       := MAXPOISSON_US;
+    MinModulus       := PSI_To_GPa(MINMODULUS_US);
+    MaxModulus       := PSI_To_GPa(MAXMODULUS_US);
+    MinGageFactor    := MINGAGEFACTOR_US;
+    MaxGageFactor    := MAXGAGEFACTOR_US;
+  end;
+  ST_Axial.caption := '';
+  ST_Transverse.caption := '';
+  ST_FullSpan.caption := '';
+  {...checking Applied Force to see if valid}
+  IsThereAnError := False;
+  EditStrings := EB_AppliedLoad.text;
+  val(EditStrings, load, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end
+  else if (Load < MinAppliedLoad) or (Load > MaxAppliedLoad) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_USlbf, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_N, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_AppliedLoad, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinAppliedLoad, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxAppliedLoad, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end;
+  {...checking to see if Inside Diameter is valid}
+  EditStrings := EB_InsideDiameter.text;
+  val(EditStrings, Inside, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_InsideDiameter.setfocus;
+    EB_InsideDiameter.clearselection;
+    exit;
+  end
+  else if (Inside < MinInside) or (Inside > MaxInside) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_InsideDiameter, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinInside, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxInside, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_InsideDiameter.setfocus;
+    EB_InsideDiameter.clearselection;
+    exit;
+  end;
+  {...checking to see if Outside Diameter is valid}
+  EditStrings := EB_OutsideDiameter.text;
+  val(EditStrings, Outside, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_OutsideDiameter.setfocus;
+    EB_OutsideDiameter.clearselection;
+    exit;
+  end
+  else if (Outside < MinOutside) or (Outside > MaxOutside) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_OutsideDiameter, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinOutside, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxOutside, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_OutsideDiameter.setfocus;
+    EB_OutsideDiameter.clearselection;
+    exit;
+  end;
+  {...checking to see if Poisson is valid}
+  EditStrings := EB_Poisson.text;
+  val(EditStrings, Ratio, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end
+  else if (Ratio < MinPoisson) or (Ratio > MaxPoisson) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_Poisson, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinPoisson, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxPoisson, ffFixed, 8, 2);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end;
+  {...checking to see if Modulus value is valid}
+  EditStrings := EB_Modulus.text;
+  val(EditStrings, elasticity, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end
+  else if (elasticity < MinModulus) or (elasticity > MaxModulus) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_PSI, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_GPA, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Modulus, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinModulus, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxModulus, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then begin
+    Elasticity := Elasticity * 1000;
+  end;
+  {...checking to see if Gage Factor is valid}
+  EditStrings := EB_GageFactor.text;
+  val(EditStrings, Factor, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (Factor < MinGageFactor) or (Factor > MaxGageFactor) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageFactor, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxGageFactor, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+ {...checking to make sure inside diameter is not greater than outside diameter}
+  if Inside >= Outside then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_InsideTooBig, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_OutsideDiameter.setfocus;
+    EB_OutsideDiameter.clearselection;
+    exit;
+  end;
+  {...doing calculations}
+  if IsThereAnError = False then begin
+    {...Axial Strain}
+    AxialE := CalculateAxialStrain;
+    if abs(AxialE) < 5000 then begin
+      if ExceptionRaised = false then begin
+        AxialText := floattostrf(AxialE, ffFixed, 4, 0);
+        ST_Axial.caption := AxialText;
+      end;
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ST_Axial.caption := '';
+      ST_Transverse.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    {...Transverse Strain}
+    TransverseE := CalculateTransverseStrain;
+    if abs(TransverseE) < 5000 then begin
+      if ExceptionRaised = false then begin
+        TransverseText := floattostrf(TransverseE, ffFixed, 4, 0);
+        ST_Transverse.caption := TransverseText;
+      end;
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ST_Axial.caption := '';
+      ST_Transverse.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    {...Full Bridge Sensitivity}
+    FullSensitivity := CalculateFullSpan;
+    if ExceptionRaised = false then begin
+      FullSpanText := floattostrf(FullSensitivity, ffFixed, 4, 3);
+      ST_FullSpan.caption := FullSpanText;
+    end;
+    if abs(AxialE) > 1700 then begin
+      LoadString(hinstance, ID_SZ_StrainExceeds1700, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ModalResult := 0;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.BN_CancelClick}
+procedure TRndHollowColFrm.BN_CancelClick(Sender: TObject);
+begin
+  {...palcing initial values in Edit Boxes}
+  EB_AppliedLoad.text := Old_AppliedLoad;
+  EB_InsideDiameter.text := Old_InsideDiameter;
+  EB_OutsideDiameter.text := Old_OutsideDiameter;
+  EB_Poisson.text := Old_Poisson;
+  EB_Modulus.text := Old_Modulus;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_Transverse.caption  := Old_Transverse;
+  ST_Axial.caption := Old_Axial;
+  ST_FullSpan.caption := Old_FullSpan;
+  close;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.FormActivate}
+procedure TRndHollowColFrm.FormActivate(Sender: TObject);
+var
+  EditStrings  : string;
+  i            : integer;
+  TheItem      : TacStreamable;
+begin
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TRoundHollowCol then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {if there is an object, then placing values in editboxes}
+  if TheItem <> nil then begin
+    EB_AppliedLoad.text := (TheItem as TRoundHollowCol).AppliedLoad;
+    EB_InsideDiameter.text := (TheItem as TRoundHollowCol).InsideDiameter;
+    EB_OutsideDiameter.text  := (TheItem as TRoundHollowCol).OutsideDiameter;
+    EB_Poisson.text := (TheItem as TRoundHollowCol).Poisson;
+    EB_Modulus.text := (TheItem as TRoundHollowCol).Modulus;
+    EB_GageFactor.text := (TheItem as TRoundHollowCol).GageFactor;
+    ST_Axial.caption := (TheItem as TRoundHollowCol).AxialStrain;
+    ST_Transverse.caption := (TheItem as TRoundHollowCol).TransverseStrain;
+    ST_FullSpan.caption := (TheItem as TRoundHollowCol).FullSpan;
+  end;
+  {...placing initial values in old variables}
+  Old_AppliedLoad := EB_AppliedLoad.text;
+  Old_InsideDiameter := EB_InsideDiameter.text;
+  Old_OutsideDiameter := EB_OutsideDiameter.text;
+  Old_Poisson := EB_Poisson.text;
+  Old_Modulus := EB_Modulus.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_Axial := ST_Axial.caption;
+  Old_Transverse := ST_Transverse.caption;
+  Old_FullSpan := ST_FullSpan.caption;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.BN_OKClick}
+procedure TRndHollowColFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem : TacStreamable;
+  i       : integer;
+  j       : integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = True then begin
+    exit;
+  end;
+  MainForm.DesignChosen := true;
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TRoundHollowCol then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {if there is an object, then placing values in editboxes}
+  if TheItem = nil then begin
+    {...creating and placing values in object}
+    RoundHollowColObject := TRoundHollowCol.create;
+    RoundHollowColObject.AppliedLoad := EB_AppliedLoad.text;
+    RoundHollowColObject.InsideDiameter := EB_InsideDiameter.text;
+    RoundHollowColObject.OutsideDiameter := EB_OutsideDiameter.text;
+    RoundHollowColObject.Poisson := EB_Poisson.text;
+    RoundHollowColObject.Modulus := EB_Modulus.text;
+    RoundHollowColObject.GageFactor := EB_GageFactor.text;
+    RoundHollowColObject.AxialStrain := ST_Axial.caption;
+    RoundHollowColObject.TransverseStrain := ST_Transverse.caption;
+    RoundHollowColObject.FullSpan := ST_FullSpan.caption;
+    MainForm.AddToLog(RoundHollowColObject);
+    j := 0;
+    {...placing string associated with object in the outline}
+    repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Design Verification') or (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, RoundHollowColObject.GetAsString);
+  end
+  else begin
+    (TheItem as TRoundHollowCol).AppliedLoad := EB_AppliedLoad.text;
+    (TheItem as TRoundHollowCol).InsideDiameter := EB_InsideDiameter.text;
+    (TheItem as TRoundHollowCol).OutsideDiameter := EB_OutsideDiameter.text;
+    (TheItem as TRoundHollowCol).Poisson := EB_Poisson.text;
+    (TheItem as TRoundHollowCol).Modulus := EB_Modulus.text;
+    (TheItem as TRoundHollowCol).GageFactor := EB_GageFactor.text;
+    (TheItem as TRoundHollowCol).AxialStrain := ST_Axial.caption;
+    (TheItem as TRoundHollowCol).TransverseStrain := ST_Transverse.caption;
+    (TheItem as TRoundHollowCol).FullSpan := ST_FullSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.DesignDlgShowing = True then begin
+    DesignDlg.close;
+  end;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.FormClose}
+procedure TRndHollowColFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.EB_AppliedLoadExit}
+procedure TRndHollowColFrm.EB_AppliedLoadExit(Sender: TObject);
+var
+  ForceUnit  : array[0..MAXTEXTLENGTH-1] of char;
+  ForceText  : string;
+  ForceValue : double;
+  ErrorCode  : integer;
+begin
+  if MainForm.UnitsAreUS = false then begin
+    ForceText := EB_AppliedLoad.text;
+    val(ForceText, ForceValue, ErrorCode);
+    if ErrorCode <> 0 then begin
+      exit;
+    end;
+    ForceValue := ForceValue * 0.101971;
+//    str(ForceValue:4:3, ForceText);
+    ForceText := format('%4.3f',[ForceValue]) ;
+    ST_KGF.caption := ForceText;
+    Loadstring(hinstance, ID_SZ_MetricKg, ForceUnit, sizeof(ForceUnit));
+    ST_KGFUnit.caption := ForceUnit;
+  end
+  else begin
+    St_KGF.caption := '';
+    ST_KGFUnit.caption := '';
+  end;
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.BN_PrintClick}
+procedure TRndHollowColFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderPChar   : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderString  : string;
+  DateString    : string;
+  id            : longint;
+  MetaHandle    : Thandle;
+  sserror       : integer;
+  htmlText      : string ;
+  stream        : tResourceStream ;
+  strstream     : tStringStream;
+
+begin
+   Stream := TResourceStream.Create(HInstance, 'RndHlw', RT_RCDATA)  ;
+   strstream := TStringStream.Create() ;
+
+   try
+     strstream.LoadFromStream(stream)     ;
+     htmlText := strstream.DataString ;
+   finally
+     StrStream.Free() ;
+     Stream.Free() ;
+   end;
+   htmlText := StringReplace(htmlText, '$af2',ST_LoadUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$id2',ST_InsideUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$od2',ST_OutsideUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$me2',ST_ModulusUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+
+  htmlText := StringReplace(htmlText, '$af1',EB_AppliedLoad.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$id1',EB_InsideDiameter.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$od1',EB_OutsideDiameter.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$pr1',EB_Poisson.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$me1',EB_Modulus.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$gf1',EB_GageFactor.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$as1',ST_Axial.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$cs1',ST_Transverse.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$sf1',ST_FullSpan.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   SaveDialogPrint.FileName := '' ;
+   SaveDialogPrint.InitialDir := tPath.GetDocumentsPath ;
+   if SaveDialogPrint.Execute
+     then begin
+       tfile.writeAllText(SaveDialogPrint.FileName,htmlText) ;
+       ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName) ,nil,nil,SW_SHOWNORMAL);
+     end;
+  {...clearing sheet for new values}
+(*  SSClearRange(Sheet1.SS, 4, 5, 17, 5, 3);
+  {placing Units on sheet}
+  SSSetActiveCell(Sheet1.SS, 4, 6);
+  Sheet1.text := ST_LoadUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 6, 6);
+  Sheet1.text := ST_InsideUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 7, 6);
+  Sheet1.text := ST_OutsideUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 10, 6);
+  Sheet1.text := ST_ModulusUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 4, 5);
+  Sheet1.text := EB_AppliedLoad.text;
+  SSSetActiveCell(Sheet1.SS, 6, 5);
+  Sheet1.text := EB_InsideDiameter.text;
+  SSSetActiveCell(Sheet1.SS, 7, 5);
+  Sheet1.text := EB_OutsideDiameter.text;
+  SSSetActiveCell(Sheet1.SS, 9, 5);
+  Sheet1.text := EB_Poisson.text;
+  SSSetActiveCell(Sheet1.SS, 10, 5);
+  Sheet1.text := EB_Modulus.text;
+  SSSetActiveCell(Sheet1.SS, 12, 5);
+  Sheet1.text := EB_GageFactor.text;
+  SSSetActiveCell(Sheet1.SS, 15, 5);
+  Sheet1.text := ST_Axial.caption;
+  SSSetActiveCell(Sheet1.SS, 16, 5);
+  Sheet1.text := ST_Transverse.caption;
+  SSSetActiveCell(Sheet1.SS, 17, 5);
+  Sheet1.text := ST_FullSpan.caption;
+  sserror := SSObjNewPicture(Sheet1.ss, 2, 20, 5.57, 29, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+  SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+  DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+  HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+  strpcopy(HeaderPChar, HeaderString);
+  SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+  SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+  SSFilePrint(Sheet1.ss, 0);     *)
+end;
+
+(***********************************************************************)
+{TRndHollowColFrm.BN_helpClick}
+procedure TRndHollowColFrm.BN_helpClick(Sender: TObject);
+begin
+  Application.HelpContext(1070);
+end;
+
+begin
+  {..registering the object}
+  RegisterClasses([TRoundHollowCol]);
+end.
+

@@ -1,0 +1,1285 @@
+(************************************************)
+(* Optimum Shunt Cut  C01 Resistor Unit         *)
+(************************************************)
+unit Optshc01;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons, acList, acStream, Log, LogItem,
+  LogStrm, Dialogs, Resistor, Printers;
+
+type
+  RealType = double;
+
+(************************************************)
+(*  TRung Object                                *)
+(************************************************)
+type
+  TRung = class(TLogItem)
+  private
+    CuttingArea : TRect;
+  public
+    RungIsCut   : Boolean;
+    constructor create(left, top, right, bottom : integer);
+    destructor done; virtual;
+    function IsClicked(p : TPoint):boolean;
+    function IsCut: integer;
+    procedure Cut(TheCanvas: TCanvas);
+    procedure Fix(TheCanvas: TCanvas);
+    procedure SaveToStream(Stream : TacObjStream); override;
+    procedure ReadFromStream(Stream : TacObjStream); override;
+    procedure Redraw(TheCanvas: TCanvas);
+end;
+
+(************************************************)
+(*  TC01 Resistor Object                        *)
+(************************************************)
+type
+  TC01OptShuntResist = class(TResistor)
+  private
+    FStartResistance : string;
+    TheString : string;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure ShowTheForm; override;
+    function GetAsString : string; override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+  public
+ {property and functions here}
+    FA1, FA2, FA3, FA4, FA5, FA6, FA7, FA8, FA9, FA10 : TRung;
+    SA1, SA2, SA3, SA4, SA5, SA6, SA7, SA8, SA9, SA10 : TRung;
+    B1, B2, B3, B4                                    : TRung;
+    FC1, FC2                                          : TRung;
+    SC1, SC2                                          : TRung;
+    constructor create;
+    destructor destroy; override ;
+    property StartResistance : string read FStartResistance write FStartResistance;
+    property TheStringText: string read TheString write TheString;
+end;
+
+(************************************************)
+(*  TC01 Form Object optimum shunt              *)
+(************************************************)
+type
+  TOptShuntCutC01Frm = class(TForm)
+    Image1: TImage;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    BN_Restore: TBitBtn;
+    BN_Help: TBitBtn;
+    BN_Print: TBitBtn;
+    GroupBox1: TGroupBox;
+    Label2: TLabel;
+    EB_StartingRes: TEdit;
+    GroupBox2: TGroupBox;
+    ST_CalculatedRes: TLabel;
+    Label1: TLabel;
+    procedure Image1MouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure FormCreate(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    procedure BN_RestoreClick(Sender: TObject);
+    procedure ReCalculate;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure PrintForm;
+    function GotFormImage: TBitmap;
+    procedure BN_PrintClick(Sender: TObject);
+    procedure EB_StartingResExit(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+    public
+     C01OptShuntResist : TC01OptShuntResist;
+  end;
+
+var
+  OptShuntCutC01Frm: TOptShuntCutC01Frm;
+
+implementation
+uses MainMenu;
+{$R *.DFM}
+
+(***********************************************)
+(*              TRung Methods                  *)
+(***********************************************)
+
+(***********************************************************************)
+{TRung.create}
+constructor TRung.create(left, top, right, bottom : integer);
+begin
+  inherited create;
+  {...creating the TRung object setting the cutting area and intializing RungIsCut}
+  RungIsCut := false;
+  CuttingArea.left := left;
+  CuttingArea.top := top;
+  CuttingArea.right := right;
+  CuttingArea.bottom := bottom;
+end;
+
+(***********************************************************************)
+{TRung.done}
+destructor TRung.done;
+begin
+  {...destroying the object}
+  Done;
+end;
+
+(***********************************************************************)
+{TRung.Redraw}
+procedure TRung.Redraw(TheCanvas: TCanvas);
+begin
+  {..deciding whether to cut or fix the rung depending on whether it was fixed or cut}
+  with TheCanvas do begin
+    if RungIsCut = False then begin {...we need to restore the rung}
+      pen.Color := clGray;
+      brush.color := clGray;
+    end
+    else begin          {...we need to cut rung}
+      pen.Color := clYellow;
+      brush.color := clYellow;
+    end;
+    {...setting pen and  brush attributes}
+    brush.Style := bsSolid;
+    pen.style := psSolid;
+    Rectangle(CuttingArea.Left, CuttingArea.top, CuttingArea.right, CuttingArea.Bottom);
+  end;
+end;
+
+(***********************************************************************)
+{TRung.SaveToStream}
+procedure TRung.SaveToStream(Stream : TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(CuttingArea, sizeof(TRect));
+  Stream.SaveBuffer(RungIsCut, sizeof(Boolean));
+end;
+
+(***********************************************************************)
+{TRung.ReadFromStream}
+procedure TRung.ReadFromStream(Stream : TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(CuttingArea, sizeof(TRect));
+  Stream.ReadBuffer(RungIsCut, sizeof(Boolean));
+end;
+
+(***********************************************************************)
+{TRung.IsClicked}
+function TRung.IsClicked(p : TPoint): boolean;
+begin
+  {...determines if the point clicked is in which rectangle}
+  Result := PtInRect(CuttingArea, p);
+end;
+
+(***********************************************************************)
+{TRung.IsCut}
+function TRung.IsCut: integer;
+begin
+  if RungIsCut then begin
+    IsCut := 0;
+  end
+  else begin
+    IsCut  := 1;
+  end;
+end;
+
+(***********************************************************************)
+{TRung.Cut}
+procedure TRung.Cut(TheCanvas: TCanvas);
+begin
+  {...setting the RungIsCut Value}
+  RungIsCut := true;
+  {...Cutting the rung}
+  Redraw(TheCanvas);
+end;
+
+(***********************************************************************)
+{TRung.Fix}
+procedure TRung.Fix(TheCanvas: TCanvas);
+begin
+  {...setting RungIsCut}
+  RungIsCut := false;
+  {...fixing the rung}
+  Redraw(TheCanvas);
+end;
+
+(***********************************************)
+(*    TC01OptShuntResist Methods               *)
+(***********************************************)
+
+(***********************************************************************)
+{TC01OptShuntResist.create}
+constructor TC01OptShuntResist.create;
+begin
+  inherited create;
+  {...setting the string so can identify which object it is}
+  TheString := 'C01 Resistor';
+  {...setting the cutting area of each rung}
+  {...setting the cutting area of each rung}
+  FA10 := TRung.Create(32, 229, 36, 233);
+  FA9  := TRung.Create(32, 207, 36, 211);
+  FA8  := TRung.Create(32, 186, 36, 190);
+  FA7  := TRung.Create(32, 165, 36, 169);
+  FA6  := TRung.Create(32, 145, 36, 149);
+  FA5  := TRung.Create(32, 125, 36, 129);
+  FA4  := TRung.Create(32, 104, 36, 108);
+  FA3  := TRung.Create(32, 86, 36, 90);
+  FA2  := TRung.Create(32, 67, 36, 71);
+  FA1  := TRung.Create(32, 48, 36, 52);
+  SA10 := TRung.Create(61, 229, 65, 233);
+  SA9  := TRung.Create(61, 207, 65, 211);
+  SA8  := TRung.Create(61, 186, 65, 190);
+  SA7  := TRung.Create(61, 165, 65, 169);
+  SA6  := TRung.Create(61, 145, 65, 149);
+  SA5  := TRung.Create(61, 125, 65, 129);
+  SA4  := TRung.Create(61, 104, 65, 108);
+  SA3  := TRung.Create(61, 86, 65, 90);
+  SA2  := TRung.Create(61, 67, 65, 71);
+  SA1  := TRung.Create(61, 48, 65, 52);
+  B4  := TRung.Create(97, 229, 102, 233);
+  B3  := TRung.Create(97, 175, 102, 179);
+  B2  := TRung.Create(97, 123, 102, 127);
+  B1  := TRung.Create(97,  71, 102, 75);
+  FC2  := TRung.Create(136, 229, 141, 233);
+  FC1  := TRung.Create(136, 123, 141, 127);
+  SC2  := TRung.Create(170, 229, 175, 233);
+  SC1  := TRung.Create(170, 123, 175, 127);
+end;
+
+(***********************************************************************)
+{TC01OptShuntResist.destroy}
+destructor TC01OptShuntResist.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TC01OptShuntResist.GetAsString}
+function TC01OptShuntResist.GetAsString : string;
+begin
+  Result := TheString;
+end;
+
+(***********************************************************************)
+{TC01OptShuntResist.ShowTheForm}
+procedure TC01OptShuntResist.ShowTheForm;
+begin
+  Application.CreateForm(TOptShuntCutC01Frm, OptShuntCutC01Frm);
+  OptShuntCutC01Frm.showmodal;
+end;
+
+(***********************************************************************)
+{TD01OptShuntResist.AssignTo}
+procedure TC01OptShuntResist.AssignTo(Dest: TPersistent);
+begin
+  if ((Dest is TC01OptShuntResist) and (Self is Dest.ClassType)) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TC01OptShuntResist do begin
+      FStartResistance := self.FStartResistance;
+      TheString := self.TheString;
+      FA1  := self.FA1;
+      FA2  := self.FA2;
+      FA3  := self.FA3;
+      FA4  := self.FA4;
+      FA5  := self.FA5;
+      FA6  := self.FA6;
+      FA7  := self.FA7;
+      FA8  := self.FA8;
+      FA9  := self.FA9;
+      FA10 := self.FA10;
+      SA1  := self.SA1;
+      SA2  := self.SA2;
+      SA3  := self.SA3;
+      SA4  := self.SA4;
+      SA5  := self.SA5;
+      SA6  := self.SA6;
+      SA7  := self.SA7;
+      SA8  := self.SA8;
+      SA9  := self.SA9;
+      SA10 := self.SA10;
+      B1  := self.B1;
+      B2  := self.B2;
+      B3  := self.B3;
+      B4  := self.B4;
+      FC1  := self.FC1;
+      FC2  := self.FC2;
+      SC1  := self.SC1;
+      SC2  := self.SC2;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{TC01OptShuntResist.InitFields}
+procedure TC01OptShuntResist.InitFields;
+begin
+  inherited initfields;
+end;
+
+(***********************************************************************)
+{TC01OptShuntResist.SaveToStream}
+procedure TC01OptShuntResist.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FStartResistance, sizeof(String));
+  Stream.SaveBuffer(TheString, sizeof(String));
+  FA1.SaveToStream(Stream);
+  FA2.SaveToStream(Stream);
+  FA3.SaveToStream(Stream);
+  FA4.SaveToStream(Stream);
+  FA5.SaveToStream(Stream);
+  FA6.SaveToStream(Stream);
+  FA7.SaveToStream(Stream);
+  FA8.SaveToStream(Stream);
+  FA9.SaveToStream(Stream);
+  FA10.SaveToStream(Stream);
+  SA1.SaveToStream(Stream);
+  SA2.SaveToStream(Stream);
+  SA3.SaveToStream(Stream);
+  SA4.SaveToStream(Stream);
+  SA5.SaveToStream(Stream);
+  SA6.SaveToStream(Stream);
+  SA7.SaveToStream(Stream);
+  SA8.SaveToStream(Stream);
+  SA9.SaveToStream(Stream);
+  SA10.SaveToStream(Stream);
+  B1.SaveToStream(Stream);
+  B2.SaveToStream(Stream);
+  B3.SaveToStream(Stream);
+  B4.SaveToStream(Stream);
+  FC1.SaveToStream(Stream);
+  FC2.SaveToStream(Stream);
+  SC1.SaveToStream(Stream);
+  SC2.SaveToStream(Stream);
+end;
+
+(***********************************************************************)
+{TC01OptShuntResist.ReadFromStream}
+procedure TC01OptShuntResist.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FStartResistance, sizeof(String));
+  Stream.ReadBuffer(TheString, sizeof(String));
+  FA1  := TRung.CreateFromStream(Stream);
+  FA2  := TRung.CreateFromStream(Stream);
+  FA3  := TRung.CreateFromStream(Stream);
+  FA4  := TRung.CreateFromStream(Stream);
+  FA5  := TRung.CreateFromStream(Stream);
+  FA6  := TRung.CreateFromStream(Stream);
+  FA7  := TRung.CreateFromStream(Stream);
+  FA8  := TRung.CreateFromStream(Stream);
+  FA9  := TRung.CreateFromStream(Stream);
+  FA10 := TRung.CreateFromStream(Stream);
+  SA1  := TRung.CreateFromStream(Stream);
+  SA2  := TRung.CreateFromStream(Stream);
+  SA3  := TRung.CreateFromStream(Stream);
+  SA4  := TRung.CreateFromStream(Stream);
+  SA5  := TRung.CreateFromStream(Stream);
+  SA6  := TRung.CreateFromStream(Stream);
+  SA7  := TRung.CreateFromStream(Stream);
+  SA8  := TRung.CreateFromStream(Stream);
+  SA9  := TRung.CreateFromStream(Stream);
+  SA10 := TRung.CreateFromStream(Stream);
+  B1  := TRung.CreateFromStream(Stream);
+  B2  := TRung.CreateFromStream(Stream);
+  B3  := TRung.CreateFromStream(Stream);
+  B4  := TRung.CreateFromStream(Stream);
+  FC1  := TRung.CreateFromStream(Stream);
+  FC2  := TRung.CreateFromStream(Stream);
+  SC1  := TRung.CreateFromStream(Stream);
+  SC2  := TRung.CreateFromStream(Stream);
+end;
+
+(***********************************************)
+(*   TCutC01 Optimum Shunt Form Methods        *)
+(***********************************************)
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.BN_RestoreClick}
+procedure TOptShuntCutC01Frm.BN_RestoreClick(Sender: TObject);
+begin
+  with C01OptShuntResist do begin
+    FA1.Fix(Image1.Canvas);
+    FA2.Fix(Image1.Canvas);
+    FA3.Fix(Image1.Canvas);
+    FA4.Fix(Image1.Canvas);
+    FA5.Fix(Image1.Canvas);
+    FA6.Fix(Image1.Canvas);
+    FA7.Fix(Image1.Canvas);
+    FA8.Fix(Image1.Canvas);
+    FA9.Fix(Image1.Canvas);
+    FA10.Fix(Image1.Canvas);
+    SA1.Fix(Image1.Canvas);
+    SA2.Fix(Image1.Canvas);
+    SA3.Fix(Image1.Canvas);
+    SA4.Fix(Image1.Canvas);
+    SA5.Fix(Image1.Canvas);
+    SA6.Fix(Image1.Canvas);
+    SA7.Fix(Image1.Canvas);
+    SA8.Fix(Image1.Canvas);
+    SA9.Fix(Image1.Canvas);
+    SA10.Fix(Image1.Canvas);
+    B1.Fix(Image1.Canvas);
+    B2.Fix(Image1.Canvas);
+    B3.Fix(Image1.Canvas);
+    B4.Fix(Image1.Canvas);
+    FC1.Fix(Image1.Canvas);
+    FC2.Fix(Image1.Canvas);
+    SC1.Fix(Image1.Canvas);
+    SC2.Fix(Image1.Canvas);
+    ReCalculate;
+  end;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.ReCalculate}
+procedure TOptShuntCutC01Frm.ReCalculate;
+const
+  {FOIL SQUARES - SEE JRW's B.S.}
+  Ohm40S1  = 16.0/10.0;
+  Ohm40S2  = 4.37;
+  Ohm40S3  = 3.0;
+  Ohm40S4  = 1.5/1.0;
+  Ohm40S5  = 2.2;
+  Ohm40S6  = 20.0/8.0;
+  Ohm40S7  = 19.0/4.38{20.0/17.0};
+  Ohm40S8  = 1.5/1.0;
+  Ohm40S9  = 52.0;
+  Ohm40S10 = 2.0;
+  Ohm40S11 = 3.5;
+  Ohm40S12 = 76.0;
+  Ohm40S13 = 18.6;
+  Ohm40S14 = 18.6;
+  Ohm40S15 = 119.0;
+  Ohm40S16 = 163.0;
+  Ohm40S17 = 2.0;
+  Ohm40S18 = 3.0;
+  Ohm40S19 = 17.9;
+  Ohm40S20 = 776.8;
+  Ohm40S21 = 0;
+  Ohm40S22 = 1.5;
+  Ohm40S23 = 1.5;
+  Ohm40TOTALSQUARES = 801.0;
+  Ohm80S1  = 16.0/10.0;
+  Ohm80S2  = 4.37 * 2.0;
+  Ohm80S3  = 3.0;
+  Ohm80S4  = 1.5/1.0;
+  Ohm80S5  = 4.4;
+  Ohm80S6  = 20.0/8.0;
+  Ohm80S7  = (19.0/4.38) * 2.0;
+  Ohm80S8  = 1.5/1.0;
+  Ohm80S9  = 52.0 * 2.0;
+  Ohm80S10 = 2.0;
+  Ohm80S11 = 3.5;
+  Ohm80S12 = 70.0 * 2.0;
+  Ohm80S13 = 18.6 * 2.0;
+  Ohm80S14 = 18.6 * 2.0;
+  Ohm80S15 = 130 * 2.0;
+  Ohm80S16 = 150.0 * 2.0;
+  Ohm80S17 = 2.0;
+  Ohm80S18 = 3.0;
+  Ohm80S19 = 17.9 * 2.0;
+  Ohm80S20 = 1575.4;
+  Ohm80S21 = 0;
+  Ohm80S22 = 1.5;
+  Ohm80S23 = 1.5;
+  Ohm80TOTALSQUARES = 1600.0;
+var
+  ErrorMsg      : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption  : array[0..MAXERRORLENGTH-1] of char;
+  ErrorAnd      : array[0..MAXERRORLENGTH-1] of char;
+  ErrorUnit     : array[0..MAXERRORLENGTH-1] of char;
+  cs            : array[0..255] of char;
+  EditStrings   : string;
+  s             : string;
+  StrMsg        : string;
+  StrUnit       : string;
+  StrAnd        : string;
+  S1            : RealType;
+  S2            : RealType;
+  S3            : RealType;
+  S4            : RealType;
+  S5            : RealType;
+  S6            : RealType;
+  S7            : RealType;
+  S8            : RealType;
+  S9            : RealType;
+  S10           : RealType;
+  S11           : RealType;
+  S12           : RealType;
+  S13           : RealType;
+  S14           : RealType;
+  S15           : RealType;
+  S16           : RealType;
+  S17           : RealType;
+  S18           : RealType;
+  S19           : RealType;
+  S20           : RealType;
+  S21           : RealType;
+  S22           : RealType;
+  S23           : RealType;
+  TotalSquares  : RealType;
+  C             : RealType;
+  CFA           : RealType;
+  CSA           : RealType;
+  CB            : RealType;
+  CFC           : RealType;
+  CSC           : RealType;
+  Squares       : RealType;
+  Rtotal        : RealType;
+  RStart        : RealType;
+  OhmsPerSquare : RealType;
+  code          : Integer;
+  Button        : integer;
+begin
+  { Read Starting Resistance}
+  s := EB_StartingRes.text;
+  val(s,Rstart,code);
+  if code <> 0 then begin
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    Rstart := 0;
+    ST_CalculatedRes.caption := '';
+    exit;
+  end;
+  if (RStart >= 30) and (RStart <= 50) then begin
+    S1 := Ohm40S1;
+    S2 := Ohm40S2;
+    S3 := Ohm40S3;
+    S4 := Ohm40S4;
+    S5 := Ohm40S5;
+    S6 := Ohm40S6;
+    S7 := Ohm40S7;
+    S8 := Ohm40S8;
+    S9 := Ohm40S9;
+    S10 := Ohm40S10;
+    S11 := Ohm40S11;
+    S12 := Ohm40S12;
+    S13 := Ohm40S13;
+    S14 := Ohm40S14;
+    S15 := Ohm40S15;
+    S16 := Ohm40S16;
+    S17 := Ohm40S17;
+    S18 := Ohm40S18;
+    S19 := Ohm40S19;
+    S20 := Ohm40S20;
+    S21 := Ohm40S21;
+    S22 := Ohm40S22;
+    S23 := Ohm40S23;
+    TotalSquares := Ohm40TOTALSQUARES;
+  end
+  else if (RStart >= 60) and (RStart <= 110) then begin
+    S1 := Ohm80S1;
+    S2 := Ohm80S2;
+    S3 := Ohm80S3;
+    S4 := Ohm80S4;
+    S5 := Ohm80S5;
+    S6 := Ohm80S6;
+    S7 := Ohm80S7;
+    S8 := Ohm80S8;
+    S9 := Ohm80S9;
+    S10 := Ohm80S10;
+    S11 := Ohm80S11;
+    S12 := Ohm80S12;
+    S13 := Ohm80S13;
+    S14 := Ohm80S14;
+    S15 := Ohm80S15;
+    S16 := Ohm80S16;
+    S17 := Ohm80S17;
+    S18 := Ohm80S18;
+    S19 := Ohm80S19;
+    S20 := Ohm80S20;
+    S21 := Ohm80S21;
+    S22 := Ohm80S22;
+    S23 := Ohm80S23;
+    TotalSquares := Ohm80TOTALSQUARES;
+  end
+  else begin
+    LoadString(hinstance, ID_SZ_WrongResistor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    EditStrings := StrMsg + ' ' + '30-50 or 60-110' + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    EB_StartingRes.setfocus;
+    exit;
+  end;
+  if RStart > 0 then begin
+    OhmsPerSquare := Rstart/TOTALSQUARES;
+  end;
+  {Calculate Ladder First "A"}
+  C  := (C01OptShuntResist.FA1.IsCut / S3) + (1 / (2 * S7 + S6));
+  C  := (C01OptShuntResist.FA2.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA3.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA4.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA5.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA6.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA7.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA8.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.FA9.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  CFA := (C01OptShuntResist.FA10.IsCut / S10) + (1 / (2 * S2 + 1/C));
+  {Calculate Ladder Second "A"}
+  C  := (C01OptShuntResist.SA1.IsCut / S3) + (1 / (2 * S7 + S6));
+  C  := (C01OptShuntResist.SA2.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA3.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA4.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA5.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA6.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA7.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA8.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  C  := (C01OptShuntResist.SA9.IsCut / S3) + (1 / (2 * S5 + S3 + 1/C));
+  CSA := (C01OptShuntResist.SA10.IsCut / S10) + (1 / (2 * S2 + 1/C));
+  {Calculate Ladder "B"}
+  C  := (C01OptShuntResist.B1.IsCut / S10) + (1 / S12);
+  C  := (C01OptShuntResist.B2.IsCut / S11) + (1 / (S9 + S13 + 1/C));
+  C  := (C01OptShuntResist.B3.IsCut / S10) + (1 / (S9 + S13 + 1/C));
+  CB := (C01OptShuntResist.B4.IsCut / S18) + (1 / (S9 + S14 + 1/C));
+  {Calculate Ladder First "C"}
+  C  := (C01OptShuntResist.FC1.IsCut / S17) + (1 / S16);
+  C  := (C01OptShuntResist.FC2.IsCut / S18) + (1 / (S15 + S19 + 1/C));
+  CFC  := C;
+  {Calculate Ladder Second "C"}
+  C  := (C01OptShuntResist.SC1.IsCut / S17) + (1 / S16);
+  C  := (C01OptShuntResist.SC2.IsCut / S18) + (1 / (S15 + S19 + 1/C));
+  CSC := C;
+  { Calculate total resistance}
+  Squares := 1/CFA + 1/CSA + 1/CB + 1/CFC + 1/CSC + S20 + S8 + S8 + S8 + S8 +
+             S4 + S21 + S22 + S1 + S23;                
+  RTotal := OhmsPerSquare * Squares;
+  {Display}
+  if RTotal > 0 then begin
+//    Str(Rtotal:7:1, s);
+    s := format('%7.1f',[Rtotal]) ;
+    StrPcopy(cs,s);
+    ST_CalculatedRes.caption := s;
+  end
+  else
+    ST_CalculatedRes.caption := s;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.Image1MouseDown}
+procedure TOptShuntCutC01Frm.Image1MouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  p      : TPoint;
+begin
+  {...retrieving the point clicked}
+  p.x := x;
+  p.y := y;
+  with C01OptShuntResist do begin
+    {...Checking whether to cut or fix FA1 depending on if it is already cut or fixed}
+    if FA1.isClicked(p) then
+      if FA1.RungIsCut then
+        FA1.Fix(Image1.Canvas)
+      else
+        FA1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA2 depending on if it is already cut or fixed}
+    if FA2.isClicked(p) then
+      if FA2.RungIsCut then
+        FA2.Fix(Image1.Canvas)
+      else
+        FA2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA3 depending on if it is already cut or fixed}
+    if FA3.isClicked(p) then
+      if FA3.RungIsCut then
+        FA3.Fix(Image1.Canvas)
+      else
+        FA3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA4 depending on if it is already cut or fixed}
+    if FA4.isClicked(p) then
+      if FA4.RungIsCut then
+        FA4.Fix(Image1.Canvas)
+      else
+        FA4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA5 depending on if it is already cut or fixed}
+    if FA5.isClicked(p) then
+      if FA5.RungIsCut then
+        FA5.Fix(Image1.Canvas)
+      else
+        FA5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA6 depending on if it is already cut or fixed}
+    if FA6.isClicked(p) then
+      if FA6.RungIsCut then
+        FA6.Fix(Image1.Canvas)
+      else
+        FA6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA7 depending on if it is already cut or fixed}
+    if FA7.isClicked(p) then
+      if FA7.RungIsCut then
+        FA7.Fix(Image1.Canvas)
+      else
+        FA7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA8 depending on if it is already cut or fixed}
+    if FA8.isClicked(p) then
+      if FA8.RungIsCut then
+        FA8.Fix(Image1.Canvas)
+      else
+        FA8.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA9 depending on if it is already cut or fixed}
+    if FA9.isClicked(p) then
+      if FA9.RungIsCut then
+        FA9.Fix(Image1.Canvas)
+      else
+        FA9.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FA10 depending on if it is already cut or fixed}
+    if FA10.isClicked(p) then
+      if FA10.RungIsCut then
+        FA10.Fix(Image1.Canvas)
+      else
+        FA10.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA1 depending on if it is already cut or fixed}
+    if SA1.isClicked(p) then
+      if SA1.RungIsCut then
+        SA1.Fix(Image1.Canvas)
+      else
+        SA1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA2 depending on if it is already cut or fixed}
+    if SA2.isClicked(p) then
+      if SA2.RungIsCut then
+        SA2.Fix(Image1.Canvas)
+      else
+        SA2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA3 depending on if it is already cut or fixed}
+    if SA3.isClicked(p) then
+      if SA3.RungIsCut then
+        SA3.Fix(Image1.Canvas)
+      else
+        SA3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA4 depending on if it is already cut or fixed}
+    if SA4.isClicked(p) then
+      if SA4.RungIsCut then
+        SA4.Fix(Image1.Canvas)
+      else
+        SA4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA5 depending on if it is already cut or fixed}
+    if SA5.isClicked(p) then
+      if SA5.RungIsCut then
+        SA5.Fix(Image1.Canvas)
+      else
+        SA5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA6 depending on if it is already cut or fixed}
+    if SA6.isClicked(p) then
+      if SA6.RungIsCut then
+        SA6.Fix(Image1.Canvas)
+      else
+        SA6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA7 depending on if it is already cut or fixed}
+    if SA7.isClicked(p) then
+      if SA7.RungIsCut then
+        SA7.Fix(Image1.Canvas)
+      else
+        SA7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA8 depending on if it is already cut or fixed}
+    if SA8.isClicked(p) then
+      if SA8.RungIsCut then
+        SA8.Fix(Image1.Canvas)
+      else
+        SA8.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA9 depending on if it is already cut or fixed}
+    if SA9.isClicked(p) then
+      if SA9.RungIsCut then
+        SA9.Fix(Image1.Canvas)
+      else
+        SA9.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SA10 depending on if it is already cut or fixed}
+    if SA10.isClicked(p) then
+      if SA10.RungIsCut then
+        SA10.Fix(Image1.Canvas)
+      else
+        SA10.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B1 depending on if it is already cut or fixed}
+    if B1.isClicked(p) then
+      if B1.RungIsCut then
+        B1.Fix(Image1.Canvas)
+      else
+        B1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B2 depending on if it is already cut or fixed}
+    if B2.isClicked(p) then
+      if B2.RungIsCut then
+        B2.Fix(Image1.Canvas)
+      else
+        B2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B3 depending on if it is already cut or fixed}
+    if B3.isClicked(p) then
+      if B3.RungIsCut then
+        B3.Fix(Image1.Canvas)
+      else
+        B3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B4 depending on if it is already cut or fixed}
+    if B4.isClicked(p) then
+      if B4.RungIsCut then
+        B4.Fix(Image1.Canvas)
+      else
+        B4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FC1 depending on if it is already cut or fixed}
+    if FC1.isClicked(p) then
+      if FC1.RungIsCut then
+        FC1.Fix(Image1.Canvas)
+      else
+        FC1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FC2 depending on if it is already cut or fixed}
+    if FC2.isClicked(p) then
+      if FC2.RungIsCut then
+        FC2.Fix(Image1.Canvas)
+      else
+        FC2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix SC1 depending on if it is already cut or fixed}
+    if SC1.isClicked(p) then
+      if SC1.RungIsCut then
+        SC1.Fix(Image1.Canvas)
+      else
+        SC1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix FC2 depending on if it is already cut or fixed}
+    if SC2.isClicked(p) then
+      if SC2.RungIsCut then
+        SC2.Fix(Image1.Canvas)
+      else
+        SC2.Cut(Image1.Canvas);
+    ReCalculate;
+  end;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.FormCreate}
+procedure TOptShuntCutC01Frm.FormCreate(Sender: TObject);
+begin
+  C01OptShuntResist := TC01OptShuntResist.create;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.FormActivate}
+procedure TOptShuntCutC01Frm.FormActivate(Sender: TObject);
+var
+  i : integer;
+  TheItem : TacStreamable;
+begin
+  TheItem := nil;
+  i := 0;
+  {...getting item from object if there is one}
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TC01OptShuntResist then begin
+      TheItem := MainForm.FLog.atIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  if TheItem <> nil then begin
+    {..getting the starting resistance rom object and place in edit box}
+    EB_StartingRes.text := (TheItem as TC01OptShuntResist).StartResistance;
+    {...Getting FA1 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA1.RungIsCut then
+      C01OptShuntResist.FA1.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA1.Fix(Image1.Canvas);
+    {...Getting A2 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA2.RungIsCut then
+      C01OptShuntResist.FA2.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA2.Fix(Image1.Canvas);
+    {...Getting FA3 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA3.RungIsCut then
+      C01OptShuntResist.FA3.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA3.Fix(Image1.Canvas);
+    {...Getting FA4 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA4.RungIsCut then
+      C01OptShuntResist.FA4.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA4.Fix(Image1.Canvas);
+    {...Getting FA5 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA5.RungIsCut then
+      C01OptShuntResist.FA5.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA5.Fix(Image1.Canvas);
+    {...Getting FA6 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA6.RungIsCut then
+      C01OptShuntResist.FA6.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA6.Fix(Image1.Canvas);
+    {...Getting FA7 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA7.RungIsCut then
+      C01OptShuntResist.FA7.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA7.Fix(Image1.Canvas);
+    {...Getting FA8 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA8.RungIsCut then
+      C01OptShuntResist.FA8.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA8.Fix(Image1.Canvas);
+    {...Getting FA9 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA9.RungIsCut then
+      C01OptShuntResist.FA9.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA9.Fix(Image1.Canvas);
+    {...Getting FA10 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FA10.RungIsCut then
+      C01OptShuntResist.FA10.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FA10.Fix(Image1.Canvas);
+    {...Getting SA1 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA1.RungIsCut then
+      C01OptShuntResist.SA1.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA1.Fix(Image1.Canvas);
+    {...Getting SA2 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA2.RungIsCut then
+      C01OptShuntResist.SA2.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA2.Fix(Image1.Canvas);
+    {...Getting SA3 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA3.RungIsCut then
+      C01OptShuntResist.SA3.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA3.Fix(Image1.Canvas);
+    {...Getting SA4 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA4.RungIsCut then
+      C01OptShuntResist.SA4.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA4.Fix(Image1.Canvas);
+    {...Getting SA5 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA5.RungIsCut then
+      C01OptShuntResist.SA5.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA5.Fix(Image1.Canvas);
+    {...Getting SA6 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA6.RungIsCut then
+      C01OptShuntResist.SA6.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA6.Fix(Image1.Canvas);
+    {...Getting SA7 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA7.RungIsCut then
+      C01OptShuntResist.SA7.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA7.Fix(Image1.Canvas);
+    {...Getting SA8 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA8.RungIsCut then
+      C01OptShuntResist.SA8.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA8.Fix(Image1.Canvas);
+    {...Getting SA9 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA9.RungIsCut then
+      C01OptShuntResist.SA9.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA9.Fix(Image1.Canvas);
+    {...Getting SA10 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SA10.RungIsCut then
+      C01OptShuntResist.SA10.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SA10.Fix(Image1.Canvas);
+    {...Getting B1 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).B1.RungIsCut then
+      C01OptShuntResist.B1.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.B1.Fix(Image1.Canvas);
+    {...Getting B2 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).B2.RungIsCut then
+      C01OptShuntResist.B2.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.B2.Fix(Image1.Canvas);
+    {...Getting B3 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).B3.RungIsCut then
+      C01OptShuntResist.B3.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.B3.Fix(Image1.Canvas);
+    {...Getting B4 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).B4.RungIsCut then
+      C01OptShuntResist.B4.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.B4.Fix(Image1.Canvas);
+    {...Getting FC1 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FC1.RungIsCut then
+      C01OptShuntResist.FC1.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FC1.Fix(Image1.Canvas);
+    {...Getting FC2 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).FC2.RungIsCut then
+      C01OptShuntResist.FC2.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.FC2.Fix(Image1.Canvas);
+    {...Getting SC1 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SC1.RungIsCut then
+      C01OptShuntResist.SC1.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SC1.Fix(Image1.Canvas);
+    {...Getting SC2 item from object and Checking whether to cut or fix }
+    if (TheItem as TC01OptShuntResist).SC2.RungIsCut then
+      C01OptShuntResist.SC2.Cut(Image1.Canvas)
+    else
+      C01OptShuntResist.SC2.Fix(Image1.Canvas);
+    Recalculate;
+  end;
+  EB_StartingRes.setfocus;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.BN_OKClick}
+procedure TOptShuntCutC01Frm.BN_OKClick(Sender: TObject);
+var
+  i            : integer;
+  TheItem      : TacStreamable;
+begin
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TC01OptShuntResist then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {If there is an object, then placing values in edit boxes}
+  if TheItem = nil then begin
+    {...placing the fields in the object}
+    C01OptShuntResist.StartResistance := EB_StartingRes.text;
+    C01OptShuntResist.FA1.RungIsCut := C01OptShuntResist.FA1.RungIsCut;
+    C01OptShuntResist.FA2.RungIsCut := C01OptShuntResist.FA2.RungIsCut;
+    C01OptShuntResist.FA3.RungIsCut := C01OptShuntResist.FA3.RungIsCut;
+    C01OptShuntResist.FA4.RungIsCut := C01OptShuntResist.FA4.RungIsCut;
+    C01OptShuntResist.FA5.RungIsCut := C01OptShuntResist.FA5.RungIsCut;
+    C01OptShuntResist.FA6.RungIsCut := C01OptShuntResist.FA6.RungIsCut;
+    C01OptShuntResist.FA7.RungIsCut := C01OptShuntResist.FA7.RungIsCut;
+    C01OptShuntResist.FA8.RungIsCut := C01OptShuntResist.FA8.RungIsCut;
+    C01OptShuntResist.FA9.RungIsCut := C01OptShuntResist.FA9.RungIsCut;
+    C01OptShuntResist.FA10.RungIsCut := C01OptShuntResist.FA10.RungIsCut;
+    C01OptShuntResist.SA1.RungIsCut := C01OptShuntResist.SA1.RungIsCut;
+    C01OptShuntResist.SA2.RungIsCut := C01OptShuntResist.SA2.RungIsCut;
+    C01OptShuntResist.SA3.RungIsCut := C01OptShuntResist.SA3.RungIsCut;
+    C01OptShuntResist.SA4.RungIsCut := C01OptShuntResist.SA4.RungIsCut;
+    C01OptShuntResist.SA5.RungIsCut := C01OptShuntResist.SA5.RungIsCut;
+    C01OptShuntResist.SA6.RungIsCut := C01OptShuntResist.SA6.RungIsCut;
+    C01OptShuntResist.SA7.RungIsCut := C01OptShuntResist.SA7.RungIsCut;
+    C01OptShuntResist.SA8.RungIsCut := C01OptShuntResist.SA8.RungIsCut;
+    C01OptShuntResist.SA9.RungIsCut := C01OptShuntResist.SA9.RungIsCut;
+    C01OptShuntResist.SA10.RungIsCut := C01OptShuntResist.SA10.RungIsCut;
+    C01OptShuntResist.B1.RungIsCut := C01OptShuntResist.B1.RungIsCut;
+    C01OptShuntResist.B2.RungIsCut := C01OptShuntResist.B2.RungIsCut;
+    C01OptShuntResist.B3.RungIsCut := C01OptShuntResist.B3.RungIsCut;
+    C01OptShuntResist.B4.RungIsCut := C01OptShuntResist.B4.RungIsCut;
+    C01OptShuntResist.FC1.RungIsCut := C01OptShuntResist.FC1.RungIsCut;
+    C01OptShuntResist.FC2.RungIsCut := C01OptShuntResist.FC2.RungIsCut;
+    C01OptShuntResist.SC1.RungIsCut := C01OptShuntResist.SC1.RungIsCut;
+    C01OptShuntResist.SC2.RungIsCut := C01OptShuntResist.SC2.RungIsCut;
+    MainForm.AddToLog(C01OptShuntResist);
+  end
+  else begin
+    (TheItem as TC01OptShuntResist).StartResistance := EB_StartingRes.text;
+    (TheItem as TC01OptShuntResist).FA1.RungIsCut := C01OptShuntResist.FA1.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA2.RungIsCut := C01OptShuntResist.FA2.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA3.RungIsCut := C01OptShuntResist.FA3.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA4.RungIsCut := C01OptShuntResist.FA4.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA5.RungIsCut := C01OptShuntResist.FA5.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA6.RungIsCut := C01OptShuntResist.FA6.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA7.RungIsCut := C01OptShuntResist.FA7.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA8.RungIsCut := C01OptShuntResist.FA8.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA9.RungIsCut := C01OptShuntResist.FA9.RungIsCut;
+    (TheItem as TC01OptShuntResist).FA10.RungIsCut := C01OptShuntResist.FA10.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA1.RungIsCut := C01OptShuntResist.SA1.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA2.RungIsCut := C01OptShuntResist.SA2.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA3.RungIsCut := C01OptShuntResist.SA3.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA4.RungIsCut := C01OptShuntResist.SA4.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA5.RungIsCut := C01OptShuntResist.SA5.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA6.RungIsCut := C01OptShuntResist.SA6.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA7.RungIsCut := C01OptShuntResist.SA7.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA8.RungIsCut := C01OptShuntResist.SA8.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA9.RungIsCut := C01OptShuntResist.SA9.RungIsCut;
+    (TheItem as TC01OptShuntResist).SA10.RungIsCut := C01OptShuntResist.SA10.RungIsCut;
+    (TheItem as TC01OptShuntResist).B1.RungIsCut := C01OptShuntResist.B1.RungIsCut;
+    (TheItem as TC01OptShuntResist).B2.RungIsCut := C01OptShuntResist.B2.RungIsCut;
+    (TheItem as TC01OptShuntResist).B3.RungIsCut := C01OptShuntResist.B3.RungIsCut;
+    (TheItem as TC01OptShuntResist).B4.RungIsCut := C01OptShuntResist.B4.RungIsCut;
+    (TheItem as TC01OptShuntResist).FC1.RungIsCut := C01OptShuntResist.FC1.RungIsCut;
+    (TheItem as TC01OptShuntResist).FC2.RungIsCut := C01OptShuntResist.FC2.RungIsCut;
+    (TheItem as TC01OptShuntResist).SC1.RungIsCut := C01OptShuntResist.SC1.RungIsCut;
+    (TheItem as TC01OptShuntResist).SC2.RungIsCut := C01OptShuntResist.SC2.RungIsCut;
+  end;
+  MainForm.IsDirty := true;
+  close;
+end;
+
+procedure TOptShuntCutC01Frm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.GotFormImage}
+function TOptShuntCutC01Frm.GotFormImage: TBitmap;
+var
+  ScreenDC, PrintDC: HDC;
+  OldBits, PrintBits: HBITMAP;
+  PaintLParam: Longint;
+
+  procedure PrintHandle(Handle: HWND);
+  var
+    R: TRect;
+    Child: HWND;
+    SavedIndex: Integer;
+  begin
+    if {IsWindowVisible(Handle)} true then
+    begin
+      SavedIndex := SaveDC(PrintDC);
+      WinProcs.GetClientRect(Handle, R);
+      MapWindowPoints(Handle, Self.Handle, R, 2);
+      with R do
+      begin
+        SetWindowOrgEx(PrintDC, -Left, -Top, nil);
+        IntersectClipRect(PrintDC, 0, 0, Right - Left, Bottom - Top);
+      end;
+      SendMessage(Handle, WM_ERASEBKGND, PrintDC, 0);
+      SendMessage(Handle, WM_PAINT, PrintDC, PaintLParam);
+      Child := GetWindow(Handle, GW_CHILD);
+      if Child <> 0 then
+      begin
+        Child := GetWindow(Child, GW_HWNDLAST);
+        while Child <> 0 do
+        begin
+          PrintHandle(Child);
+          Child := GetWindow(Child, GW_HWNDPREV);
+        end;
+      end;
+      RestoreDC(PrintDC, SavedIndex);
+    end;
+  end;
+
+begin
+  Result := nil;
+  ScreenDC := GetDC(0);
+  PaintLParam := 0;
+  try
+    PrintDC := CreateCompatibleDC(ScreenDC);
+    { Work around an apparent bug in Windows NT }
+ //   if GetWinFlags and $4000 <> 0 then PaintLParam := PrintDC or $DEFE0000;
+    try
+      PrintBits := CreateCompatibleBitmap(ScreenDC, ClientWidth, ClientHeight);
+      try
+        OldBits := SelectObject(PrintDC, PrintBits);
+        try
+          { Clear the contents of the bitmap }
+          FillRect(PrintDC, ClientRect, Brush.Handle);
+          { Paint form into a bitmap }
+          PrintHandle(Handle);
+        finally
+          SelectObject(PrintDC, OldBits);
+        end;
+        Result := TBitmap.Create;
+        Result.Handle := PrintBits;
+        PrintBits := 0;
+      except
+        Result.Free;
+        if PrintBits <> 0 then DeleteObject(PrintBits);
+        raise;
+      end;
+    finally
+      DeleteDC(PrintDC);
+    end;
+  finally
+    ReleaseDC(0, ScreenDC);
+  end;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.PrintForm}
+procedure TOptShuntCutC01Frm.PrintForm;
+var
+  FormImage: TBitmap;
+  Info: PBitmapInfo;
+  InfoSize: Integer;
+  Image: Pointer;
+  ImageSize: Longint;
+  Bits: HBITMAP;
+  DIBWidth, DIBHeight: Longint;
+  PrintWidth, PrintHeight: Longint;
+begin
+(*  Printer.BeginDoc;
+  try
+    FormImage := GotFormImage;
+    try
+      { Paint bitmap to the printer }
+      with Printer, Canvas do
+      begin
+        Bits := FormImage.Handle;
+   //     GetDIBSizes(Bits, InfoSize, ImageSize);
+        Info := MemAlloc(InfoSize);
+        try
+          Image := MemAlloc(ImageSize);
+          try
+            GetDIB(Bits, 0, Info^, Image^);
+            with Info^.bmiHeader do
+            begin
+              DIBWidth := biWidth;
+              DIBHeight := biHeight;
+            end;
+            PrintWidth := MulDiv(DIBWidth, PageHeight, DIBHeight);
+            if PrintWidth < PageWidth then
+              PrintHeight := PageHeight
+            else begin
+              PrintWidth := PageWidth;
+              PrintHeight := MulDiv(DIBHeight, PageWidth, DIBWidth);
+            end;
+            StretchDIBits(Canvas.Handle, 0, 0, PrintWidth, PrintHeight, 0, 0,
+            DIBWidth, DIBHeight, Image, Info^, DIB_RGB_COLORS, SRCCOPY);
+          finally
+            FreeMem(Image, ImageSize);
+          end;
+        finally
+          FreeMem(Info, InfoSize);
+        end;
+      end;
+    finally
+      FormImage.Free;
+    end;
+  finally
+    Printer.EndDoc;
+  end;     *)
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.BN_PrintClick}
+procedure TOptShuntCutC01Frm.BN_PrintClick(Sender: TObject);
+begin
+  BN_OK.visible := false;
+  BN_Cancel.visible := false;
+  BN_Help.visible := false;
+  BN_Restore.visible := false;
+  BN_Print.Visible := false;
+  PrintForm;
+  BN_OK.visible := true;
+  BN_Cancel.visible := true;
+  BN_Help.visible := true;
+  BN_Restore.visible := true;
+  BN_Print.Visible := true;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.EB_StartingResExit}
+procedure TOptShuntCutC01Frm.EB_StartingResExit(Sender: TObject);
+begin
+  Recalculate;
+end;
+
+(***********************************************************************)
+{TOptShuntCutC01Frm.BN_HelpClick}
+procedure TOptShuntCutC01Frm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(3034);
+end;
+
+begin
+  {...Registering the object}
+  RegisterClasses([TC01OptShuntResist]);
+end.

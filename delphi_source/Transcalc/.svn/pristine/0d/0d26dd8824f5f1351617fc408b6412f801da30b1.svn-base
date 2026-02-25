@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:http="http://schemas.microsoft.com/wix/HttpExtension"
+     xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension"
+     xmlns:netfx="http://schemas.microsoft.com/wix/NetFxExtension">
+  <Product Id="*" Name="Transcalc" Language="1033" Version="1.2.6" Manufacturer="Micro-Measurements" UpgradeCode="2BB4A03F-C340-43D5-8499-6617714E416F"  >
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine"  />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes"  VolumeLabel="VolumeLabel"/>
+
+    <Feature Id="ProductFeature" Title="Transcalc" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="COMPANYFOLDER" Name="Micro-Measurements">
+          <Directory Id="INSTALLFOLDER" Name="TransCalc">
+          </Directory>
+        </Directory>
+      </Directory>
+      <Directory Id ="ProgramMenuFolder">
+        <Directory Id="MenuCOMPANYFOLDER" Name="Micro-Measurements">
+          <Directory Id="MenuINSTALLFOLDER" Name="TransCalc">
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+  </Product>
+
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="XCalcPro.exe" Guid="DCAF3157-7F3D-4D9B-AC03-85DBBF46D48B" >
+        <File Id="XCalcPro.exe" Name="XCalcPro.exe" Source="..\..\XCalcPro.exe" KeyPath="yes">
+          <Shortcut Id="SSMenuShortcut" Name="TransCalc" Directory="MenuINSTALLFOLDER" Advertise="yes"  Icon="XCalcPro.exe" IconIndex="0" WorkingDirectory="INSTALLFOLDER"  >
+            <Icon Id="XCalcPro.exe" SourceFile="..\..\XCalcPro.exe" />
+          </Shortcut>
+        </File>
+        <RemoveFolder Id="RemoveMenu" Directory="MenuCOMPANYFOLDER" On="uninstall"/>
+        <RemoveFolder Id="RemoveMenuInstall" Directory="MenuINSTALLFOLDER" On="uninstall"/>
+      </Component>
+      <Component Id="TCRCalc.exe" Guid="50542F2C-BFC4-4626-941F-B483860EB512" >
+        <File Id="TCRCalc.exe" Name="TCRCalc.exe" Source="..\..\TcrCalc.exe" KeyPath="yes" >
+          <Shortcut Id="TCRMenuShortcut" Name="TC Ratio Calculator" Directory="MenuINSTALLFOLDER" Advertise="yes"  Icon="TCRCalc.exe" IconIndex="0" WorkingDirectory="INSTALLFOLDER">
+            <Icon Id="TCRCalc.exe" SourceFile="..\..\TcrCalc.exe" />
+          </Shortcut>
+        </File>
+      </Component>
+      <Component Id="XCalc.chm" Guid="9021924A-B9A7-4BD9-8289-1171588492F1" >
+        <File Id="XCalc.chm" Name="XCalc.Chm" Source="..\..\xcalc.chm" KeyPath="yes" >
+          <Shortcut Id="HelpMenuShortcut" Name="Transcalc Help" Directory="MenuINSTALLFOLDER" Advertise="yes"  Icon="xcalc.chm" IconIndex="0" WorkingDirectory="INSTALLFOLDER">
+            <Icon Id="xcalc.chm" SourceFile="..\..\xcalc.chm" />
+          </Shortcut>
+        </File>
+      </Component>
+      <Component Id="SoftwareLicenseAgreement.rtf" Guid="30B0D0A7-97C8-41F0-9784-D5925AFE7898" >
+        <File Id="SoftwareLicenseAgreement.rtf" Name="Software License Agreement.rtf" Source="../Transcalc Installer/License/Software License Agreement.rtf" KeyPath="yes" />
+      </Component>
+      <Component Id="RRSensor.txt" Guid="AC380DD1-9BE6-448D-8AA9-DC478EFFCC9C" >
+        <File Id="RRSensor.Txt" Name="RRSensor.txt" Source="..\..\RRSensor.txt" KeyPath="yes" >
+        </File>
+      </Component>
+      <Component Id="XConfig.exe" Guid="79743330-8629-412F-9D79-FCAF7EA9DC93" >
+        <File Id="XConfig.exe" Name="XConfig.exe" Source="..\..\XConfig.exe" KeyPath="yes" >
+          <Shortcut Id="XConfigMenuShortcut" Name="Transcalc Configuration" Directory="MenuINSTALLFOLDER" Advertise="yes"  Icon="XConfig.exe" IconIndex="0" WorkingDirectory="INSTALLFOLDER">
+            <Icon Id="XConfig.exe" SourceFile="..\..\XConfig.exe" />
+          </Shortcut>
+        </File>
+      </Component>
+      <Component Id="Table.exe" Guid="E7C99F33-B648-4B36-AE4A-18EF24DD5539" >
+        <File Id="Table.exe" Name="Table.exe" Source="..\..\wire\Table.exe" KeyPath="yes" >
+          <Shortcut Id="TableMenuShortcut" Name="Wire Table" Directory="MenuINSTALLFOLDER" Advertise="yes"  Icon="Table.exe" IconIndex="0" WorkingDirectory="INSTALLFOLDER">
+            <Icon Id="Table.exe" SourceFile="..\..\wire\Table.exe" />
+          </Shortcut>
+        </File>
+      </Component>
+      <Component Id="BridgeAp.exe" Guid="B8BD70D2-3C50-4B17-A1A4-C8CDBACAF352" >
+        <File Id="BridgeAp.exe" Name="BridgeAp.exe" Source="..\..\bridge\BridgeAp.exe" KeyPath="yes" >
+          <Shortcut Id="TBridgeMenuShortcut" Name="Bridge Configurations" Directory="MenuINSTALLFOLDER" Advertise="yes"  Icon="BridgeAp.exe" IconIndex="0" WorkingDirectory="INSTALLFOLDER">
+            <Icon Id="BridgeAp.exe" SourceFile="..\..\bridge\BridgeAp.exe" />
+          </Shortcut>
+        </File>
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+
+</Wix>

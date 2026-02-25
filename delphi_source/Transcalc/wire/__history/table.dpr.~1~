@@ -1,0 +1,15 @@
+program Table;
+                        
+uses
+  Forms,
+  Wiretbl in 'WIRETBL.PAS' {WireTableForm},
+  Convert in '\SOFTWA~1\TRANSC~1\CONVERT.PAS';
+
+{$R *.RES}
+
+begin
+  Application.Title := 'Wire Table';
+  Application.HelpFile := 'XCALC.HLP';
+  Application.CreateForm(TWireTableForm, WireTableForm);
+  Application.Run;
+end.

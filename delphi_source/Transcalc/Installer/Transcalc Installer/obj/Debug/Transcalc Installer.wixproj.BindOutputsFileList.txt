@@ -1,0 +1,2 @@
+D:\AFAB\Vishay\transcalc\Transcalc\Installer\Transcalc Installer\bin\Debug\Transcalc_Installer.exe
+D:\AFAB\Vishay\transcalc\Transcalc\Installer\Transcalc Installer\bin\Debug\Transcalc_Installer.wixpdb

@@ -1,0 +1,699 @@
+(***********************************************)
+(*  Zero Balance Unit                          *)
+(***********************************************)
+unit Zerobal;
+
+interface
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, ExtCtrls, StdCtrls, Buttons, acStream, acList, Log, LogStrm,
+  LogItem, Printers, ioUtils, ShellAPI;
+
+const
+  MAXTEXTLENGTH   = 40;
+  MAXERRORLENGTH  = 255;
+
+type
+  RealType = double;
+
+(***********************************************)
+(*  Zero Balance Object                        *)
+(***********************************************)
+
+{ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - }
+{ Wire Object Definition }
+type
+   TWire  = class(Tobject)
+    Name       : string;
+    Resistivity: real;
+    TCR        : real;
+end;
+
+type TZeroBalance = class(TLogItem)
+  private
+    FUnbalance      : shortstring;
+    FRBridge        : shortstring;
+    FWireType       : Int16;
+    FResistorTCR    : shortstring;
+    FResistors      : shortstring;
+    FResistance     : shortstring;
+    FBridgeArm      : shortstring;
+    TheString       : shortstring;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+  procedure ShowTheForm; override;
+  procedure PrintTheForm; override;
+  function GetAsString: String; override;
+public
+  constructor create;
+  destructor destroy; override ;
+  property Unbalance: shortstring read FUnbalance write FUnbalance;
+  property RBridge: shortstring read FRBridge write FRBridge;
+  property TheWireType: Int16 read FWireType write FWireType;
+  property ResistorTCR: shortstring read FResistorTCR write FResistorTCR;
+  property Resistors: shortstring read FResistors write FResistors;
+  property Resistance: shortstring read FResistance write FResistance;
+  property BridgeArm: shortstring read FBridgeArm write FBridgeArm;
+  property TheStringText: shortstring read TheString write TheString;
+end;
+
+(***********************************************)
+(*  Zero Balance Form Object                   *)
+(***********************************************)
+type
+  TZeroBalanceFrm = class(TForm)
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    EB_Unbalance: TEdit;
+    EB_RBridge: TEdit;
+    Label3: TLabel;
+    Label4: TLabel;
+    GroupBox2: TGroupBox;
+    Label5: TLabel;
+    Label6: TLabel;
+    ST_Resistance: TLabel;
+    ST_BridgeArm: TLabel;
+    Label7: TLabel;
+    GroupBox3: TGroupBox;
+    RB_E01Resistor: TRadioButton;
+    RB_Wire: TRadioButton;
+    BN_Cut: TBitBtn;
+    BN_Compute: TBitBtn;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    BN_Help: TBitBtn;
+    CB_WireType: TComboBox;
+    Label8: TLabel;
+    ST_ResistanceTCR: TLabel;
+    ST_ResistanceTCRUnits: TLabel;
+    BN_Print: TBitBtn;
+    Image1: TImage;
+    Image_Wire: TImage;
+    Image_E01: TImage;
+    SaveDialogPrint: TSaveDialog;
+//    Sheet1: TSheet;
+    procedure RB_E01ResistorClick(Sender: TObject);
+    procedure RB_WireClick(Sender: TObject);
+    procedure BN_CutClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    function CalculateResistance: RealType;
+    function CalculateBridgeArm : String;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure CB_WireTypeChange(Sender: TObject);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    { Private declarations }
+    OldUnbalance     : string;
+    OldRBridge       : string;
+    OldResistor      : string;
+    Old_Resistance   : string;
+    Old_BridgeArm    : string;
+    Resistor         : string;
+    ExceptionRaised  : boolean;
+    IsThereAnError   : boolean;
+    Unbal            : RealType;
+    Bridge           : RealType;
+    ResistValue      : RealType;
+  private
+    { Public declarations }
+    TheType : integer;
+    ZeroBalanceObject: TZeroBalance;
+    Wire             : TWire;
+  end;
+
+var
+  ZeroBalanceFrm: TZeroBalanceFrm;
+
+implementation
+uses E01Zero, MainMenu, Convert, ZBWire, Compenst;
+{$R *.DFM}
+
+(***********************************************)
+(*  Zero Balance Object Methods                *)
+(***********************************************)
+
+(***********************************************************************)
+{TZeroBalance.create}
+constructor TZeroBalance.Create;
+begin
+  {...create object}
+  inherited create;
+  {...associate the string with the object}
+  TheString := 'Initial Bridge Balance';
+end;
+
+(***********************************************************************)
+{TZeroBalance.destroy}
+destructor TZeroBalance.Destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TZeroBalance.GetAsString}
+function TZeroBalance.GetAsString: String;
+begin
+  Result := TheString;
+end;
+
+(***********************************************************************)
+{TZeroBalance.ShowTheForm}
+procedure TZeroBalance.ShowTheForm;
+begin
+  Application.CreateForm(TZeroBalanceFrm, ZeroBalanceFrm);
+  ZeroBalanceFrm.showmodal;
+end;
+
+(***********************************************************************)
+{TZeroBalance.PrintTheForm}
+procedure TZeroBalance.PrintTheForm;
+var
+  Sender : TObject;
+begin
+  Sender := self ;
+  Application.CreateForm(TZeroBalanceFrm, ZeroBalanceFrm);
+  ZeroBalanceFrm.visible := false;
+  ZeroBalanceFrm.FormActivate(sender);
+  ZeroBalanceFrm.BN_PrintClick(sender);
+  ZeroBalanceFrm.BN_CancelClick(Sender);
+end;
+
+(***********************************************************************)
+{TZeroBalance.AssignTo}
+procedure TZeroBalance.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TZeroBalance) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TZeroBalance do begin
+      FUnbalance := self.FUnbalance;
+      FRBridge := self.FRBridge;
+      FWireType := self.FWireType;
+      FResistorTCR := self.FResistorTCR;
+      FResistors := self.FResistors;
+      FResistance := self.FResistance;
+      FBridgeArm := self.FBridgeArm;
+      TheString := self.TheString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{TZeroBalance.InitFields}
+procedure TZeroBalance.InitFields;
+begin
+  inherited initfields;
+end;
+
+(***********************************************************************)
+{TZeroBalance.SaveToStream}
+procedure TZeroBalance.SaveToStream(Stream : TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FUnbalance, sizeof(shortstring));
+  Stream.SaveBuffer(FRBridge, sizeof(shortstring));
+  Stream.SaveBuffer(FWireType, sizeof(Int16));
+  Stream.SaveBuffer(FResistorTCR, sizeof(shortstring));
+  Stream.SaveBuffer(FResistors, sizeof(shortstring));
+  Stream.SaveBuffer(FResistance, sizeof(shortstring));
+  Stream.SaveBuffer(FBridgeArm, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************************************)
+{TZeroBalance.ReadFromStream}
+procedure TZeroBalance.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FUnbalance, sizeof(shortstring));
+  Stream.ReadBuffer(FRBridge, sizeof(shortstring));
+  Stream.ReadBuffer(FWireType, sizeof(Int16));
+  Stream.ReadBuffer(FResistorTCR, sizeof(shortstring));
+  Stream.ReadBuffer(FResistors, sizeof(shortstring));
+  Stream.ReadBuffer(FResistance, sizeof(shortstring));
+  Stream.ReadBuffer(FBridgeArm, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************)
+(*  Zero Balance Form Methods                  *)
+(***********************************************)
+
+(***********************************************************************)
+{TZeroBalanceFrm.Resistance}
+function TZeroBalanceFrm.CalculateResistance: RealType;
+var
+  ResistanceValue : RealType;
+begin
+  ExceptionRaised := false;
+  ResistanceValue := UnBal * 4.0 * Bridge * 1e-3;
+  CalculateResistance := ResistanceValue;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BridgeArm}
+function TZeroBalanceFrm.CalculateBridgeArm: String;
+var
+  BridgeArmText   : array[0..MAXERRORLENGTH-1] of char;
+begin
+  ExceptionRaised := false;
+  if ResistValue > 0 then begin
+    Loadstring(hinstance, ID_SZ_PMinusSMinus, BridgeArmText, sizeof(BridgeArmText));
+  end
+  else begin
+    Loadstring(hinstance, ID_SZ_PPlusSMinus, BridgeArmText, sizeof(BridgeArmText));
+  end;
+  CalculateBridgeArm := BridgeArmText;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.RB_E01Click}
+procedure TZeroBalanceFrm.RB_E01ResistorClick(Sender: TObject);
+begin
+  {...RB_E01 is checked and image is set to display a drawing of E01 Resistor}
+  RB_E01Resistor.checked := true;
+  Image_E01.visible := true;
+  Image_Wire.visible := false;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.RB_WireClick}
+procedure TZeroBalanceFrm.RB_WireClick(Sender: TObject);
+begin
+  {...RB_Wire is checked and image is set to display a spool of wire}
+  RB_Wire.checked := true;
+  Image_E01.visible := false;
+  Image_Wire.visible := true;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BN_CutClick}
+procedure TZeroBalanceFrm.BN_CutClick(Sender: TObject);
+begin
+  {...When cut button pressed shows the appropiate form}
+  if RB_E01Resistor.checked = true then begin
+    Application.CreateForm(TE01ZeroBalanceForm, E01ZeroBalanceForm);
+    E01ZeroBalanceForm.showmodal;
+  end
+  else begin
+    Application.CreateForm(TZBWireTableForm, ZBWireTableForm);
+    ZBWireTableForm.showmodal;
+  end;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.FormCreate}
+procedure TZeroBalanceFrm.FormCreate(Sender: TObject);
+var
+  StaticUnits : array[0..MAXTEXTLENGTH-1] of char;
+begin
+  {initializing radio button and images}
+  RB_E01Resistor.checked := true;
+  Image_E01.visible := true;
+  Image_Wire.visible := false;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+  if MainForm.UnitsAreUS = True then begin
+    Loadstring(hinstance, ID_SZ_PercentF, StaticUnits, sizeof(StaticUnits));
+    ST_ResistanceTCRUnits.caption := StaticUnits;
+  end
+  else begin
+    Loadstring(hinstance, ID_SZ_PercentC, StaticUnits, sizeof(StaticUnits));
+    ST_ResistanceTCRUnits.caption := StaticUnits;
+  end;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BN_ComputeClick}
+procedure TZeroBalanceFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINUNBALANCE   = -10;
+  MAXUNBALANCE   = 10;
+  MINRBRIDGE     = 50;
+  MAXRBRIDGE     = 10000;
+var
+  ErrorMsg            : array[0..MAXERRORLENGTH-1] of char;
+  ErrorUnit           : array[0..MAXERRORLENGTH-1] of char;
+  ErrorAnd            : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption        : array[0..MAXERRORLENGTH-1] of char;
+  StrUnit             : string;
+  StrAnd              : string;
+  StrMsg              : string;
+  StrMin              : string;
+  StrMax              : string;
+  EditStrings         : string;
+  ErrorCode           : integer;
+  Button              : integer;
+begin
+  ST_Resistance.caption := '';
+  ST_BridgeArm.caption := '';
+  IsThereAnError := false;
+  {..checking to see if UnBalance is valid}
+  EditStrings := EB_Unbalance.text;
+  val(EditStrings, UnBal, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Unbalance.setfocus;
+    EB_Unbalance.clearselection;
+    exit;
+  end
+  else if (UnBal < MINUNBALANCE) or (UnBal > MAXUNBALANCE) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_MV, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_Unbalance, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINUNBALANCE, ffFixed, 8, 3);
+    StrMax := floattostrf(MAXUNBALANCE, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Unbalance.setfocus;
+    EB_Unbalance.clearselection;
+    exit;
+  end;
+  {..checking to see if RBridge is valid}
+  EditStrings := EB_RBridge.text;
+  val(EditStrings, Bridge, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_RBridge.setfocus;
+    EB_RBridge.clearselection;
+    exit;
+  end
+  else if (Bridge < MINRBRIDGE) or (Bridge > MAXRBRIDGE) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_BridgeResist, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINRBRIDGE, ffFixed, 8, 3);
+    StrMax := floattostrf(MAXRBRIDGE, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_RBridge.setfocus;
+    EB_RBridge.clearselection;
+    exit;
+  end;
+  {...calculating Resistance value}
+  if (UnBal = 0) then begin
+    {..display message telling user the bridge is balanced, calculation not needed}
+    LoadString(hinstance, ID_SZ_UnBalanceEqualZero, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    exit;
+  end
+  else begin
+    ResistValue := CalculateResistance;
+    ST_Resistance.caption := floattostrf(abs(ResistValue), ffFixed, 4, 2);
+    ST_BridgeArm.caption := CalculateBridgeArm;
+  end;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.FormActivate}
+procedure TZeroBalanceFrm.FormActivate(Sender: TObject);
+var
+  EditStrings : string;
+  i           : integer;
+  TheItem     : TacStreamable;
+  TheItems    : string;
+begin
+  CB_WireType.itemindex := 0;
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  {...add 1st Wire Type to Combobox}
+  TheItems := CB_WireType.items.strings[0];
+  CB_WireType.items.delete(0);
+  Wire := TWire.create;
+  Wire.name := 'Constantan (A Alloy)';
+  Wire.Resistivity := 294;
+  Wire.TCR := 0.00004;
+  CB_WireType.items.addobject(TheItems, Wire);
+  {...add 2nd Wire Type to Combobox}
+  TheItems := CB_WireType.items.strings[1];
+  CB_WireType.items.delete(1);
+  Wire := TWire.create;
+  Wire.name := 'Manganin';
+  Wire.Resistivity := 290;
+  Wire.TCR := 0.000015;
+  CB_WireType.items.addobject(TheItems, Wire);
+  {...add 3rd Wire Type to Combobox}
+  TheItems := CB_WireType.items.strings[2];
+  CB_WireType.items.delete(2);
+  Wire := TWire.create;
+  Wire.name := 'Modified Karma (K Alloy)';
+  Wire.Resistivity := 800;
+  Wire.TCR := 0.00002;
+  CB_WireType.items.addobject(TheItems, Wire);
+  {...getting the object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    If MainForm.Flog.AtIndex(i) is TZeroBalance then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or ( i > MainForm.Flog.Count);
+  {...If there is object, placing values in edit boxes}
+  if TheItem <> nil then begin
+    EB_UnBalance.text := (TheItem as TZeroBalance).UnBalance;
+    EB_RBridge.text := (TheItem as TZeroBalance).RBridge;
+    ST_Resistance.caption := (TheItem as TZeroBalance).Resistance;
+    CB_WireType.ItemIndex := (TheItem as TZeroBalance).TheWireType;
+    ST_ResistanceTCR.caption := (TheItem as TZeroBalance).ResistorTCR;
+    ST_BridgeArm.caption := (TheITem as TZeroBalance).BridgeArm;
+  end
+  else begin
+    CB_Wiretype.Itemindex := 0;
+    CB_WireTypeChange(Sender);
+  end;
+  {...placing initial values in old variables in case cancel clicked}
+  OldUnBalance := EB_UnBalance.text;
+  OldRBridge := EB_RBridge.text;
+  Old_Resistance := ST_Resistance.caption;
+  Old_BridgeArm := ST_BridgeArm.caption;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BN_CancelClick}
+procedure TZeroBalanceFrm.BN_CancelClick(Sender: TObject);
+begin
+  {...placing initialvalues in edit box}
+  EB_Unbalance.text := OldUnBalance;
+  EB_RBridge.text := OldRBridge;
+  ST_Resistance.caption := Old_Resistance;
+  ST_BridgeArm.caption := Old_BridgeArm;
+  close;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BN_OKClick}
+procedure TZeroBalanceFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem : TacStreamable;
+  i       : integer;
+  j       : integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = True then begin
+    exit;
+  end;
+  {...getting the object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    If MainForm.Flog.AtIndex(i) is TZeroBalance then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or ( i > MainForm.Flog.Count);
+  {...If there is object, placing values in edit boxes}
+  if TheItem = nil then begin
+    {...placing values in object}
+    ZeroBalanceObject := TZeroBalance.create;
+    ZeroBalanceObject.UnBalance := EB_UnBalance.text;
+    ZeroBalanceObject.RBridge := EB_RBridge.text;
+    ZeroBalanceObject.TheWireType := CB_WireType.ItemIndex;
+    ZeroBalanceObject.ResistorTCR := ST_ResistanceTCR.caption;
+    ZeroBalanceObject.Resistance := ST_Resistance.caption;
+    ZeroBalanceObject.BridgeArm := ST_BridgeArm.caption;
+    MainForm.AddToLog(ZeroBalanceObject);
+    j := 0;
+    {...placing object string in outline}
+    Repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Circuit Refinements') or (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, ZeroBalanceObject.GetAsString);
+  end
+  else begin
+    (TheItem as TZeroBalance).UnBalance := EB_UnBalance.text;
+    (TheItem as TZeroBalance).RBridge := EB_RBridge.text;
+    (TheItem as TZeroBalance).TheWireType := CB_WireType.ItemIndex;
+    (TheItem as TZeroBalance).ResistorTCR := ST_ResistanceTCR.caption;
+    (TheItem as TZeroBalance).Resistance := ST_Resistance.caption;
+    (TheItem as TZeroBalance).BridgeArm := ST_BridgeArm.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.CompDlgShowing = true then begin
+    CompensationDlg.close;
+  end;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.FormClose}
+procedure TZeroBalanceFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.CB_WireTypeChange}
+procedure TZeroBalanceFrm.CB_WireTypeChange(Sender: TObject);
+var
+ TheStr    : string;
+ TheObject : TObject;
+ TheWire   : Tobject;
+ TheItems  : TStrings;
+ WireID    : string;
+ ResistNo  : Real{type};
+ TCRNo     : Real{Type};
+ converted : RealType;
+ Resistance: RealType;
+ WireGage  : string;
+ Diameter  : string;
+ i         : integer;
+ j         : integer;
+begin
+  if CB_WireType.text = 'Manganin' then begin
+    RB_E01Resistor.enabled := false;
+    RB_Wire.checked := true;
+  end
+  else begin
+    RB_E01Resistor.enabled := true;
+  end;
+  TheType := CB_WireType.itemindex;
+  TheItems := CB_WireType.Items;
+  TheObject := TheItems.objects[CB_WireType.itemindex];
+  WireID := TheItems.strings[CB_WireType.ItemIndex];
+  TheObject := TheItems.objects[CB_WireType.items.indexof(WireID)];
+  {...placing TCR in string grid}
+  TCRNo := TWire(TheObject).TCR;
+  if MainForm.UnitsAreUS = true then begin
+//    str(TCRNo:8:2, thestr);
+    TheStr := format('%8.2f',[TCRNo]) ;
+  end
+  else begin
+    TCRNo := TCRNo * 9/5;
+//    str(TCRNo:8:2, thestr);
+    TheStr := format('%8.2f',[TCRNo]) ;
+  end;
+  ST_ResistanceTCR.caption := thestr;
+  ST_Resistance.caption := '';
+  ST_BridgeArm.caption := '';
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BN_PrintClick}
+procedure TZeroBalanceFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderPChar   : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderString  : string;
+  DateString    : string;
+  id            : longint;
+  MetaHandle    : Thandle;
+  sserror       : integer;
+  htmlText      : string ;
+  stream        : tResourceStream ;
+  strstream     : tStringStream;
+
+begin
+   Stream := TResourceStream.Create(HInstance, 'ZeroBal', RT_RCDATA)  ;
+   strstream := TStringStream.Create() ;
+
+   try
+     strstream.LoadFromStream(stream)     ;
+     htmlText := strstream.DataString ;
+   finally
+     StrStream.Free() ;
+     Stream.Free() ;
+   end;
+
+   htmlText := StringReplace(htmlText, '$ib1',EB_Unbalance.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$br1',EB_RBridge.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$zb1',ST_Resistance.Caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$ba1',ST_BridgeArm.Caption, [rfReplaceAll, rfIgnoreCase]) ;
+   SaveDialogPrint.FileName := '' ;
+   SaveDialogPrint.InitialDir := tPath.GetDocumentsPath ;
+   if SaveDialogPrint.Execute
+     then begin
+       tfile.writeAllText(SaveDialogPrint.FileName,htmlText) ;
+       ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName) ,nil,nil,SW_SHOWNORMAL);
+     end;
+
+  {...clearing sheet for new values}
+(*  SSClearRange(Sheet1.SS, 4, 4, 10, 4, 3);
+  {...placing values on Sheet}
+  SSSetActiveCell(Sheet1.SS, 4, 4);
+  Sheet1.text := EB_UnBalance.text;
+  SSSetActiveCell(Sheet1.SS, 5, 4);
+  Sheet1.text := EB_RBridge.text;
+  SSSetActiveCell(Sheet1.SS, 9, 4);
+  Sheet1.text := ST_Resistance.caption;
+  SSSetActiveCell(Sheet1.SS, 10, 4);
+  Sheet1.text := ST_BridgeArm.caption;
+  sserror := SSObjNewPicture(Sheet1.ss, 1, 13, 6, 20, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+  SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+  DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+  HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+  strpcopy(HeaderPChar, HeaderString);
+  SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+  SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+  SSFilePrint(Sheet1.ss, 0);   *)
+end;
+
+(***********************************************************************)
+{TZeroBalanceFrm.BN_HelpClick}
+procedure TZeroBalanceFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(2020);
+end;
+
+begin
+  {...registering object}
+  RegisterClasses([TZeroBalance]);
+end.

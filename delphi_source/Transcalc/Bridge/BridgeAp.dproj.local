@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="..\..\Transcalc"/>
+    <File Path="..\CONVERT.PAS"/>
+    <File Path="ACTIVE11.PAS"/>
+    <File Path="ACTIVE11.dfm"/>
+    <File Path="BRIDGE.PAS"/>
+    <File Path="BRIDGE.dfm"/>
+    <File Path="FULLFOUR.PAS"/>
+    <File Path="FULLFOUR.dfm"/>
+    <File Path="FULLTWO.PAS"/>
+    <File Path="FULLTWO.dfm"/>
+    <File Path="LINEAR.PAS"/>
+    <File Path="LINEAR.dfm"/>
+    <File Path="NONLINE.PAS"/>
+    <File Path="NONLINE.dfm"/>
+    <File Path="TWOADJ.PAS"/>
+    <File Path="TWOADJ.dfm"/>
+  </ProjectSortOrder>
+</BorlandProject>

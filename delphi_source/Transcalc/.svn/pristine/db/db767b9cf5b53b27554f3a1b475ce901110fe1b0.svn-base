@@ -1,0 +1,355 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{583631E7-72CD-4D17-83D4-4A52AD988F7F}</ProjectGuid>
+        <MainSource>XCALCPRO.DPR</MainSource>
+        <Base>True</Base>
+        <Config Condition="'$(Config)'==''">Debug</Config>
+        <AppType>Application</AppType>
+        <FrameworkType>VCL</FrameworkType>
+        <DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
+        <ProjectVersion>19.2</ProjectVersion>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <TargetedPlatforms>1</TargetedPlatforms>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
+        <Base_Win32>true</Base_Win32>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
+        <Base_Win64>true</Base_Win64>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_1)'!=''">
+        <Cfg_1>true</Cfg_1>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
+        <Cfg_1_Win32>true</Cfg_1_Win32>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_2)'!=''">
+        <Cfg_2>true</Cfg_2>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
+        <Cfg_2_Win32>true</Cfg_2_Win32>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base)'!=''">
+        <DCC_E>false</DCC_E>
+        <DCC_ImageBase>00400000</DCC_ImageBase>
+        <DCC_F>false</DCC_F>
+        <DCC_S>false</DCC_S>
+        <DCC_N>false</DCC_N>
+        <DCC_K>false</DCC_K>
+        <SanitizedProjectName>XCALCPRO</SanitizedProjectName>
+        <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;FireDAC.VCLUI;$(DCC_Namespace)</DCC_Namespace>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win32)'!=''">
+        <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+        <BT_BuildType>Debug</BT_BuildType>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+        <Icon_MainIcon>XCALCPRO_Icon1.ico</Icon_MainIcon>
+        <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
+        <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
+        <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
+        <Icon_MainIcon>XCALCPRO_Icon1.ico</Icon_MainIcon>
+        <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
+        <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
+        <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1)'!=''">
+        <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
+        <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
+        <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+        <DCC_DebugInformation>0</DCC_DebugInformation>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+        <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
+        <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2)'!=''">
+        <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+        <DCC_Optimize>false</DCC_Optimize>
+        <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
+        <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
+        <DCC_Hints>false</DCC_Hints>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
+    </PropertyGroup>
+    <ItemGroup>
+        <DelphiCompile Include="$(MainSource)">
+            <MainSource>MainSource</MainSource>
+        </DelphiCompile>
+        <DCCReference Include="MAINMENU.PAS">
+            <Form>MainForm</Form>
+        </DCCReference>
+        <DCCReference Include="SPLASH.PAS">
+            <Form>SplashScreen</Form>
+        </DCCReference>
+        <DCCReference Include="ZVSTEMP.PAS">
+            <Form>ZeroVsTempDlg</Form>
+        </DCCReference>
+        <DCCReference Include="CUTE01.PAS">
+            <Form>E01AdjustmentFrm</Form>
+        </DCCReference>
+        <DCCReference Include="ZEROBAL.PAS">
+            <Form>ZeroBalanceFrm</Form>
+        </DCCReference>
+        <DCCReference Include="BBCANT.PAS">
+            <Form>CantileverBBFrm</Form>
+        </DCCReference>
+        <DCCReference Include="REVBB.PAS">
+            <Form>ReverseBBFrm</Form>
+        </DCCReference>
+        <DCCReference Include="BINO.PAS">
+            <Form>BinocularBBFrm</Form>
+        </DCCReference>
+        <DCCReference Include="ACLIST.PAS"/>
+        <DCCReference Include="ACSTREAM.PAS"/>
+        <DCCReference Include="LOG.PAS"/>
+        <DCCReference Include="LOGITEM.PAS"/>
+        <DCCReference Include="LOGSTRM.PAS"/>
+        <DCCReference Include="SBBEAM.PAS">
+            <Form>SBeamBBFrm</Form>
+        </DCCReference>
+        <DCCReference Include="DUALBB.PAS">
+            <Form>DualBBFrm</Form>
+        </DCCReference>
+        <DCCReference Include="RNDHLWC.PAS">
+            <Form>RndHollowColFrm</Form>
+        </DCCReference>
+        <DCCReference Include="SQRCOL.PAS">
+            <Form>SqrColumnFrm</Form>
+        </DCCReference>
+        <DCCReference Include="RNDSLDC.PAS">
+            <Form>RndSolidColFrm</Form>
+        </DCCReference>
+        <DCCReference Include="SHEARSQR.PAS">
+            <Form>SqrShearWebFrm</Form>
+        </DCCReference>
+        <DCCReference Include="SHERRND1.PAS">
+            <Form>RndShrWebFrm</Form>
+        </DCCReference>
+        <DCCReference Include="SHEARSB.PAS">
+            <Form>RndSBeamShrFrm</Form>
+        </DCCReference>
+        <DCCReference Include="SQTORQUE.PAS">
+            <Form>SqTorqueShftFrm</Form>
+        </DCCReference>
+        <DCCReference Include="RNDSLDTQ.PAS">
+            <Form>RndSldTorqueFrm</Form>
+        </DCCReference>
+        <DCCReference Include="RNDHLWTQ.PAS">
+            <Form>RndHlwTorqueFrm</Form>
+        </DCCReference>
+        <DCCReference Include="PRESSURE.PAS">
+            <Form>PressureFrm</Form>
+        </DCCReference>
+        <DCCReference Include="RESISTOR.PAS"/>
+        <DCCReference Include="CONVERT.PAS"/>
+        <DCCReference Include="E01ZERO.PAS">
+            <Form>E01ZeroBalanceForm</Form>
+        </DCCReference>
+        <DCCReference Include="SPAN2PT.PAS">
+            <Form>SvsTTwoPtForm</Form>
+        </DCCReference>
+        <DCCReference Include="SPAN3PT.PAS">
+            <Form>Span3ptForm</Form>
+        </DCCReference>
+        <DCCReference Include="D013PT.PAS">
+            <Form>CutD013PointFrm</Form>
+        </DCCReference>
+        <DCCReference Include="D012PT.PAS">
+            <Form>CutD012ptForm</Form>
+        </DCCReference>
+        <DCCReference Include="OPTSHUNT.PAS">
+            <Form>OptShuntForm</Form>
+        </DCCReference>
+        <DCCReference Include="OPTSHD01.PAS">
+            <Form>OptShuntD01ResistorForm</Form>
+        </DCCReference>
+        <DCCReference Include="OPTSHC01.PAS">
+            <Form>OptShuntCutC01Frm</Form>
+        </DCCReference>
+        <DCCReference Include="SPAN3C01.PAS">
+            <Form>Span3PtC01Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPANSET.PAS">
+            <Form>SpanSetForm</Form>
+        </DCCReference>
+        <DCCReference Include="SETD01.PAS">
+            <Form>SpanSetD01ResistorForm</Form>
+        </DCCReference>
+        <DCCReference Include="WIRETBL.PAS">
+            <Form>WireTableForm</Form>
+        </DCCReference>
+        <DCCReference Include="ABOUT.PAS">
+            <Form>AboutForm</Form>
+        </DCCReference>
+        <DCCReference Include="MATH.PAS"/>
+        <DCCReference Include="DIAPRAGM.PAS">
+            <Form>StrainDistForm</Form>
+        </DCCReference>
+        <DCCReference Include="APATTERN.PAS">
+            <Form>APatternForm</Form>
+        </DCCReference>
+        <DCCReference Include="BPATTERN.PAS">
+            <Form>BPatternForm</Form>
+        </DCCReference>
+        <DCCReference Include="CPATTERN.PAS">
+            <Form>CPatternForm</Form>
+        </DCCReference>
+        <DCCReference Include="DPATTERN.PAS">
+            <Form>DPatternForm</Form>
+        </DCCReference>
+        <DCCReference Include="DESIGN.PAS">
+            <Form>DesignDlg</Form>
+        </DCCReference>
+        <DCCReference Include="COMPENST.PAS">
+            <Form>CompensationDlg</Form>
+        </DCCReference>
+        <DCCReference Include="SPAN2C01.PAS">
+            <Form>Span2PtC01Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPAN2C11.PAS">
+            <Form>Span2ptC11Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPAN3C11.PAS">
+            <Form>Span3PtC11Form</Form>
+        </DCCReference>
+        <DCCReference Include="OPTSHC11.PAS">
+            <Form>OptShuntC11Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPN21210.PAS">
+            <Form>Span2ptC1210Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPN31210.PAS">
+            <Form>Span3ptC1210Form</Form>
+        </DCCReference>
+        <DCCReference Include="OPSH1210.PAS">
+            <Form>OptShuntC1210Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPN21220.PAS">
+            <Form>Span2PtC1220Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPN31220.PAS">
+            <Form>Span3PtC1220Form</Form>
+        </DCCReference>
+        <DCCReference Include="OPSH1220.PAS">
+            <Form>OptShuntC1220Form</Form>
+        </DCCReference>
+        <DCCReference Include="ZBWIRE.PAS">
+            <Form>ZBWireTableForm</Form>
+        </DCCReference>
+        <DCCReference Include="WIRE2PT.PAS">
+            <Form>WireTable2ptForm</Form>
+        </DCCReference>
+        <DCCReference Include="SPANWIRE.PAS">
+            <Form>WireTableSpanForm</Form>
+        </DCCReference>
+        <DCCReference Include="SIMSPAN.PAS">
+            <Form>SimulSpanForm</Form>
+        </DCCReference>
+        <DCCReference Include="SPANSC13.PAS">
+            <Form>SpanSpanC01Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPANSC11.PAS">
+            <Form>SpanSpanC11Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPNS1210.PAS">
+            <Form>SpanSpanC1210Form</Form>
+        </DCCReference>
+        <DCCReference Include="SPNS1220.PAS">
+            <Form>SpanSpanC1220Form</Form>
+        </DCCReference>
+        <DCCReference Include="D01SPANS.PAS">
+            <Form>CutD01SpansFrm</Form>
+        </DCCReference>
+        <DCCReference Include="WARNING.PAS">
+            <Form>WarningForm</Form>
+        </DCCReference>
+        <BuildConfiguration Include="Debug">
+            <Key>Cfg_2</Key>
+            <CfgParent>Base</CfgParent>
+        </BuildConfiguration>
+        <BuildConfiguration Include="Base">
+            <Key>Base</Key>
+        </BuildConfiguration>
+        <BuildConfiguration Include="Release">
+            <Key>Cfg_1</Key>
+            <CfgParent>Base</CfgParent>
+        </BuildConfiguration>
+    </ItemGroup>
+    <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
+    <Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+    <ProjectExtensions>
+        <Borland.Personality>Delphi.Personality.12</Borland.Personality>
+        <Borland.ProjectType>VCLApplication</Borland.ProjectType>
+        <BorlandProject>
+            <Delphi.Personality>
+                <Source>
+                    <Source Name="MainSource">XCALCPRO.DPR</Source>
+                </Source>
+                <VersionInfo>
+                    <VersionInfo Name="IncludeVerInfo">True</VersionInfo>
+                    <VersionInfo Name="AutoIncBuild">False</VersionInfo>
+                    <VersionInfo Name="MajorVer">1</VersionInfo>
+                    <VersionInfo Name="MinorVer">0</VersionInfo>
+                    <VersionInfo Name="Release">0</VersionInfo>
+                    <VersionInfo Name="Build">0</VersionInfo>
+                    <VersionInfo Name="Debug">False</VersionInfo>
+                    <VersionInfo Name="PreRelease">False</VersionInfo>
+                    <VersionInfo Name="Special">False</VersionInfo>
+                    <VersionInfo Name="Private">False</VersionInfo>
+                    <VersionInfo Name="DLL">False</VersionInfo>
+                    <VersionInfo Name="Locale">1033</VersionInfo>
+                    <VersionInfo Name="CodePage">1252</VersionInfo>
+                </VersionInfo>
+                <VersionInfoKeys>
+                    <VersionInfoKeys Name="CompanyName"/>
+                    <VersionInfoKeys Name="FileDescription"/>
+                    <VersionInfoKeys Name="FileVersion">1.0.0.0</VersionInfoKeys>
+                    <VersionInfoKeys Name="InternalName"/>
+                    <VersionInfoKeys Name="LegalCopyright"/>
+                    <VersionInfoKeys Name="LegalTrademarks"/>
+                    <VersionInfoKeys Name="OriginalFilename"/>
+                    <VersionInfoKeys Name="ProductName"/>
+                    <VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys>
+                    <VersionInfoKeys Name="Comments"/>
+                </VersionInfoKeys>
+                <Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k270.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp270.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                </Excluded_Packages>
+            </Delphi.Personality>
+            <Platforms>
+                <Platform value="Win32">True</Platform>
+                <Platform value="Win64">False</Platform>
+            </Platforms>
+        </BorlandProject>
+        <ProjectFileVersion>12</ProjectFileVersion>
+    </ProjectExtensions>
+</Project>

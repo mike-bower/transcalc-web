@@ -1,0 +1,668 @@
+(************************************************)
+(*   Full Bridge four active arms Unit          *)
+(************************************************)
+unit Fullfour;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons, Printers
+  {, acStream, acList, Log, LogItem, LogStrm};
+
+const
+  MAXTEXTLENGTH  = 40;
+  MAXERRORLENGTH = 255;
+
+type
+  RealType = double;
+
+(************************************************)
+(*  TFullFourActive object                      *)
+(************************************************)
+(*
+type TFullFourActive = class(TLogItem)
+private
+  FStrain12        : string;
+  FStrain34        : string;
+  FGageFactor      : string;
+  FOutput          : string;
+  TheString        : string;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+  procedure ShowTheForm; override;
+  function GetAsString: String; override;
+public
+  constructor create;
+  destructor destroy;
+  property Strain12: string read FStrain12 write FStrain12;
+  property Strain34: string read FStrain34 write FStrain34;
+  property GageFactor: string read FGageFactor write FGageFactor;
+  property BridgeOutput: string read FOutput write FOutput;
+  property TheStringText: string read TheString write TheString;
+end;
+*)
+
+(************************************************)
+(*  TFull4Active Form object                    *)
+(************************************************)
+type
+  TFull4ActiveForm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    Image1: TImage;
+    Panel2: TPanel;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    EB_Strain12: TEdit;
+    EB_GageFactor: TEdit;
+    Label3: TLabel;
+    Panel3: TPanel;
+    GroupBox2: TGroupBox;
+    ST_Output: TLabel;
+    Label4: TLabel;
+    BN_Compute: TBitBtn;
+    Label9: TLabel;
+    EB_Strain34: TEdit;
+    Label12: TLabel;
+    BN_Print: TBitBtn;
+    Label5: TLabel;
+    Label6: TLabel;
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function CalculateOutput: RealType;
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure BN_PrintClick(Sender: TObject);
+    function GotFormImage: TBitmap;
+    procedure PrintForm;
+  private
+    Old_Strain12        : string;
+    Old_Strain34        : string;
+    Old_GageFactor      : string;
+    Old_Output          : string;
+    TheOutput           : string;
+    IsThereAnError      : boolean;
+    ExceptionRaised     : boolean;
+    TheStrain12         : RealType;
+    TheStrain34         : RealType;
+    TheGageFactor       : RealType;
+    OutputValue         : RealType;
+  public
+{    FullFourActiveObject: TFullFourActive;}
+    Full4Chosen         : boolean;
+  end;
+
+var
+  Full4ActiveForm: TFull4ActiveForm;
+
+implementation
+uses {MainMenu,} Bridge;
+
+{$R *.DFM}
+
+(***********************************************)
+(*  Full Four Active Object Methods            *)
+(***********************************************)
+
+(***********************************************************************)
+{TFullFourActive.create}
+(*
+constructor TFullFourActive.create;
+begin
+  {...creating object}
+  inherited create;
+  {...setting the objects stream so know what kind of object it is when save}
+  TheString := 'Four Arms, Bending/Shear'
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.destroy}
+(*
+destructor TFullFourActive.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.GetAsString}
+(*
+function TFullFourActive.GetAsString: string;
+begin
+  Result := TheString;
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.ShowTheForm}
+(*
+procedure TFullFourActive.ShowTheForm;
+begin
+  Application.CreateForm(TFull4ActiveForm, Full4ActiveForm);
+  Full4ActiveForm.showmodal;
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.AssignTo}
+(*
+procedure TFullFourActive.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TFullFourActive) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TFullFourActive do begin
+      FStrain12 := self.FStrain12;
+      FStrain34 := self.FStrain34;
+      FGageFactor := self.FGageFactor;
+      FOutput := self.FOutput;
+      TheString := self.TheString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.InitFields}
+(*
+procedure TFullFourActive.InitFields;
+begin
+  inherited InitFields;
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.SaveToStream}
+(*
+procedure TFullFourActive.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FStrain12, sizeof(string));
+  Stream.SaveBuffer(FStrain34, sizeof(string));
+  Stream.SaveBuffer(FGageFactor, sizeof(string));
+  Stream.SaveBuffer(FOutput, sizeof(string));
+  Stream.SaveBuffer(TheString, sizeof(string));
+end;
+*)
+
+(***********************************************************************)
+{TFullFourActive.ReadFromStream}
+(*
+procedure TFullFourActive.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FStrain12, sizeof(string));
+  Stream.ReadBuffer(FStrain34, sizeof(string));
+  Stream.ReadBuffer(FGageFactor, sizeof(string));
+  Stream.ReadBuffer(FOutput, sizeof(string));
+  Stream.ReadBuffer(TheString, sizeof(string));
+end;
+*)
+
+(***********************************************)
+(*  Full Bridge Four active Arms Form Methods  *)
+(***********************************************)
+
+(***********************************************************************)
+{TFull4ActiveForm.CalculateOutput}
+function TFull4ActiveForm.CalculateOutput: RealType;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH] of char;
+  FirstValue       : RealType;
+  OutValue         : RealType;
+  Button           : integer;
+begin
+  ExceptionRaised := false;
+  try
+    FirstValue := (TheStrain12 - TheStrain34)/2;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoBridgeOutput, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      EB_Strain12.setfocus;
+      exit;
+    end;
+  end;
+  try
+    OutValue := FirstValue * TheGageFactor * 1e-3;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoBridgeOutput, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      EB_Strain12.setfocus;
+      exit;
+    end;
+  end;
+  CalculateOutput := OutValue;
+end;
+
+(***********************************************************************)
+{TFull4ActiveForm.BN_ComputeClick}
+procedure TFull4ActiveForm.BN_ComputeClick(Sender: TObject);
+const
+  MINSTRAIN     = -5000;
+  MAXSTRAIN     = 5000;
+  MINGAGEFACTOR = 1.00;
+  MAXGAGEFACTOR = 5.00;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH] of char;
+  ErrorUnit        : array[0..MAXERRORLENGTH] of char;
+  ErrorAnd         : array[0..MAXERRORLENGTH] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH] of char;
+  StrUnit          : string;
+  StrAnd           : string;
+  StrMsg           : string;
+  StrMin           : string;
+  strMax           : string;
+  EditStrings      : string;
+  ErrorCode        : integer;
+  Button           : integer;
+begin
+  ST_Output.caption := '';
+  IsThereAnError := false;
+  {...checking Strain12 to make sure valid}
+  EditStrings := EB_Strain12.text;
+  StrVal(EditStrings, TheStrain12, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Strain12.setfocus;
+    EB_Strain12.clearselection;
+    exit;
+  end
+  else if (TheStrain12 < MINSTRAIN) or (TheStrain12 > MAXSTRAIN) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_StrainUnit, ErrorUnit, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_Strain, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINSTRAIN, ffFixed, 8, 0);
+    StrMax := floattostrf(MAXSTRAIN, ffFixed, 8, 0);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Strain12.setfocus;
+    EB_Strain12.clearselection;
+    exit;
+  end;
+  {...checking Strain34 to make sure valid}
+  EditStrings := EB_Strain34.text;
+  StrVal(EditStrings, TheStrain34, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Strain34.setfocus;
+    EB_Strain34.clearselection;
+    exit;
+  end
+  else if (TheStrain34 < MINSTRAIN) or (TheStrain34 > MAXSTRAIN) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_StrainUnit, ErrorUnit, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_Strain, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINSTRAIN, ffFixed, 8, 0);
+    StrMax := floattostrf(MAXSTRAIN, ffFixed, 8, 0);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Strain34.setfocus;
+    EB_Strain34.clearselection;
+    exit;
+  end;
+  {...checking Gage Factor to make sure valid}
+  EditStrings := EB_GageFactor.text;
+  StrVal(EditStrings, TheGageFactor, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (TheGageFactor < MINGAGEFACTOR) or (TheGageFactor > MAXGAGEFACTOR) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINGAGEFACTOR, ffFixed, 8, 1);
+    StrMax := floattostrf(MAXGAGEFACTOR, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  OutputValue := CalculateOutput;
+  if ExceptionRaised = false then begin
+    TheOutput := floattostrf(abs(OutputValue), ffFixed, 6, 3);
+    ST_Output.caption := TheOutput;
+  end;
+end;
+
+(***********************************************************************)
+{TFull4ActiveForm.BN_CancelClick}
+procedure TFull4ActiveForm.BN_CancelClick(Sender: TObject);
+begin
+  {...placing old form data in fields b/c cancel was clicked}
+  EB_Strain12.text := Old_Strain12;
+  EB_Strain34.text := Old_Strain34;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_Output.caption := Old_Output;
+  if Full4Chosen = false then begin
+    Full4Chosen := false;
+    {MainForm.Bridge1.enabled := true;}
+  end;
+  close;
+end;
+
+(***********************************************************************)
+{TFull4ActiveForm.FormCreate}
+procedure TFull4ActiveForm.FormCreate(Sender: TObject);
+begin
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TFull4ActiveForm.FormActivate}
+procedure TFull4ActiveForm.FormActivate(Sender: TObject);
+var
+  EditStrings  : string;
+  i            : integer;
+{  TheItem      : TacStreamable;}
+begin
+  {getting item from object if there is one}
+(*
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TFullFourActive then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is an object, loading it into fields}
+  if TheItem <> nil then begin
+    EB_Strain12.text := (TheItem as TFullFourActive).Strain12;
+    EB_Strain34.text := (TheItem as TFullFourActive).Strain34;
+    EB_GageFactor.text := (TheItem as TFullFourActive).GageFactor;
+    ST_Output.caption := (TheItem as TFullFourActive).BridgeOutput;
+  end;
+*)
+  {...placing orginal data in old fields in case cancel clicked}
+  Old_Strain12 := EB_Strain12.text;
+  Old_Strain34 := EB_Strain34.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_Output := ST_Output.caption;
+end;
+
+(***********************************************************************)
+{TFull4ActiveForm.BN_OKClick}
+procedure TFull4ActiveForm.BN_OKClick(Sender: TObject);
+(*
+var
+  TheItem : TacStreamable;
+  i       : integer;
+  j       : integer;
+*)
+begin
+  Full4Chosen := true;
+  BN_ComputeClick(Sender);
+  if IsThereAnError = True then begin
+    exit;
+  end;
+  {getting item from object if there is one}
+  (*
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TFullFourActive then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is an object, loading it into fields}
+  if TheItem = nil then begin
+    {...placing fields in object}
+    FullFourActiveObject := TFullFourActive.create;
+    FullFourActiveObject.Strain12 := EB_Strain12.text;
+    FullFourActiveObject.Strain34 := EB_Strain34.text;
+    FullFourActiveObject.GageFactor := EB_GageFactor.text;
+    FullFourActiveObject.BridgeOutput := ST_Output.caption;
+    MainForm.AddToLog(FullFourActiveObject);
+    {...addding The object string to the outline}
+    j := 0;
+     repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Bridge Configurations') or (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, FullFourActiveObject.GetAsString);
+  end
+  else begin
+    (TheItem as TFullFourActive).Strain12 := EB_Strain12.text;
+    (TheItem as TFullFourActive).Strain34 := EB_Strain34.text;
+    (TheItem as TFullFourActive).GageFactor := EB_GageFactor.text;
+    (TheItem as TFullFourActive).BridgeOutput := ST_Output.caption;
+  end;
+  MainForm.IsDirty := true;
+  *)
+  close;
+  (*
+  if BridgeDlg.BridgeDlgShowing = true then begin
+    BridgeDlg.close;
+  end;
+  *)
+end;
+
+procedure TFull4ActiveForm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(*
+begin
+  {...registering object}
+  RegisterClasses([TFullFourActive]);
+*)
+procedure TFull4ActiveForm.BN_PrintClick(Sender: TObject);
+begin
+  BN_Compute.visible := false;
+  BN_OK.visible := false;
+  BN_Cancel.visible := false;
+  BN_Print.visible := false;
+  PrintForm;
+  BN_Compute.visible := true;
+  BN_OK.visible := true;
+  BN_Cancel.visible := true;
+  BN_Print.visible := true;
+end;
+
+{TFull4ActiveForm.GotFormImage}
+function TFull4ActiveForm.GotFormImage: TBitmap;
+var
+  ScreenDC, PrintDC: HDC;
+  OldBits, PrintBits: HBITMAP;
+  PaintLParam: Longint;
+
+  procedure PrintHandle(Handle: HWND);
+  var
+    R: TRect;
+    Child: HWND;
+    SavedIndex: Integer;
+  begin
+    if {IsWindowVisible(Handle)} true then
+    begin
+      SavedIndex := SaveDC(PrintDC);
+      WinProcs.GetClientRect(Handle, R);
+      MapWindowPoints(Handle, Self.Handle, R, 2);
+      with R do
+      begin
+        SetWindowOrgEx(PrintDC, -Left, -Top, nil);
+        IntersectClipRect(PrintDC, 0, 0, Right - Left, Bottom - Top);
+      end;
+      SendMessage(Handle, WM_ERASEBKGND, PrintDC, 0);
+      SendMessage(Handle, WM_PAINT, PrintDC, PaintLParam);
+      Child := GetWindow(Handle, GW_CHILD);
+      if Child <> 0 then
+      begin
+        Child := GetWindow(Child, GW_HWNDLAST);
+        while Child <> 0 do
+        begin
+          PrintHandle(Child);
+          Child := GetWindow(Child, GW_HWNDPREV);
+        end;
+      end;
+      RestoreDC(PrintDC, SavedIndex);
+    end;
+  end;
+
+begin
+  Result := nil;
+  ScreenDC := GetDC(0);
+  PaintLParam := 0;
+  try
+    PrintDC := CreateCompatibleDC(ScreenDC);
+    { Work around an apparent bug in Windows NT }
+  //  if GetWinFlags and $4000 <> 0 then PaintLParam := PrintDC or $DEFE0000;
+    try
+      PrintBits := CreateCompatibleBitmap(ScreenDC, ClientWidth, ClientHeight);
+      try
+        OldBits := SelectObject(PrintDC, PrintBits);
+        try
+          { Clear the contents of the bitmap }
+          FillRect(PrintDC, ClientRect, Brush.Handle);
+          { Paint form into a bitmap }
+          PrintHandle(Handle);
+        finally
+          SelectObject(PrintDC, OldBits);
+        end;
+        Result := TBitmap.Create;
+        Result.Handle := PrintBits;
+        PrintBits := 0;
+      except
+        Result.Free;
+        if PrintBits <> 0 then DeleteObject(PrintBits);
+        raise;
+      end;
+    finally
+      DeleteDC(PrintDC);
+    end;
+  finally
+    ReleaseDC(0, ScreenDC);
+  end;
+end;
+
+(***********************************************************************)
+{TFull4ActiveForm.PrintForm}
+procedure TFull4ActiveForm.PrintForm;
+var
+  FormImage: TBitmap;
+  Info: PBitmapInfo;
+  InfoSize: Cardinal;
+  Image: Pointer;
+  ImageSize: Cardinal;
+  Bits: HBITMAP;
+  DIBWidth, DIBHeight: Longint;
+  PrintWidth, PrintHeight: Longint;
+begin
+  Printer.BeginDoc;
+  try
+    FormImage := GotFormImage;
+    try
+      { Paint bitmap to the printer }
+      with Printer, Canvas do
+      begin
+        Bits := FormImage.Handle;
+        GetDIBSizes(Bits, InfoSize, ImageSize);
+        Info := AllocMem(InfoSize);
+        try
+          Image := AllocMem(ImageSize);
+          try
+            GetDIB(Bits, 0, Info^, Image^);
+            with Info^.bmiHeader do
+            begin
+              DIBWidth := biWidth;
+              DIBHeight := biHeight;
+            end;
+            {case PrintScale of
+              poProportional:
+                begin
+                  PrintWidth := MulDiv(DIBWidth, GetDeviceCaps(Handle,
+                    LOGPIXELSX), PixelsPerInch);
+                  PrintHeight := MulDiv(DIBHeight, GetDeviceCaps(Handle,
+                    LOGPIXELSY), PixelsPerInch);
+                end;
+              poPrintToFit:
+                begin
+             }     PrintWidth := MulDiv(DIBWidth, PageHeight, DIBHeight);
+                  if PrintWidth < PageWidth then
+                    PrintHeight := PageHeight
+                  else
+                  begin
+                    PrintWidth := PageWidth;
+                    PrintHeight := MulDiv(DIBHeight, PageWidth, DIBWidth);
+                  end;
+                {end;
+            else
+              PrintWidth := DIBWidth;
+              PrintHeight := DIBHeight;
+            end;}
+            StretchDIBits(Canvas.Handle, 0, 0, PrintWidth, PrintHeight, 0, 0,
+              DIBWidth, DIBHeight, Image, Info^, DIB_RGB_COLORS, SRCCOPY);
+          finally
+            FreeMem(Image, ImageSize);
+          end;
+        finally
+          FreeMem(Info, InfoSize);
+        end;
+      end;
+    finally
+      FormImage.Free;
+    end;
+  finally
+    Printer.EndDoc;
+  end;
+end;
+
+end.
+
+

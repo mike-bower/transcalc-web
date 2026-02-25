@@ -1,0 +1,20 @@
+program Bridgeap;
+
+uses
+  Forms,
+  Bridge in 'BRIDGE.PAS' {BridgeDlg},
+  Active11 in 'ACTIVE11.PAS' {OneActiveOnePoissonFrm},
+  Fullfour in 'FULLFOUR.PAS' {Full4ActiveForm},
+  Fulltwo in 'FULLTWO.PAS' {TwoActiveOppForm},
+  Linear in 'LINEAR.PAS' {LinearPoissonForm},
+  Nonline in 'NONLINE.PAS' {NonLinearForm},
+  Twoadj in 'TWOADJ.PAS' {TwoAdjActiveForm};
+
+{$R *.RES}
+                
+begin
+  Application.Title := 'Bridge Configurations';
+  Application.HelpFile := 'XCALC.HLP';
+  Application.CreateForm(TBridgeDlg, BridgeDlg);
+  Application.Run;
+end.

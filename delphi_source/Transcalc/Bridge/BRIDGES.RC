@@ -1,0 +1,22 @@
+/****************************************************************************
+
+
+Bridges.rc
+
+produced by Borland Resource Workshop
+
+
+*****************************************************************************/
+#include "Bridges.inc"
+
+STRINGTABLE 
+{
+ ID_SZ_ErrorMsg, "TransCalc message"
+ ID_SZ_NotValidNo, "Not a valid number."
+ ID_SZ_And, "and"
+ ID_SZ_Poisson, "Poisson's ratio must be between"
+ ID_SZ_Strain, "The longitudinal strain value must be between"
+ ID_SZ_GageFactor, "The gage factor value must be between"
+ ID_SZ_StrainUnit, "microstrain."
+ ID_SZ_NoBridgeOutput, "Unable to calculate bridge output.  Please recheck entries."
+}

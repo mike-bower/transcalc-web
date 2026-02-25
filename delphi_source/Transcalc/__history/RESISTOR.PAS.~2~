@@ -1,0 +1,76 @@
+unit Resistor;
+
+interface
+
+uses Classes, LogItem, Log, LogStrm, acStream, acList;
+
+type
+  RealType = double;
+
+type
+  TResistor = class(TLogItem)
+  private
+    TheString : shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure ShowTheForm; override;
+    function GetAsString : string; override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+  public
+    constructor create;
+    destructor destroy; override;
+    function CalculateResistance(StartingResistance : RealType): RealType; virtual;
+end;
+
+implementation
+
+procedure TResistor.AssignTo(Dest: TPersistent);
+begin
+  if ((Dest is TLogItem) and (Self is Dest.ClassType)) then begin
+    with Dest as TResistor do begin
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+procedure TResistor.InitFields;
+begin
+  inherited InitFields;
+end;
+
+procedure TResistor.SaveToStream(Stream: TacObjStream);
+begin
+end;
+
+procedure TResistor.ReadFromStream(Stream: TacObjStream);
+begin
+end;
+
+procedure TResistor.ShowTheForm;
+begin
+end;
+
+function TResistor.CalculateResistance(StartingResistance : RealType): RealType;
+begin
+  result := 0.0 ;
+end;
+
+function TResistor.GetAsString : string;
+begin
+end;
+
+constructor TResistor.create;
+begin
+end;
+
+destructor TResistor.destroy;
+begin
+end;
+
+
+end.
+ 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:bal="http://schemas.microsoft.com/wix/BalExtension"
+     xmlns:netfx="http://schemas.microsoft.com/wix/NetFxExtension">
+
+
+  <Bundle Name="Transcalc" Version="1.2.2" Manufacturer="Micro-Measurements" UpgradeCode="78B20C77-28D9-43E5-9992-6C2BA153B706">
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense">
+      <bal:WixStandardBootstrapperApplication
+        LicenseFile="$(var.ProjectDir)License\Software License Agreement.rtf"
+        LogoFile="$(var.ProjectDir)License\LargeLogo.png"
+            />
+    </BootstrapperApplicationRef>
+
+
+    <Chain>
+      <MsiPackage Id="Transcalc"  SourceFile="$(var.Transcalc.TargetPath)" DisplayInternalUI="yes" Compressed="yes" Vital="yes"  />
+    </Chain>
+
+
+  </Bundle>
+</Wix>

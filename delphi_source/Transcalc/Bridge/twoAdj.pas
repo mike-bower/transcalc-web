@@ -1,0 +1,633 @@
+(***********************************************)
+(*  Two active adjacent arms Unit              *)
+(***********************************************)
+unit Twoadj;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons, Printers
+  {, acStream, acList, Log, LogItem, LogStrm};
+
+const
+  MAXTEXTLENGTH  = 40;
+  MAXERRORLENGTH = 255;
+
+type
+  RealType = double;
+
+(***********************************************)
+(*  TTwoActiveAdj Object                       *)
+(***********************************************)
+(*
+type TTwoActiveAdj = class(TLogItem)
+private
+  FStrain          : string;
+  FGageFactor      : string;
+  FOutput          : string;
+  TheString        : string;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+  procedure ShowTheForm; override;
+  function GetAsString: String; override;
+public
+  constructor create;
+  destructor destroy;
+  property Strain: string read FStrain write FStrain;
+  property GageFactor: string read FGageFactor write FGageFactor;
+  property BridgeOutput: string read FOutput write FOutput;
+  property TheStringText: string read TheString write TheString;
+end;
+*)
+
+(***********************************************)
+(*  TTwoAdjActiveForm Object                   *)
+(***********************************************)
+type
+  TTwoAdjActiveForm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    Image1: TImage;
+    BN_Compute: TBitBtn;
+    Panel2: TPanel;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    EB_Strain: TEdit;
+    EB_GageFactor: TEdit;
+    Label3: TLabel;
+    Panel3: TPanel;
+    GroupBox2: TGroupBox;
+    ST_Output: TLabel;
+    Label5: TLabel;
+    Label7: TLabel;
+    BN_Print: TBitBtn;
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function CalculateOutput: RealType;
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure BN_PrintClick(Sender: TObject);
+    function GotFormImage: TBitmap;
+    procedure PrintForm;
+  private
+    Old_Strain          : string;
+    Old_GageFactor      : string;
+    Old_Output          : string;
+    TheOutput           : string;
+    ExceptionRaised     : boolean;
+    IsThereAnError      : boolean;
+    TheStrain           : RealType;
+    TheGageFactor       : RealType;
+    OutputValue         : RealType;
+  public
+  {  TwoActiveAdjObject  : TTwoActiveAdj;}
+    Adj2ActiveChosen    : boolean;
+  end;
+
+var
+  TwoAdjActiveForm: TTwoAdjActiveForm;
+
+implementation
+uses {MainMenu,} Bridge, Convert;
+
+{$R *.DFM}
+
+(***********************************************)
+(*  Two Active Adjacent Object Methods         *)
+(***********************************************)
+
+(***********************************************************************)
+{TTwoActiveAdj.create}
+(*
+constructor TTwoActiveAdj.create;
+begin
+  {...creating object}
+  inherited create;
+  {...associating string with object}
+  TheString := 'Two Arms, Bending/Shear'
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.destroy}
+(*
+destructor TTwoActiveAdj.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.GetAsString}
+(*
+function TTwoActiveAdj.GetAsString: string;
+begin
+  Result := TheString;
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.ShowTheForm}
+(*
+procedure TTwoActiveAdj.ShowTheForm;
+begin
+  Application.CreateForm(TTwoAdjActiveForm, TwoAdjActiveForm);
+  TwoAdjActiveForm.showmodal;
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.AssignTo}
+(*
+procedure TTwoActiveAdj.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TTwoActiveAdj) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TTwoActiveAdj do begin
+      FStrain := self.FStrain;
+      FGageFactor := self.FGageFactor;
+      FOutput := self.FOutput;
+      TheString := self.TheString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.InitFields}
+(*
+procedure TTwoActiveAdj.InitFields;
+begin
+  inherited InitFields;
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.SaveToStream}
+(*
+procedure TTwoActiveAdj.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FStrain, sizeof(string));
+  Stream.SaveBuffer(FGageFactor, sizeof(string));
+  Stream.SaveBuffer(FOutput, sizeof(string));
+  Stream.SaveBuffer(TheString, sizeof(string));
+end;
+*)
+
+(***********************************************************************)
+{TTwoActiveAdj.ReadFromStream}
+(*
+procedure TTwoActiveAdj.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FStrain, sizeof(string));
+  Stream.ReadBuffer(FGageFactor, sizeof(string));
+  Stream.ReadBuffer(FOutput, sizeof(string));
+  Stream.ReadBuffer(TheString, sizeof(string));
+end;
+*)
+
+
+(***********************************************)
+(*  Two Adjacent active Arms Form Methods      *)
+(***********************************************)
+
+(***********************************************************************)
+{TTwoAdjActiveForm.CalculateOutput}
+function TTwoAdjActiveForm.CalculateOutput: RealType;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH] of char;
+  Numerator        : RealType;
+  Denominator      : RealType;
+  OutValue         : RealType;
+  Button           : integer;
+begin
+  ExceptionRaised := false;
+  try
+    Numerator := TheStrain * TheGageFactor;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoBridgeOutput, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      EB_Strain.setfocus;
+      exit;
+    end;
+  end;
+  try
+    Denominator := 2;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoBridgeOutput, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      EB_Strain.setfocus;
+      exit;
+    end;                         
+  end;
+  try
+    OutValue := (Numerator/Denominator) * 1e-3;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoBridgeOutput, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      EB_Strain.setfocus;
+      exit;
+    end;
+  end;
+  CalculateOutput := OutValue;
+end;
+
+(***********************************************************************)
+{TTwoAdjActiveForm.BN_ComputeClick}
+procedure TTwoAdjActiveForm.BN_ComputeClick(Sender: TObject);
+const
+  MINSTRAIN     = -5000;
+  MAXSTRAIN     = 5000;
+  MINGAGEFACTOR = 1.00;
+  MAXGAGEFACTOR = 5.00;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH] of char;
+  ErrorUnit        : array[0..MAXERRORLENGTH] of char;
+  ErrorAnd         : array[0..MAXERRORLENGTH] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH] of char;
+  StrUnit          : string;
+  StrAnd           : string;
+  StrMsg           : string;
+  StrMin           : string;
+  strMax           : string;
+  EditStrings      : string;
+  ErrorCode        : integer;
+  Button           : integer;
+begin
+  ST_Output.caption := '';
+  IsThereAnError := false;
+  {...checking Strain to make sure valid}
+  EditStrings := EB_Strain.text;
+  StrVal(EditStrings, TheStrain, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Strain.setfocus;
+    EB_Strain.clearselection;
+    exit;
+  end
+  else if (TheStrain < MINSTRAIN) or (TheStrain > MAXSTRAIN) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_StrainUnit, ErrorUnit, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_Strain, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINSTRAIN, ffFixed, 8, 0);
+    StrMax := floattostrf(MAXSTRAIN, ffFixed, 8, 0);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Strain.setfocus;
+    EB_Strain.clearselection;
+    exit;
+  end;
+  {...checking Gage Factor to make sure valid}
+  EditStrings := EB_GageFactor.text;
+  StrVal(EditStrings, TheGageFactor, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (TheGageFactor < MINGAGEFACTOR) or (TheGageFactor > MAXGAGEFACTOR) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MINGAGEFACTOR, ffFixed, 8, 1);
+    StrMax := floattostrf(MAXGAGEFACTOR, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  OutputValue := CalculateOutput;
+  if ExceptionRaised = false then begin
+    TheOutput := floattostrf(abs(OutputValue), ffFixed, 6, 3);
+    ST_Output.caption := TheOutput;
+  end;
+end;
+
+(***********************************************************************)
+{TTwoAdjActiveForm.BN_CancelClick}
+procedure TTwoAdjActiveForm.BN_CancelClick(Sender: TObject);
+begin
+  {...placing initial values in edit boxes}
+  EB_Strain.text := Old_Strain;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_output.caption := Old_Output;
+  if Adj2ActiveChosen = false then begin
+    Adj2ActiveChosen := false;
+    {MainForm.Bridge1.enabled := true;}
+  end;
+  close;
+end;
+
+(***********************************************************************)
+{TTwoAdjActiveForm.FormCreate}
+procedure TTwoAdjActiveForm.FormCreate(Sender: TObject);
+begin
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TTwoAdjActiveForm.FormActivate}
+procedure TTwoAdjActiveForm.FormActivate(Sender: TObject);
+var
+  EditStrings  : string;
+  i            : integer;
+{  TheItem      : TacStreamable;}
+begin
+(*
+  {...getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TTwoActiveAdj then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is object, then placing valus in edit boxes}
+  if TheItem <> nil then begin
+    EB_Strain.text := (TheItem as TTwoActiveAdj).Strain;
+    EB_GageFactor.text := (TheItem as TTwoActiveAdj).GageFactor;
+    ST_Output.caption := (TheItem as TTwoActiveAdj).BridgeOutput;
+  end;
+*)
+  {...placing initial values in old variables in casse cancel clicked}
+  Old_Strain := EB_Strain.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_Output := ST_Output.caption;
+end;
+
+(***********************************************************************)
+{TTwoAdjActiveForm.BN_OKClick}
+procedure TTwoAdjActiveForm.BN_OKClick(Sender: TObject);
+(*
+var
+  TheItem : TacStreamable;
+  i       : integer;
+  j       : integer;
+*)
+begin
+  Adj2ActiveChosen := true;
+  BN_ComputeClick(Sender);
+  if IsThereAnError = True then begin
+    exit;
+  end;
+  {...getting item from object if there is one}
+(*
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TTwoActiveAdj then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is object, then placing valus in edit boxes}
+  if TheItem = nil then begin
+    {...placing values in object}
+    TwoActiveAdjObject := TTwoActiveAdj.create;
+    TwoActiveAdjObject.Strain := EB_Strain.text;
+    TwoActiveAdjObject.GageFactor := EB_GageFactor.text;
+    TwoActiveAdjObject.BridgeOutput :=ST_Output.caption;
+    MainForm.AddToLog(TwoActiveAdjObject);
+    j := 0;
+    {...placing string value associated with object in outline}
+    repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Bridge Configurations') or (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, TwoActiveAdjObject.GetAsString);
+  end
+  else begin
+    (TheItem as TTwoActiveAdj).Strain := EB_Strain.text;
+    (TheItem as TTwoActiveAdj).GageFactor := EB_GageFactor.text;
+    (TheItem as TTwoActiveAdj).BridgeOutput := ST_Output.caption;
+  end;
+  MainForm.IsDirty := true;
+*)
+  close;
+(*
+  if BridgeDlg.BridgeDlgShowing = true then begin
+    BridgeDlg.close;
+  end;
+*)
+end;
+
+procedure TTwoAdjActiveForm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(*
+begin
+  {...registering object}
+  RegisterClasses([TTwoActiveAdj]);
+*)
+
+procedure TTwoAdjActiveForm.BN_PrintClick(Sender: TObject);
+begin
+  BN_Compute.visible := false;
+  BN_OK.visible := false;
+  BN_Cancel.visible := false;
+  BN_Print.visible := false;
+  PrintForm;
+  BN_Compute.visible := true;
+  BN_OK.visible := true;
+  BN_Cancel.visible := true;
+  BN_Print.visible := true;
+end;
+
+{TTwoAdjActiveForm.GotFormImage}
+function TTwoAdjActiveForm.GotFormImage: TBitmap;
+var
+  ScreenDC, PrintDC: HDC;
+  OldBits, PrintBits: HBITMAP;
+  PaintLParam: Longint;
+
+  procedure PrintHandle(Handle: HWND);
+  var
+    R: TRect;
+    Child: HWND;
+    SavedIndex: Integer;
+  begin
+    if {IsWindowVisible(Handle)} true then
+    begin
+      SavedIndex := SaveDC(PrintDC);
+      WinProcs.GetClientRect(Handle, R);
+      MapWindowPoints(Handle, Self.Handle, R, 2);
+      with R do
+      begin
+        SetWindowOrgEx(PrintDC, -Left, -Top, nil);
+        IntersectClipRect(PrintDC, 0, 0, Right - Left, Bottom - Top);
+      end;
+      SendMessage(Handle, WM_ERASEBKGND, PrintDC, 0);
+      SendMessage(Handle, WM_PAINT, PrintDC, PaintLParam);
+      Child := GetWindow(Handle, GW_CHILD);
+      if Child <> 0 then
+      begin
+        Child := GetWindow(Child, GW_HWNDLAST);
+        while Child <> 0 do
+        begin
+          PrintHandle(Child);
+          Child := GetWindow(Child, GW_HWNDPREV);
+        end;
+      end;
+      RestoreDC(PrintDC, SavedIndex);
+    end;
+  end;
+
+begin
+  Result := nil;
+  ScreenDC := GetDC(0);
+  PaintLParam := 0;
+  try
+    PrintDC := CreateCompatibleDC(ScreenDC);
+    { Work around an apparent bug in Windows NT }
+//    if GetWinFlags and $4000 <> 0 then PaintLParam := PrintDC or $DEFE0000;
+    try
+      PrintBits := CreateCompatibleBitmap(ScreenDC, ClientWidth, ClientHeight);
+      try
+        OldBits := SelectObject(PrintDC, PrintBits);
+        try
+          { Clear the contents of the bitmap }
+          FillRect(PrintDC, ClientRect, Brush.Handle);
+          { Paint form into a bitmap }
+          PrintHandle(Handle);
+        finally
+          SelectObject(PrintDC, OldBits);
+        end;
+        Result := TBitmap.Create;
+        Result.Handle := PrintBits;
+        PrintBits := 0;
+      except
+        Result.Free;
+        if PrintBits <> 0 then DeleteObject(PrintBits);
+        raise;
+      end;
+    finally
+      DeleteDC(PrintDC);
+    end;
+  finally
+    ReleaseDC(0, ScreenDC);
+  end;
+end;
+
+(***********************************************************************)
+{TTwoAdjActiveForm.PrintForm}
+procedure TTwoAdjActiveForm.PrintForm;
+var
+  FormImage: TBitmap;
+  Info: PBitmapInfo;
+  InfoSize: Cardinal;
+  Image: Pointer;
+  ImageSize: Cardinal;
+  Bits: HBITMAP;
+  DIBWidth, DIBHeight: Longint;
+  PrintWidth, PrintHeight: Longint;
+begin
+  Printer.BeginDoc;
+  try
+    FormImage := GotFormImage;
+    try
+      { Paint bitmap to the printer }
+      with Printer, Canvas do
+      begin
+        Bits := FormImage.Handle;
+        GetDIBSizes(Bits, InfoSize, ImageSize);
+        Info := AllocMem(InfoSize);
+        try
+          Image := AllocMem(ImageSize);
+          try
+            GetDIB(Bits, 0, Info^, Image^);
+            with Info^.bmiHeader do
+            begin
+              DIBWidth := biWidth;
+              DIBHeight := biHeight;
+            end;
+            {case PrintScale of
+              poProportional:
+                begin
+                  PrintWidth := MulDiv(DIBWidth, GetDeviceCaps(Handle,
+                    LOGPIXELSX), PixelsPerInch);
+                  PrintHeight := MulDiv(DIBHeight, GetDeviceCaps(Handle,
+                    LOGPIXELSY), PixelsPerInch);
+                end;
+              poPrintToFit:
+                begin
+             }     PrintWidth := MulDiv(DIBWidth, PageHeight, DIBHeight);
+                  if PrintWidth < PageWidth then
+                    PrintHeight := PageHeight
+                  else
+                  begin
+                    PrintWidth := PageWidth;
+                    PrintHeight := MulDiv(DIBHeight, PageWidth, DIBWidth);
+                  end;
+                {end;
+            else
+              PrintWidth := DIBWidth;
+              PrintHeight := DIBHeight;
+            end;}
+            StretchDIBits(Canvas.Handle, 0, 0, PrintWidth, PrintHeight, 0, 0,
+              DIBWidth, DIBHeight, Image, Info^, DIB_RGB_COLORS, SRCCOPY);
+          finally
+            FreeMem(Image, ImageSize);
+          end;
+        finally
+          FreeMem(Info, InfoSize);
+        end;
+      end;
+    finally
+      FormImage.Free;
+    end;
+  finally
+    Printer.EndDoc;
+  end;
+end;
+
+end.

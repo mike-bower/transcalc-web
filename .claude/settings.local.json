@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l \"c:\\\\Users\\\\Mike\\\\OneDrive\\\\MM Projects\\\\transcalc\\\\transcalc-web\\\\src\\\\domain\"/*.ts)",
+      "Bash(npm test -- --reporter=verbose)",
+      "Bash(npm test -- --run)"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+program Tcrcalc;
+
+uses
+  Forms,
+  Tcratio in 'TCRATIO.PAS' {Form1};
+
+{$R *.RES}
+
+begin
+  Application.Title := 'Resistance Ratios';
+  Application.HelpFile := 'XCALC.HLP';
+  Application.CreateForm(TForm1, Form1);
+  Application.Run;
+end.

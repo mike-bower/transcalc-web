@@ -1,0 +1,339 @@
+unit Tcratio;
+
+interface
+
+uses                  
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Mask, Buttons, INIfiles;
+
+type
+  TForm1 = class(TForm)
+    cb_SensorType: TComboBox;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    Label3: TLabel;
+    GroupBox2: TGroupBox;
+    rb_US: TRadioButton;
+    rb_SI: TRadioButton;
+    GroupBox3: TGroupBox;
+    Label4: TLabel;
+    st_Rtl: TLabel;
+    Label6: TLabel;
+    st_Rta: TLabel;
+    Label8: TLabel;
+    st_Rth: TLabel;
+    bn_Compute: TBitBtn;
+    bn_Close: TBitBtn;
+    GroupBox4: TGroupBox;
+    EB_TLow: TEdit;
+    EB_TAmbient: TEdit;
+    EB_THigh: TEdit;
+    BN_Help: TBitBtn;
+    procedure FormActivate(Sender: TObject);
+    procedure bn_ComputeClick(Sender: TObject);
+    procedure cb_SensorTypeChange(Sender: TObject);
+    procedure rb_USClick(Sender: TObject);
+    procedure rb_SIClick(Sender: TObject);
+    procedure eb_TLowExit(Sender: TObject);
+    procedure eb_TAmbientExit(Sender: TObject);
+    procedure eb_THighExit(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    procedure ClearCalculations;
+  end;
+
+var
+  Form1: TForm1;
+  Sensors : TStringList;
+
+implementation
+
+uses Convert;
+
+{$R *.DFM}
+
+(******************************)
+(* TCoefficient Class         *)
+(******************************)
+type
+  TCoefficient = class(TObject)
+    C0 : double;
+    C1 : double;
+    C2 : double;
+    C3 : double;
+    C4 : double;
+    C5 : double;
+    C6 : double;
+    constructor Create(aC0, aC1, aC2, aC3, aC4, aC5, aC6: double);
+    function GetValue(t:double): double;
+  end;
+
+
+{TCoefficient.Create}
+constructor TCoefficient.Create(aC0, aC1, aC2, aC3, aC4, aC5, aC6: double);
+begin
+  C0 := aC0;
+  C1 := aC1;
+  C2 := aC2;
+  C3 := aC3;
+  C4 := aC4;
+  C5 := aC5;
+  C6 := aC6;
+end;
+
+
+{TCoefficient.GetValue}
+function TCoefficient.GetValue(t:double): double;
+var
+  t1: double;
+  t2: double;
+  t3: double;
+  t4: double;
+  t5: double;
+  t6: double;
+begin
+  t1 := t;
+  t2 := t1 * t;
+  t3 := t2 * t;
+  t4 := t3 * t;
+  t5 := t4 * t;
+  t6 := t5 * t;
+  Result := C0 + C1 * t1 + C2 * t2 + C3 * t3 + C4 * t4 + C5 * t5 + C6 * t6;
+end;
+
+
+(****************************)
+(* TCoeffSet Class          *)
+(****************************)
+type
+  TCoeffSet = class(TObject)
+    US_Coeffs : TCoefficient;
+    SI_Coeffs : TCoefficient;
+  constructor Create(aUS, aSI: TCoefficient);
+end;
+
+{TCoeffSet.Create}
+constructor TCoeffSet.Create(aUS, aSI: TCoefficient);
+begin
+  US_Coeffs := aUS;
+  SI_Coeffs := aSI;
+end;
+
+
+{InvalidFile procedure}
+procedure InvalidFile;
+begin
+  Application.MessageBox('Invalid File: RRSensor.Txt', 'Problem', MB_OK or MB_ICONSTOP);
+  Application.Terminate;
+end;
+
+{InvalidConversion procedure}
+procedure InvalidConversion(L: integer);
+begin
+  if L < 0  then begin
+    Application.MessageBox('Invalid numeric conversion', 'Problem', MB_OK or MB_ICONSTOP);
+  end
+  else begin
+    Application.MessageBox('RRSensor.Txt: Invalid numeric conversion', 'Problem', MB_OK or MB_ICONSTOP);
+    Application.Terminate;
+  end;
+end;
+
+
+procedure TForm1.FormActivate(Sender: TObject);
+var
+  IniFile : TIniFile;
+  TempList : TStringList;
+  c: array[0..6] of double;
+  j: integer;
+  k: integer;
+  SensorType: string;
+  Coeffs : TCoeffSet;
+  USCoeffs : TCoefficient;
+  SICoeffs : TCoefficient;
+  tmpDouble: double ;
+  errorCode : integer ;
+const
+  INIFILENAME = 'XCALC.INI';
+begin
+  IniFile := TIniFile.Create(INIFILENAME);
+  if IniFile.ReadString('UNITS', 'UNITS','US') = 'SI' then begin
+    rb_SI.checked := TRUE;
+    rb_US.checked := FALSE;
+  end
+  else begin
+    rb_SI.checked := FALSE;
+    rb_US.checked := TRUE;
+  end;
+  { Load sensor types from file}
+  TempList := TStringList.Create;
+  TempList.LoadFromFile('RRSensor.txt');
+  Sensors := TStringList.Create;
+  if TempList.strings[0] <> 'XCALC' then InvalidFile;
+  j:= 1;
+  repeat
+    if TempList.strings[j] <> 'SENSOR' then InvalidFile;
+    inc(j);
+    {get the type string}
+    SensorType := TempList.Strings[j];
+    inc(j);
+    if TempList.strings[j] <> '[US]' then InvalidFile;
+    inc(j);
+    for k := 0 to 6 do begin
+      try
+        Val( TempList.strings[j],c[k], errorCode) ;
+      //  c[k] := StrToFloat(TempList.strings[j]);
+        inc(j);
+      except on EConvertError do
+        InvalidConversion(j);
+      end;
+    end;
+    USCoeffs := TCoefficient.Create(c[0],c[1],c[2],c[3],c[4],c[5],c[6]);
+    if TempList.strings[j] <> '[SI]' then InvalidFile;
+    inc(j);
+    for k := 0 to 6 do begin
+      try
+        Val( TempList.strings[j],c[k], errorCode) ;
+       // c[k] := StrToFloat(TempList.strings[j]);
+        inc(j);
+      except on EConvertError do
+        InvalidConversion(j);
+      end;
+    end; {for k}
+    SICoeffs := TCoefficient.Create(c[0],c[1],c[2],c[3],c[4],c[5],c[6]);
+    Coeffs := TCoeffSet.Create(USCoeffs, SICoeffs);
+    Sensors.AddObject(SensorType, Coeffs);
+  until TempList.strings[j] = 'END';
+  cb_SensorType.Items := Sensors;
+  cb_SensorType.ItemIndex := 0;
+end;
+
+procedure TForm1.bn_ComputeClick(Sender: TObject);
+var
+  TheObject      : TObject;
+  TheCoeffs      : TCoefficient;
+  EditString     : string;
+  LowValue       : double;
+  AmbientValue   : double;
+  HighValue      : double;
+  RLow           : double;
+  RAmbient       : double;
+  RHigh          : double;
+  RRLow          : double;
+  RRHigh         : double;
+  index          : integer;
+  ErrorCode      : integer;
+  ThereIsAnError : boolean;
+begin
+  ThereIsAnError := false;
+  EditString := EB_TLow.text;
+  StrVal(EditString, LowValue, ErrorCode);
+  if ErrorCode <> 0 then begin
+    ThereIsAnError := true;
+    Application.MessageBox('Not a valid number', 'Problem', mb_OK or MB_ICONEXCLAMATION);
+    EB_TLow.setFocus;
+    EB_TLow.clearselection;
+    exit;
+  end;
+  EditString := EB_TAmbient.text;
+  StrVal(EditString, AmbientValue, ErrorCode);
+  if ErrorCode <> 0 then begin
+    ThereIsAnError := true;
+    Application.MessageBox('Not a valid number', 'Problem', mb_OK or MB_ICONEXCLAMATION);
+    EB_TAmbient.setFocus;
+    EB_TAmbient.clearselection;
+    exit;
+  end;
+  EditString := EB_THigh.text;
+  StrVal(EditString, HighValue, ErrorCode);
+  if ErrorCode <> 0 then begin
+    ThereIsAnError := true;
+    Application.MessageBox('Not a valid number', 'Problem', mb_OK or MB_ICONEXCLAMATION);
+    EB_THigh.setFocus;
+    EB_THigh.clearselection;
+    exit;
+  end;
+  if ThereIsAnError = false then begin
+    try
+      if (LowValue < AmbientValue) and (AmbientValue < HighValue) then begin
+        index := cb_SensorType.ItemIndex;
+        TheObject := cb_SensorType.items.objects[index];
+        if  rb_US.checked then begin
+          TheCoeffs := (TheObject as TCoeffSet).US_Coeffs;
+        end
+        else begin
+          TheCoeffs := (TheObject as TCoeffSet).SI_Coeffs;
+       end;
+        RLow := TheCoeffs.GetValue(LowValue);
+        RAmbient := TheCoeffs.GetValue(AmbientValue);
+        RHigh := TheCoeffs.GetValue(HighValue);
+      end
+      else begin
+        Application.MessageBox('Temperature should be entered such that Low < ambient < high',
+                               'Problem', mb_OK or MB_ICONEXCLAMATION);
+      end;
+      st_rtA.caption := '1.000';
+      try
+        RRLow := RLow / RAmbient;
+        RRHigh := RHigh / RAmbient;
+      except
+        on EDivByZero do begin
+          Application.MessageBox('Cannot Calculate.  RAmbient is to Zero Ohms',
+                               'Problem',mb_OK or MB_ICONEXCLAMATION);
+          st_rtL.caption := 'ERROR';
+          st_rtH.caption := 'ERROR';
+          st_rtA.caption := 'ERROR';
+        end;
+      end;
+      st_rtL.caption := FloatToStrF(RRLow, ffFixed,3,3);
+      st_rtH.caption := FloatToStrF(RRHigh, ffFixed, 3,3);
+    except on EConvertError do
+      InvalidConversion(-1);
+    end;
+  end;
+end;
+
+procedure TForm1.cb_SensorTypeChange(Sender: TObject);
+begin
+  ClearCalculations;
+end;
+
+procedure TForm1.ClearCalculations;
+begin
+  st_rtL.caption := '';
+  st_rtH.caption := '';
+  st_rtA.caption := '';
+end;
+
+procedure TForm1.rb_USClick(Sender: TObject);
+begin
+   ClearCalculations;
+end;
+
+procedure TForm1.rb_SIClick(Sender: TObject);
+begin
+  ClearCalculations;
+end;
+
+procedure TForm1.eb_TLowExit(Sender: TObject);
+begin
+  ClearCalculations;
+end;
+
+procedure TForm1.eb_TAmbientExit(Sender: TObject);
+begin
+  ClearCalculations;
+end;
+
+procedure TForm1.eb_THighExit(Sender: TObject);
+begin
+  ClearCalculations;
+end;
+
+procedure TForm1.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(10200);
+end;
+
+end.

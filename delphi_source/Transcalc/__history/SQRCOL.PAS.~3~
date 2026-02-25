@@ -1,0 +1,983 @@
+(***********************************************)
+(*  Square Column Unit                         *)
+(***********************************************)
+unit Sqrcol;
+
+interface
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, acStream, acList, Log, LogItem, LogStrm,
+  Buttons, Printers, ioUtils, ShellAPI, Vcl.Dialogs;
+
+const
+  MAXTEXTLENGTH   = 40;
+  MAXERRORLENGTH  = 255;
+
+type
+  RealType = double;
+
+(***********************************************)
+(*  Square Column Object                       *)
+(***********************************************)
+type TSquareColumn = class(TLogItem)
+private
+  FAppliedLoad      : shortstring;
+  FColumnWidth      : shortstring;
+  FColumnDepth      : shortstring;
+  FPoisson          : shortstring;
+  FModulus          : shortstring;
+  FGageFactor       : shortstring;
+  FAxialStrain      : shortstring;
+  FTransverseStrain : shortstring;
+  FFullSpan         : shortstring;
+  TheString         : shortstring;
+protected
+  procedure AssignTo(Dest: TPersistent); override;
+  procedure InitFields; override;
+  procedure SaveToStream(Stream : TacObjStream); override;
+  procedure ReadFromStream(Stream: TacObjStream); override;
+  procedure ShowTheForm; override;
+  procedure PrintTheForm; override;
+  function GetAsString: String; override;
+public
+  constructor create;
+  destructor destroy; override ;
+  property AppliedLoad: shortstring read FAppliedLoad write FAppliedLoad;
+  property ColumnWidth: shortstring read FColumnWidth write FColumnWidth;
+  property ColumnDepth: shortstring read FColumnDepth write FColumnDepth;
+  property Poisson: shortstring read FPoisson write FPoisson;
+  property Modulus: shortstring read FModulus write FModulus;
+  property GageFactor: shortstring read FGageFactor write FGageFactor;
+  property AxialStrain: shortstring read FAxialStrain write FAxialStrain;
+  property TransverseStrain: shortstring read FTransverseStrain write FTransverseStrain;
+  property FullSpan: shortstring read FFullSpan write FFullSpan;
+  property TheStringText: shortstring read TheString write TheString;
+end;
+
+(***********************************************)
+(*  Square Column Form Object                  *)
+(***********************************************)
+type
+  TSqrColumnFrm = class(TForm)
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    EB_AppliedLoad: TEdit;
+    ST_LoadUnit: TLabel;
+    GroupBox2: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    EB_Width: TEdit;
+    EB_Depth: TEdit;
+    ST_WidthUnit: TLabel;
+    ST_DepthUnit: TLabel;
+    GroupBox3: TGroupBox;
+    EB_Poisson: TEdit;
+    Panel2: TPanel;
+    GroupBox6: TGroupBox;
+    Label12: TLabel;
+    Label14: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    ST_Axial: TLabel;
+    ST_Transverse: TLabel;
+    Label7: TLabel;
+    Label8: TLabel;
+    ST_ModulusUnit: TLabel;
+    Label10: TLabel;
+    ST_FullSpan: TLabel;
+    Label13: TLabel;
+    EB_Modulus: TEdit;
+    GroupBox4: TGroupBox;
+    EB_GageFactor: TEdit;
+    BN_Compute: TBitBtn;
+    BN_Help: TBitBtn;
+    ST_KGF: TLabel;
+    ST_KgfUnit: TLabel;
+    BN_Print: TBitBtn;
+    Image1: TImage;
+    SaveDialogPrint: TSaveDialog;
+//    Sheet1: TSheet;
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    function CalculateAxialStrain: RealType;
+    function CalculateTransverseStrain: RealType;
+    function CalculateFullSpan: RealType;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure EB_AppliedLoadExit(Sender: TObject);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    Old_AppliedLoad     : string;
+    Old_ColumnWidth     : string;
+    Old_ColumnDepth     : string;
+    Old_Poisson         : string;
+    Old_Modulus         : string;
+    Old_GageFactor      : string;
+    Old_Axial           : string;
+    Old_Transverse      : string;
+    Old_FullSpan        : string;
+    AxialText           : string;
+    TransverseText      : string;
+    FullSpanText        : string;
+    IsThereAnError      : boolean;
+    ExceptionRaised     : boolean;
+    Load                : RealType;
+    Width               : RealType;
+    Depth               : RealType;
+    Ratio               : RealType;
+    Elasticity          : RealType;
+    Factor              : RealType;
+    AxialE              : RealType;
+    TransverseE         : RealType;
+    FullSensitivity     : RealType;
+  public
+    SqrColumnObject: TSquareColumn;
+    SqrColumnChosen: boolean;
+  end;
+
+var
+  SqrColumnFrm: TSqrColumnFrm;
+
+implementation
+uses MainMenu, Convert, Design;
+{$R *.DFM}
+
+(***********************************************)
+(*  Square Column Object Methods               *)
+(***********************************************)
+
+(***********************************************************************)
+{TSquareColumn.create}
+constructor TSquareColumn.create;
+begin
+  {...creating object}
+  inherited create;
+  {...associating string with object}
+  TheString := 'Axial - Rectangular';
+end;
+
+(***********************************************************************)
+{TSquareColumn.destroy}
+destructor TSquareColumn.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TSquareColumn.GetAsString}
+function TSquareColumn.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(***********************************************************************)
+{TSquareColumn.ShowTheForm}
+procedure TSquareColumn.ShowTheForm;
+begin
+  Application.CreateForm(TSqrColumnFrm, SqrColumnFrm);
+  SqrColumnFrm.showmodal;
+end;
+
+(***********************************************************************)
+{TSquareColumn.PrintTheForm}
+procedure TSquareColumn.PrintTheForm;
+var
+  Sender : TObject;
+begin
+  Sender := self ;
+  Application.CreateForm(TSqrColumnFrm, SqrColumnFrm);
+  SqrColumnFrm.visible := false;
+  SqrColumnFrm.FormActivate(sender);
+  SqrColumnFrm.BN_PrintClick(sender);
+  SqrColumnFrm.BN_CancelClick(Sender);
+end;
+
+(***********************************************************************)
+{TSquareColumn.AssignTo}
+procedure TSquareColumn.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TSquareColumn) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TSquareColumn do begin
+      FAppliedLoad := self.FAppliedLoad;
+      FColumnWidth := self.FColumnWidth;
+      FColumnDepth := self.FColumnDepth;
+      FPoisson := self.FPoisson;
+      FModulus := self.FModulus;
+      FGageFactor := self.FGageFactor;
+      FAxialStrain := self.FAxialStrain;
+      FTransverseStrain := self.FTransverseStrain;
+      FFullSpan := self.FFullSpan;
+      TheString := self.TheString;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{TSquareColumn.InitFields}
+procedure TSquareColumn.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(***********************************************************************)
+{TSquareColumn.SaveToStream}
+procedure TSquareColumn.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.SaveBuffer(FColumnWidth, sizeof(shortstring));
+  Stream.SaveBuffer(FColumnDepth, sizeof(shortstring));
+  Stream.SaveBuffer(FPoisson, sizeof(shortstring));
+  Stream.SaveBuffer(FModulus, sizeof(shortstring));
+  Stream.SaveBuffer(FGageFactor, sizeof(shortstring));
+  Stream.SaveBuffer(FAxialStrain, sizeof(shortstring));
+  Stream.SaveBuffer(FTransverseStrain, sizeof(shortstring));
+  Stream.SaveBuffer(FFullSpan, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************************************)
+{TSquareColumn.ReadFromStream}
+procedure TSquareColumn.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FAppliedLoad, sizeof(shortstring));
+  Stream.ReadBuffer(FColumnWidth, sizeof(shortstring));
+  Stream.ReadBuffer(FColumnDepth, sizeof(shortstring));
+  Stream.ReadBuffer(FPoisson, sizeof(shortstring));
+  Stream.ReadBuffer(FModulus, sizeof(shortstring));
+  Stream.ReadBuffer(FGageFactor, sizeof(shortstring));
+  Stream.ReadBuffer(FAxialStrain, sizeof(shortstring));
+  Stream.ReadBuffer(FTransverseStrain, sizeof(shortstring));
+  Stream.ReadBuffer(FFullSpan, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(***********************************************)
+(*  Square Column Form Methods                 *)
+(***********************************************)
+
+(***********************************************************************)
+{TSqrColumnFrm.CalculateAxialStrain}
+function TSqrColumnFrm.CalculateAxialStrain: RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  AxialResult    : RealType;
+  Button         : integer;
+begin
+  AxialResult := 0.0 ;
+  ExceptionRaised := false;
+  Numerator := -(Load / (Width * Depth));
+  Denominator := Elasticity;
+  try
+    AxialResult := (Numerator/Denominator) * 1e6;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoAxialStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateAxialStrain := AxialResult;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.CalculateTransverseStrain}
+function TSqrColumnFrm.CalculateTransverseStrain: RealType;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH-1] of char;
+  FirstTerm        : RealType;
+  SecondTerm       : RealType;
+  TransverseResult : RealType;
+  Button           : integer;
+begin
+  TransverseResult := 0.0 ;
+  ExceptionRaised := false;
+  FirstTerm := AxialE;
+  SecondTerm := -(Ratio);
+  try
+    TransverseResult := FirstTerm * SecondTerm;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoTransverseStrain, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateTransverseStrain := TransverseResult;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.CalculateFullSpan}
+function TSqrColumnFrm.CalculateFullSpan: RealType;
+var
+  ErrorMsg       : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  Numerator      : RealType;
+  Denominator    : RealType;
+  SpanResult     : RealType;
+  Button         : integer;
+begin
+  SpanResult := 0.0 ;
+  ExceptionRaised := false;
+  Numerator := (-2 * AxialE) + (2 * TransverseE);
+  Denominator := 4;
+  try
+    SpanResult := (Factor * (Numerator/Denominator)) * 1e-3;
+  except
+    on EMathError do begin
+      LoadString(hinstance, ID_SZ_NoFullSpan, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+    end;
+  end;
+  CalculateFullSpan := SpanResult;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.FormCreate}
+procedure TSqrColumnFrm.FormCreate(Sender: TObject);
+var
+  LoadUnit      : array[0..MAXTEXTLENGTH-1] of char;
+  DimensionUnit : array[0..MAXTEXTLENGTH-1] of char;
+  ModulusUnit   : array[0..MAXTEXTLENGTH-1] of char;
+begin
+  {...determining whether to use Std or SI units for form}
+  if MainForm.UnitsAreUS = true then begin
+    LoadString(hinstance, ID_SZ_USLBF, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_Inches, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_PSI, ModulusUnit, sizeof(ModulusUnit));
+  end
+  else begin
+    LoadString(hinstance, ID_SZ_N, LoadUnit, sizeof(LoadUnit));
+    LoadString(hinstance, ID_SZ_MM, DimensionUnit, sizeof(DimensionUnit));
+    LoadString(hinstance, ID_SZ_GPa, ModulusUnit, sizeof(ModulusUnit));
+  end;
+  {...placing units on form}
+  ST_LoadUnit.caption := LoadUnit;
+  ST_WidthUnit.caption := DimensionUnit;
+  ST_DepthUnit.caption := DimensionUnit;
+  ST_ModulusUnit.caption := ModulusUnit;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.BN_ComputeClick}
+procedure TSqrColumnFrm.BN_ComputeClick(Sender: TObject);
+const
+  MINAPPLIEDLOAD_US        = 0.0000;
+  MAXAPPLIEDLOAD_US        = 500000;
+  MINWIDTH_US              = 0.020;
+  MAXWIDTH_US              = 10.0;
+  MINDEPTH_US              = 0.020;
+  MAXDEPTH_US              = 10.0;
+  MINPOISSON_US            = 0.1;
+  MAXPOISSON_US            = 0.4;
+  MINMODULUS_US            = 5000000;
+  MAXMODULUS_US            = 50000000;
+  MINGAGEFACTOR_US         = 1.0;
+  MAXGAGEFACTOR_US         = 5.0;
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH-1] of char;
+  ErrorUnit        : array[0..MAXERRORLENGTH-1] of char;
+  ErrorAnd         : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH-1] of char;
+  StrUnit          : string;
+  StrAnd           : string;
+  StrMsg           : string;
+  StrMin           : string;
+  strMax           : string;
+  EditStrings      : string;
+  MinAppliedLoad   : RealType;
+  MaxAppliedLoad   : RealType;
+  MinWidth         : RealType;
+  MaxWidth         : RealType;
+  MinDepth         : RealType;
+  MaxDepth         : RealType;
+  MinPoisson       : RealType;
+  MaxPoisson       : RealType;
+  MinModulus       : RealType;
+  MaxModulus       : RealType;
+  MinGageFactor    : RealType;
+  MaxGageFactor    : RealType;
+  ErrorCode        : integer;
+  Button           : integer;
+begin
+  {...Determining which units to use std. or si for min and max values}
+  if MainForm.UnitsAreUS = True then begin
+    MinAppliedLoad   := MINAPPLIEDLOAD_US;
+    MaxAppliedLoad   := MAXAPPLIEDLOAD_US;
+    MinWidth         := MINWIDTH_US;
+    MaxWidth         := MAXWIDTH_US;
+    MinDepth         := MINDEPTH_US;
+    MaxDepth         := MAXDEPTH_US;
+    MinPoisson       := MINPOISSON_US;
+    MaxPoisson       := MAXPOISSON_US;
+    MinModulus       := MINMODULUS_US;
+    MaxModulus       := MAXMODULUS_US;
+    MinGageFactor    := MINGAGEFACTOR_US;
+    MaxGageFactor    := MAXGAGEFACTOR_US;
+  end
+  else begin
+    MinAppliedLoad   := Lbf_To_N(MINAPPLIEDLOAD_US);
+    MaxAppliedLoad   := Lbf_To_N(MAXAPPLIEDLOAD_US);
+    MinWidth         := Inches_To_mm(MINWIDTH_US);
+    MaxWidth         := Inches_To_mm(MAXWIDTH_US);
+    MinDepth         := Inches_To_mm(MINDEPTH_US);
+    MaxDepth         := Inches_To_mm(MAXDEPTH_US);
+    MinPoisson       := MINPOISSON_US;
+    MaxPoisson       := MAXPOISSON_US;
+    MinModulus       := PSI_To_GPa(MINMODULUS_US);
+    MaxModulus       := PSI_To_GPa(MAXMODULUS_US);
+    MinGageFactor    := MINGAGEFACTOR_US;
+    MaxGageFactor    := MAXGAGEFACTOR_US;
+  end;
+  ST_Axial.caption := '';
+  ST_Transverse.caption := '';
+  ST_FullSpan.caption := '';
+  {...checking Applied Load to see if valid}
+  IsThereAnError := False;
+  EditStrings := EB_AppliedLoad.text;
+  val(EditStrings, load, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end
+  else if (Load < MinAppliedLoad) or (Load > MaxAppliedLoad) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_USlbf, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_N, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_AppliedLoad, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinAppliedLoad, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxAppliedLoad, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AppliedLoad.setfocus;
+    EB_AppliedLoad.clearselection;
+    exit;
+  end;
+  {...checking Width to see if valid}
+  EditStrings := EB_Width.text;
+  val(EditStrings, Width, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end
+  else if (Width < MinWidth) or (Width > MaxWidth) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Width, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinWidth, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxWidth, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Width.setfocus;
+    EB_Width.clearselection;
+    exit;
+  end;
+  {...checking Depth to see if valid}
+  EditStrings := EB_Depth.text;
+  val(EditStrings, Depth, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Depth.setfocus;
+    EB_Depth.clearselection;
+    exit;
+  end
+  else if (Depth < MinDepth) or (Depth > MaxDepth) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_Inches, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_MM, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Depth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinDepth, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxDepth, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Depth.setfocus;
+    EB_Depth.clearselection;
+    exit;
+  end;
+  {...checking to see if Poisson is valid}
+  EditStrings := EB_Poisson.text;
+  val(EditStrings, Ratio, ErrorCode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end
+  else if (Ratio < MinPoisson) or (Ratio > MaxPoisson) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_Poisson, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinPoisson, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxPoisson, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Poisson.setfocus;
+    EB_Poisson.clearselection;
+    exit;
+  end;
+  {...checking to see if Modulus value is valid}
+  EditStrings := EB_Modulus.text;
+  val(EditStrings, elasticity, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end
+  else if (elasticity < MinModulus) or (elasticity > MaxModulus) then begin
+    IsThereAnError := True;
+    if MainForm.UnitsAreUS = True then begin
+      LoadString(hinstance, ID_SZ_PSI, ErrorUnit, sizeof(ErrorMsg));
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_GPA, ErrorUnit, sizeof(ErrorMsg));
+    end;
+    LoadString(hinstance, ID_SZ_Modulus, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinModulus, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxModulus, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' ' + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_Modulus.setfocus;
+    EB_Modulus.clearselection;
+    exit;
+  end;
+  if MainForm.UnitsAreUS = false then begin
+    Elasticity := Elasticity * 1000;
+  end;
+  {...checking to see if Gage Factor is valid}
+  EditStrings := EB_GageFactor.text;
+  val(EditStrings, Factor, errorcode);
+  if ErrorCode <> 0 then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end
+  else if (Factor < MinGageFactor) or (Factor > MaxGageFactor) then begin
+    IsThereAnError := True;
+    LoadString(hinstance, ID_SZ_GageFactor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorMsg));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinGageFactor, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxGageFactor, ffFixed, 8, 1);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_GageFactor.setfocus;
+    EB_GageFactor.clearselection;
+    exit;
+  end;
+  {...warning message for LDL, so user cannot design a flat column load cell}
+  if ((Width/Depth) <> 1) then begin
+    LoadString(hinstance, ID_SZ_WidthDivDepth, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+  end;
+  {...doing calculations}
+  if IsThereAnError = False then begin
+    {...Axial Strain}
+    AxialE := CalculateAxialStrain;
+    if abs(AxialE) < 5000 then begin
+      if ExceptionRaised = false then begin
+        AxialText := floattostrf(AxialE, ffFixed, 4, 0);
+        ST_Axial.caption := AxialText;
+      end;
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ST_Axial.caption := '';
+      ST_Transverse.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    {...Transverse Strain}
+    TransverseE := CalculateTransverseStrain;
+    if abs(TransverseE) < 5000 then begin
+      if ExceptionRaised = false then begin
+        TransverseText := floattostrf(TransverseE, ffFixed, 4, 0);
+        ST_Transverse.caption := TransverseText;
+      end;
+    end
+    else begin
+      LoadString(hinstance, ID_SZ_Impratical, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ST_Axial.caption := '';
+      ST_Transverse.caption := '';
+      ST_FullSpan.caption := '';
+      ModalResult := 0;
+      exit;
+    end;
+    {...Full Bridge Sensitivity}
+    FullSensitivity := CalculateFullSpan;
+    if ExceptionRaised = false then begin
+      FullSpanText := floattostrf(FullSensitivity, ffFixed, 4, 3);
+      ST_FullSpan.caption := FullSpanText;
+    end;
+    if abs(AxialE) > 1700 then begin
+      LoadString(hinstance, ID_SZ_StrainExceeds1700, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+      ModalResult := 0;
+    end;
+  end;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.BN_CancelClick}
+procedure TSqrColumnFrm.BN_CancelClick(Sender: TObject);
+begin
+  {...placing initial values back in edit boxes}
+  EB_AppliedLoad.text := Old_AppliedLoad;
+  EB_Width.text := Old_ColumnWidth;
+  EB_Depth.text := Old_ColumnDepth;
+  EB_Poisson.text := Old_Poisson;
+  EB_Modulus.text := Old_Modulus;
+  EB_GageFactor.text := Old_GageFactor;
+  ST_Transverse.caption  := Old_Transverse;
+  ST_Axial.caption := Old_Axial;
+  ST_FullSpan.caption := Old_FullSpan;
+  close;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.FormActivate}
+procedure TSqrColumnFrm.FormActivate(Sender: TObject);
+var
+  EditStrings  : string;
+  i            : integer;
+  TheItem      : TacStreamable;
+begin
+  {...getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TSquareColumn then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is an object then placing values in edit boxes}
+  if TheItem <> nil then begin
+    EB_AppliedLoad.text := (TheItem as TSquareColumn).AppliedLoad;
+    EB_Width.text := (TheItem as TSquareColumn).ColumnWidth;
+    EB_Depth.text := (TheItem as TSquareColumn).ColumnDepth;
+    EB_Poisson.text := (TheItem as TSquareColumn).Poisson;
+    EB_Modulus.text := (TheItem as TSquareColumn).Modulus;
+    EB_GageFactor.text := (TheItem as TSquareColumn).GageFactor;
+    ST_Axial.caption := (TheItem as TSquareColumn).AxialStrain;
+    ST_Transverse.caption := (TheItem as TSquareColumn).TransverseStrain;
+    ST_FullSpan.caption := (TheItem as TSquareColumn).FullSpan;
+  end;
+  {...placing initial values in old variables in case cancel clicked}
+  Old_AppliedLoad := EB_AppliedLoad.text;
+  Old_ColumnWidth := EB_Width.text;
+  Old_ColumnDepth := EB_Depth.text;
+  Old_Poisson := EB_Poisson.text;
+  Old_Modulus := EB_Modulus.text;
+  Old_GageFactor := EB_GageFactor.text;
+  Old_Axial := ST_Axial.caption;
+  Old_Transverse := ST_Transverse.caption;
+  Old_FullSpan := ST_FullSpan.caption;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.BN_OKClick}
+procedure TSqrColumnFrm.BN_OKClick(Sender: TObject);
+var
+  TheItem : TacStreamable;
+  i       : integer;
+  j       : integer;
+begin
+  BN_ComputeClick(Sender);
+  if IsThereAnError = True then begin
+    exit;
+  end;
+  MainForm.DesignChosen := true;
+  {...getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TSquareColumn then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {...if there is an object then placing values in edit boxes}
+  if TheItem = nil then begin
+    {...creating and placing values in object}
+    SqrColumnObject := TSquareColumn.create;
+    SqrColumnObject.AppliedLoad := EB_AppliedLoad.text;;
+    SqrColumnObject.ColumnWidth := EB_Width.text;
+    SqrColumnObject.ColumnDepth := EB_Depth.text;
+    SqrColumnObject.Poisson := EB_Poisson.text;
+    SqrColumnObject.Modulus := EB_Modulus.text;
+    SqrColumnObject.GageFactor := EB_GageFactor.text;
+    SqrColumnObject.AxialStrain := ST_Axial.caption;
+    SqrColumnObject.TransverseStrain := ST_Transverse.caption;
+    SqrColumnObject.FullSpan := ST_FullSpan.caption;
+    MainForm.AddToLog(SqrColumnObject);
+    j := 0;
+    {...placing string associated with object in outline}
+    repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Design Verification') or (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, SqrColumnObject.GetAsString);
+  end
+  else begin
+    (TheItem as TSquareColumn).AppliedLoad := EB_AppliedLoad.text;;
+    (TheItem as TSquareColumn).ColumnWidth := EB_Width.text;
+    (TheItem as TSquareColumn).ColumnDepth := EB_Depth.text;
+    (TheItem as TSquareColumn).Poisson := EB_Poisson.text;
+    (TheItem as TSquareColumn).Modulus := EB_Modulus.text;
+    (TheItem as TSquareColumn).GageFactor := EB_GageFactor.text;
+    (TheItem as TSquareColumn).AxialStrain := ST_Axial.caption;
+    (TheItem as TSquareColumn).TransverseStrain := ST_Transverse.caption;
+    (TheItem as TSquareColumn).FullSpan := ST_FullSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.DesignDlgShowing = True then begin
+    DesignDlg.close;
+  end;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.FormClose}
+procedure TSqrColumnFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.EB_AppliedLoadExit}
+procedure TSqrColumnFrm.EB_AppliedLoadExit(Sender: TObject);
+var
+  ForceUnit  : array[0..MAXTEXTLENGTH-1] of char;
+  ForceText  : string;
+  ForceValue : double;
+  ErrorCode  : integer;
+begin
+  if MainForm.UnitsAreUS = false then begin
+    ForceText := EB_AppliedLoad.text;
+    val(ForceText, ForceValue, ErrorCode);
+    if ErrorCode <> 0 then begin
+      exit;
+    end;
+    ForceValue := ForceValue * 0.101971;
+//   str(ForceValue:4:3, ForceText);
+    ForceText := format('%4.3f',[ForceValue]) ;
+    ST_KGF.caption := ForceText;
+    Loadstring(hinstance, ID_SZ_MetricKg, ForceUnit, sizeof(ForceUnit));
+    ST_KGFUnit.caption := ForceUnit;
+  end
+  else begin
+    St_KGF.caption := '';
+    ST_KGFUnit.caption := '';
+  end;
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.BN_PrintClick}
+procedure TSqrColumnFrm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderPChar   : array[0..MAXTEXTLENGTH-1] of char;
+  HeaderString  : string;
+  DateString    : string;
+  id            : longint;
+  MetaHandle    : Thandle;
+  sserror       : integer;
+  htmlText      : string ;
+  stream        : tResourceStream ;
+  strstream     : tStringStream;
+
+begin
+   Stream := TResourceStream.Create(HInstance, 'BBCant', RT_RCDATA)  ;
+   strstream := TStringStream.Create() ;
+
+   try
+     strstream.LoadFromStream(stream)     ;
+     htmlText := strstream.DataString ;
+   finally
+     StrStream.Free() ;
+     Stream.Free() ;
+   end;
+   htmlText := StringReplace(htmlText, '$af2',ST_AppliedLoadUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$bw2',ST_BeamWidthUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$bt2',ST_ThicknessUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$cl2',ST_MomentArmUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$me2',ST_ModulusUnits.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$gl2',ST_GageLengthUnit.caption, [rfReplaceAll, rfIgnoreCase]) ;
+
+  htmlText := StringReplace(htmlText, '$af1',EB_AppliedLoad.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$bw1',EB_BeamWidth.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$bt1',EB_Thickness.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$cl1',EB_MomentArm.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$me1',EB_Modulus.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$gl1',EB_GageLength.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$gf1',EB_GageFactor.text, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$gs1',ST_AvgStrain.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$sv1',ST_Gradient.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   htmlText := StringReplace(htmlText, '$sf1',ST_FullBridgeSpan.caption, [rfReplaceAll, rfIgnoreCase]) ;
+   SaveDialogPrint.FileName := '' ;
+   SaveDialogPrint.InitialDir := tPath.GetDocumentsPath ;
+   if SaveDialogPrint.Execute
+     then begin
+       tfile.writeAllText(SaveDialogPrint.FileName,htmlText) ;
+       ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName) ,nil,nil,SW_SHOWNORMAL);
+     end;
+  {...clearing sheet for new values}
+(*  SSClearRange(Sheet1.SS, 4, 5, 17, 5, 3);
+  {placing Units on sheet}
+  SSSetActiveCell(Sheet1.SS, 4, 6);
+  Sheet1.text := ST_LoadUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 6, 6);
+  Sheet1.text := ST_WidthUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 7, 6);
+  Sheet1.text := ST_DepthUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 10, 6);
+  Sheet1.text := ST_ModulusUnit.caption;
+  SSSetActiveCell(Sheet1.SS, 4, 5);
+  Sheet1.text := EB_AppliedLoad.text;
+  SSSetActiveCell(Sheet1.SS, 6, 5);
+  Sheet1.text := EB_Width.text;
+  SSSetActiveCell(Sheet1.SS, 7, 5);
+  Sheet1.text := EB_Depth.text;
+  SSSetActiveCell(Sheet1.SS, 9, 5);
+  Sheet1.text := EB_Poisson.text;
+  SSSetActiveCell(Sheet1.SS, 10, 5);
+  Sheet1.text := EB_Modulus.text;
+  SSSetActiveCell(Sheet1.SS, 12, 5);
+  Sheet1.text := EB_GageFactor.text;
+  SSSetActiveCell(Sheet1.SS, 15, 5);
+  Sheet1.text := ST_Axial.caption;
+  SSSetActiveCell(Sheet1.SS, 16, 5);
+  Sheet1.text := ST_Transverse.caption;
+  SSSetActiveCell(Sheet1.SS, 17, 5);
+  Sheet1.text := ST_FullSpan.caption;
+  sserror := SSObjNewPicture(Sheet1.ss, 2, 20, 5.57, 29, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+  SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+  DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+  HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+  strpcopy(HeaderPChar, HeaderString);
+  SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+  SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+  SSFilePrint(Sheet1.ss, 0); *)
+end;
+
+(***********************************************************************)
+{TSqrColumnFrm.BN_HelpClick}
+procedure TSqrColumnFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(1060);
+end;
+
+begin
+  {...registering object}
+  RegisterClasses([TSquareColumn]);
+end.

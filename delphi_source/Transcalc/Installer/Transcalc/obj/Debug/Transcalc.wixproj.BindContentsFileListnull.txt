@@ -1,0 +1,8 @@
+..\..\bridge\BridgeAp.exe
+..\..\RRSensor.txt
+../Transcalc Installer/License/Software License Agreement.rtf
+..\..\wire\Table.exe
+..\..\TcrCalc.exe
+..\..\xcalc.chm
+..\..\XCalcPro.exe
+..\..\XConfig.exe

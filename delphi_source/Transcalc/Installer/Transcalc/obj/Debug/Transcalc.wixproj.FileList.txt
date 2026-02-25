@@ -1,0 +1,6 @@
+D:\AFAB\Vishay\transcalc\Transcalc\Installer\Transcalc\bin\Debug\Setup.msi
+D:\AFAB\Vishay\transcalc\Transcalc\Installer\Transcalc\bin\Debug\Setup.wixpdb
+obj\Debug\Product.wixobj
+obj\Debug\Transcalc.wixproj.BindContentsFileListnull.txt
+obj\Debug\Transcalc.wixproj.BindOutputsFileListnull.txt
+obj\Debug\Transcalc.wixproj.BindBuiltOutputsFileListnull.txt

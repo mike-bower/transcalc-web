@@ -1,0 +1,121 @@
+{TransCalc}
+program Xcalcpro;
+
+
+
+{$R *.dres}
+
+uses
+  Forms,
+  WinProcs,
+  SysUtils,
+  WinTypes,
+  MAINMENU in 'MAINMENU.PAS' {MainForm},
+  SPLASH in 'SPLASH.PAS' {SplashScreen},
+  ZVSTEMP in 'ZVSTEMP.PAS' {ZeroVsTempDlg},
+  CUTE01 in 'CUTE01.PAS' {E01AdjustmentFrm},
+  ZEROBAL in 'ZEROBAL.PAS' {ZeroBalanceFrm},
+  BBCANT in 'BBCANT.PAS' {CantileverBBFrm},
+  REVBB in 'REVBB.PAS' {ReverseBBFrm},
+  BINO in 'BINO.PAS' {BinocularBBFrm},
+  ACLIST in 'ACLIST.PAS',
+  ACSTREAM in 'ACSTREAM.PAS',
+  LOG in 'LOG.PAS',
+  LOGITEM in 'LOGITEM.PAS',
+  LOGSTRM in 'LOGSTRM.PAS',
+  SBBEAM in 'SBBEAM.PAS' {SBeamBBFrm},
+  DUALBB in 'DUALBB.PAS' {DualBBFrm},
+  RNDHLWC in 'RNDHLWC.PAS' {RndHollowColFrm},
+  SQRCOL in 'SQRCOL.PAS' {SqrColumnFrm},
+  RNDSLDC in 'RNDSLDC.PAS' {RndSolidColFrm},
+  SHEARSQR in 'SHEARSQR.PAS' {SqrShearWebFrm},
+  SHERRND1 in 'SHERRND1.PAS' {RndShrWebFrm},
+  SHEARSB in 'SHEARSB.PAS' {RndSBeamShrFrm},
+  SQTORQUE in 'SQTORQUE.PAS' {SqTorqueShftFrm},
+  RNDSLDTQ in 'RNDSLDTQ.PAS' {RndSldTorqueFrm},
+  RNDHLWTQ in 'RNDHLWTQ.PAS' {RndHlwTorqueFrm},
+  PRESSURE in 'PRESSURE.PAS' {PressureFrm},
+  RESISTOR in 'RESISTOR.PAS',
+  CONVERT in 'CONVERT.PAS',
+  E01ZERO in 'E01ZERO.PAS' {E01ZeroBalanceForm},
+  SPAN2PT in 'SPAN2PT.PAS' {SvsTTwoPtForm},
+  SPAN3PT in 'SPAN3PT.PAS' {Span3ptForm},
+  D013PT in 'D013PT.PAS' {CutD013PointFrm},
+  D012PT in 'D012PT.PAS' {CutD012ptForm},
+  OPTSHUNT in 'OPTSHUNT.PAS' {OptShuntForm},
+  OPTSHD01 in 'OPTSHD01.PAS' {OptShuntD01ResistorForm},
+  OPTSHC01 in 'OPTSHC01.PAS' {OptShuntCutC01Frm},
+  SPAN3C01 in 'SPAN3C01.PAS' {Span3PtC01Form},
+  SPANSET in 'SPANSET.PAS' {SpanSetForm},
+  SETD01 in 'SETD01.PAS' {SpanSetD01ResistorForm},
+  WIRETBL in 'WIRETBL.PAS' {WireTableForm},
+  ABOUT in 'ABOUT.PAS' {AboutForm},
+  MATH in 'MATH.PAS',
+  DIAPRAGM in 'DIAPRAGM.PAS' {StrainDistForm},
+  APATTERN in 'APATTERN.PAS' {APatternForm},
+  BPATTERN in 'BPATTERN.PAS' {BPatternForm},
+  CPATTERN in 'CPATTERN.PAS' {CPatternForm},
+  DPATTERN in 'DPATTERN.PAS' {DPatternForm},
+  DESIGN in 'DESIGN.PAS' {DesignDlg},
+  COMPENST in 'COMPENST.PAS' {CompensationDlg},
+  SPAN2C01 in 'SPAN2C01.PAS' {Span2PtC01Form},
+  SPAN2C11 in 'SPAN2C11.PAS' {Span2ptC11Form},
+  SPAN3C11 in 'SPAN3C11.PAS' {Span3PtC11Form},
+  OPTSHC11 in 'OPTSHC11.PAS' {OptShuntC11Form},
+  SPN21210 in 'SPN21210.PAS' {Span2ptC1210Form},
+  SPN31210 in 'SPN31210.PAS' {Span3ptC1210Form},
+  OPSH1210 in 'OPSH1210.PAS' {OptShuntC1210Form},
+  SPN21220 in 'SPN21220.PAS' {Span2PtC1220Form},
+  SPN31220 in 'SPN31220.PAS' {Span3PtC1220Form},
+  OPSH1220 in 'OPSH1220.PAS' {OptShuntC1220Form},
+  ZBWIRE in 'ZBWIRE.PAS' {ZBWireTableForm},
+  WIRE2PT in 'WIRE2PT.PAS' {WireTable2ptForm},
+  SPANWIRE in 'SPANWIRE.PAS' {WireTableSpanForm},
+  SIMSPAN in 'SIMSPAN.PAS' {SimulSpanForm},
+  SPANSC13 in 'SPANSC13.PAS' {SpanSpanC01Form},
+  SPANSC11 in 'SPANSC11.PAS' {SpanSpanC11Form},
+  SPNS1210 in 'SPNS1210.PAS' {SpanSpanC1210Form},
+  SPNS1220 in 'SPNS1220.PAS' {SpanSpanC1220Form},
+  D01SPANS in 'D01SPANS.PAS' {CutD01SpansFrm},
+  WARNING in 'WARNING.PAS' {WarningForm};
+
+{$R *.RES}
+
+const
+  MAXTEXTLENGTH = 80;
+  MAXERRORLENGTH = 255;
+  MAXDIRLENGTH = 150;
+var
+  Cs             : array[0..MAXERRORLENGTH-1] of char;
+  Msg            : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption   : array[0..MAXERRORLENGTH-1] of char;
+  WindowsBuffer  : array[0..MAXDIRLENGTH-1] of char;
+  WindowsString  : string;
+  MsgStr         : string;
+  ShowTheMessage : integer;
+  Button         : integer;
+  exp_month      : integer;
+  exp_day        : integer;
+  exp_year       : integer;
+  IllegalUse     : boolean;
+begin
+  Application.CreateForm(TMainForm, MainForm);
+  IllegalUse := true;
+  GetWindowsDirectory(WindowsBuffer, sizeof(WindowsBuffer));
+  WindowsString := strpas(WindowsBuffer);
+  WindowsString := WindowsString + '\comp.cf';
+  strpCopy(WindowsBuffer, WindowsString);
+
+    Application.Title := 'TransCalc';
+    Application.HelpFile := 'XCALC.HLP';
+    Application.CreateForm(TSplashScreen, SplashScreen);
+    SplashScreen.showmodal;
+    MainForm.StatusLine.caption := '';
+    ShowTheMessage := GetPrivateProfileInt('StartUp', 'Warning', 1, 'XCALC.INI');
+    if ShowTheMessage = 1 then begin
+       Application.CreateForm(TWarningForm, WarningForm);
+       WarningForm.showmodal;
+    end;
+    Application.Run;
+
+end.

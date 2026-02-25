@@ -1,0 +1,108 @@
+(***********************************************)
+(*  DPattern Unit                              *)
+(***********************************************)
+unit Dpattern;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons;
+
+type
+  TDPatternForm = class(TForm)
+    Panel1: TPanel;
+    Image1: TImage;
+    BN_OK: TBitBtn;
+    BN_Cut: TBitBtn;
+    BN_Help: TBitBtn;
+    Label1: TLabel;
+    Label2: TLabel;
+    procedure showformmodal(TheSource : TObject);
+    procedure BN_OKClick(Sender: TObject);
+    procedure BN_CutClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure BN_HelpClick(Sender: TObject);
+    procedure Image1Click(Sender: TObject);
+  private
+    FormCalled : TObject;
+  end;
+
+var
+  DPatternForm: TDPatternForm;
+
+implementation
+uses OptshD01, D012pt, D013pt, OptShunt, Span3pt, Span2pt, SimSpan, D01Spans;
+{$R *.DFM}
+
+(***********************************************************************)
+{TDPatternForm.showformmodal}
+procedure TDPatternForm.showformmodal(TheSource: TObject);
+begin
+  FormCalled := TheSource;
+  showmodal;
+end;
+
+(***********************************************************************)
+{TDPatternForm.BN_OKClick}
+procedure TDPatternForm.BN_OKClick(Sender: TObject);
+begin
+  close;
+end;
+
+(***********************************************************************)
+{TDPatternForm.BN_CutClick}
+procedure TDPatternForm.BN_CutClick(Sender: TObject);
+begin
+  if (FormCalled = Span3ptForm) then begin
+    close;
+    Application.CreateForm(TCutD013PointFrm, CutD013PointFrm);
+    CutD013PointFrm.showmodal;
+  end
+  else if (FormCalled = SvsTTwoPtForm) then begin
+    close;
+    Application.CreateForm(TCutD012ptForm, CutD012ptForm);
+    CutD012ptForm.showmodal;
+  end
+  else if (FormCalled = OptShuntForm)then begin
+    close;
+    Application.CreateForm(TOptShuntD01ResistorForm, OptShuntD01ResistorForm);
+    OptShuntD01ResistorForm.showmodal;
+  end
+  else if (FormCalled = SimulSpanForm)then begin
+    close;
+    Application.CreateForm(TCutD013PointFrm, CutD013PointFrm);
+    CutD013PointFrm.showmodal;
+  end;
+end;
+
+(***********************************************************************)
+{TDPatternForm.FormCreate}
+procedure TDPatternForm.FormCreate(Sender: TObject);
+begin
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+procedure TDPatternForm.Image1Click(Sender: TObject);
+begin
+
+end;
+
+(***********************************************************************)
+{TDPatternForm.FormClose}
+procedure TDPatternForm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TDPatternForm.BN_HelpClick}
+procedure TDPatternForm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(3040);
+end;
+
+end.

@@ -1,0 +1,43 @@
+[Engine]
+Type=1
+
+[Options]
+Title=TransCalc 1.10
+DefaultDir=c:\xcalc
+Password=
+FindFile=
+Language=English (USA)
+AskUserName=0
+AskCompanyName=0
+AskDirectory=1
+AskSerialNumber=0
+UseDefaultDir=1
+UseFindFile=0
+Win32=1
+Win16=1
+ShowBackground=1
+ColorFrom=4
+ColorTo=12
+Direction=0
+Trigger=
+
+[Items]
+Component="Borland VBX DLL v.1.1" [""]
+File="d:\software projects\transcalc\install\xconfig.exe" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\tcrcalc.exe" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\xcalc.hlp" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\pppwin.dll" "<system>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\rrsensor.txt" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\vtss.vbx" "<system>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\table.exe" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\xcalc.exe" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\output.exe" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\software projects\transcalc\install\vtssdll.dll" "<system>" "0" "always" "compress" "any" "noprompt" [""] ""
+File="d:\Software Projects\Transcalc\install\Xcalc.hlp" "<install>" "0" "always" "compress" "any" "noprompt" [""] ""
+Action="Run external program" "<install>\xconfig.exe" "after" [""]
+ProgMan="TransCalc" "<install>\xcalc.exe" "<install>\xcalc.exe" "0" [""] "<install>"
+ProgMan="TransCalc Configuration" "<install>\xconfig.exe" "<install>\xconfig.exe" "0" [""] "<install>"
+ProgMan="TransCalc Help" "<install>\xcalc.hlp" "<install>\xcalc.hlp" "0" [""] "<install>"
+ProgMan="Wire Table" "<install>\table.exe" "<install>\table.exe" "0" [""] "<install>"
+ProgMan="Resistance Ratios" "<install>\tcrcalc.exe" "<install>\tcrcalc.exe" "0" [""] "<install>"
+ProgMan="Bridge Output" "<install>\output.exe" "<install>\output.exe" "0" [""] "<install>"

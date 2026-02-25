@@ -1,0 +1,1411 @@
+(* ********************************************* *)
+(* Span vs. Temperature Opt. Shunt Unit *)
+(* ********************************************* *)
+unit Optshunt;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  StdCtrls, ExtCtrls, Forms, Buttons, Log, LogItem, LogStrm, acStream, acList,
+  Printers, Vcl.Dialogs, ioUtils, ShellAPI;
+
+const
+  MAXTEXTLENGTH = 40;
+  MAXERRORLENGTH = 255;
+
+type
+  RealType = Double;
+
+  (* ********************************************* *)
+  (* Optimum Shunt Object *)
+  (* ********************************************* *)
+type
+  TOptimumShunt = class(TLogItem)
+  private
+    FLowSpan: shortstring;
+    FLowRBridge: shortstring;
+    FLowRmod: shortstring;
+    FHighSpan: shortstring;
+    FHighRBridge: shortstring;
+    FHighRmod: shortstring;
+    FAmbientSpan: shortstring;
+    FAmbientRBridge: shortstring;
+    FAmbientRmod: shortstring;
+    FResistors: shortstring;
+    FRShunt: shortstring;
+    FSpanLow: shortstring;
+    FSpanAmbient: shortstring;
+    FSpanHigh: shortstring;
+    TheString: shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+    procedure ShowTheForm; override;
+    procedure PrintTheForm; override;
+    function GetAsString: String; override;
+  public
+    constructor create;
+    destructor destroy; override;
+    property LowSpan: shortstring read FLowSpan write FLowSpan;
+    property LowRBridge: shortstring read FLowRBridge write FLowRBridge;
+    property LowRmod: shortstring read FLowRmod write FLowRmod;
+    property HighSpan: shortstring read FHighSpan write FHighSpan;
+    property HighRBridge: shortstring read FHighRBridge write FHighRBridge;
+    property HighRmod: shortstring read FHighRmod write FHighRmod;
+    property AmbientSpan: shortstring read FAmbientSpan write FAmbientSpan;
+    property AmbientRBridge: shortstring read FAmbientRBridge
+      write FAmbientRBridge;
+    property AmbientRmod: shortstring read FAmbientRmod write FAmbientRmod;
+    property RShunt: shortstring read FRShunt write FRShunt;
+    property SpanLow: shortstring read FSpanLow write FSpanLow;
+    property SpanAmbient: shortstring read FSpanAmbient write FSpanAmbient;
+    property SpanHigh: shortstring read FSpanHigh write FSpanHigh;
+    property TheStringText: shortstring read TheString write TheString;
+  end;
+
+  (* ********************************************* *)
+  (* Span vs. Temperature Opt. Shunt Form Object *)
+  (* ********************************************* *)
+type
+  TOptShuntForm = class(TForm)
+    Panel1: TPanel;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    Label5: TLabel;
+    Label6: TLabel;
+    EB_LowSpan: TEdit;
+    EB_LowRbridge: TEdit;
+    EB_LowRMod: TEdit;
+    GroupBox2: TGroupBox;
+    Label7: TLabel;
+    EB_AmbientSpan: TEdit;
+    Label8: TLabel;
+    Label9: TLabel;
+    EB_AmbientRBridge: TEdit;
+    Label10: TLabel;
+    Label11: TLabel;
+    EB_AmbientRMod: TEdit;
+    Label12: TLabel;
+    GroupBox3: TGroupBox;
+    Label13: TLabel;
+    EB_HighSpan: TEdit;
+    Label14: TLabel;
+    Label15: TLabel;
+    EB_HighRBridge: TEdit;
+    Label16: TLabel;
+    Label17: TLabel;
+    EB_HighRMod: TEdit;
+    Label18: TLabel;
+    Panel2: TPanel;
+    GroupBox4: TGroupBox;
+    Panel3: TPanel;
+    ImageC01: TImage;
+    ImageD01: TImage;
+    RB_C01: TRadioButton;
+    RB_D01: TRadioButton;
+    BN_Select: TBitBtn;
+    Panel5: TPanel;
+    GroupBox5: TGroupBox;
+    St_RShunt: TLabel;
+    Label20: TLabel;
+    RB_APattern: TRadioButton;
+    RB_BPattern: TRadioButton;
+    ImageAPattern: TImage;
+    ImageBPattern: TImage;
+    BN_Compute: TBitBtn;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    BN_Help: TBitBtn;
+    Label19: TLabel;
+    Label21: TLabel;
+    Label22: TLabel;
+    Label23: TLabel;
+    ST_LowSpan: TLabel;
+    ST_AmbientSpan: TLabel;
+    ST_HighSpan: TLabel;
+    Label27: TLabel;
+    Label28: TLabel;
+    Label29: TLabel;
+    BN_Print: TBitBtn;
+    Image1: TImage;
+    SaveDialogPrint: TSaveDialog;
+    // Sheet1: TSheet;
+    procedure RB_C01Click(Sender: TObject);
+    procedure RB_D01Click(Sender: TObject);
+    procedure BN_SelectClick(Sender: TObject);
+    procedure BN_CancelClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure BN_ComputeClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    procedure RB_APatternClick(Sender: TObject);
+    procedure RB_BPatternClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+    procedure Image1Click(Sender: TObject);
+  private
+    OldLowRMod: string;
+    OldLowRBridge: string;
+    OldLowSpan: string;
+    OldHighRMod: string;
+    OldHighRBridge: string;
+    OldHighSpan: string;
+    OldAmbientRMod: string;
+    OldAmbientRBridge: string;
+    OldAmbientSpan: string;
+    Old_RShunt: string;
+    Old_SpanLow: string;
+    Old_SpanAmbient: string;
+    Old_SpanHigh: string;
+    TheRShunt: string;
+    TheSpanLow: string;
+    TheSpanAmbient: string;
+    TheSpanHigh: string;
+    Resistor: string;
+    ExceptionRaised: boolean;
+    IsThereAnError: boolean;
+    TheLowRMod: RealType;
+    TheLowRBridge: RealType;
+    TheLowSpan: RealType;
+    TheHighRMod: RealType;
+    TheHighRBridge: RealType;
+    TheHighSpan: RealType;
+    TheAmbientRMod: RealType;
+    TheAmbientRBridge: RealType;
+    TheAmbientSpan: RealType;
+  public
+    OptimumShuntObject: TOptimumShunt;
+  end;
+
+var
+  OptShuntForm: TOptShuntForm;
+
+implementation
+
+uses MainMenu, Math, OptShD01, OptShC01, APattern, BPattern, CPattern, DPattern,
+  Compenst;
+{$R *.DFM}
+
+(* ********************************************* *)
+(* Span vs Temp 3 Pt. Object Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TOptimumShunt.create }
+constructor TOptimumShunt.create;
+begin
+  { ...create object }
+  inherited create;
+  { ...associating string with with object }
+  TheString := 'Span Shift with Temperature Change, Optimum Shunt';
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.destroy }
+destructor TOptimumShunt.destroy;
+begin
+  { ...destroying object }
+  inherited destroy;
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.GetAsString }
+function TOptimumShunt.GetAsString: String;
+begin
+  Result := TheString;
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.ShowTheForm }
+procedure TOptimumShunt.ShowTheForm;
+begin
+  Application.CreateForm(TOptShuntForm, OptShuntForm);
+  OptShuntForm.showmodal;
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.PrintTheForm }
+procedure TOptimumShunt.PrintTheForm;
+var
+  Sender: TObject;
+begin
+  Sender := self;
+  Application.CreateForm(TOptShuntForm, OptShuntForm);
+  OptShuntForm.visible := false;
+  OptShuntForm.FormActivate(Sender);
+  OptShuntForm.BN_PrintClick(Sender);
+  OptShuntForm.BN_CancelClick(Sender);
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.AssignTo }
+procedure TOptimumShunt.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TOptimumShunt) and (self is Dest.ClassType) then
+  begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TOptimumShunt do
+    begin
+      FLowSpan := self.FLowSpan;
+      FLowRBridge := self.LowRBridge;
+      FLowRmod := self.FLowRmod;
+      FHighSpan := self.FHighSpan;
+      FHighRBridge := self.HighRBridge;
+      FHighRmod := self.FHighRmod;
+      FAmbientSpan := self.FAmbientSpan;
+      FAmbientRBridge := self.FAmbientRBridge;
+      FAmbientRmod := self.AmbientRmod;
+      FResistors := self.FResistors;
+      FRShunt := self.FRShunt;
+      FSpanLow := self.FSpanLow;
+      FSpanAmbient := self.FSpanAmbient;
+      FSpanHigh := self.FSpanHigh;
+      TheString := self.TheString;
+    end;
+  end
+  else
+  begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.InitFields }
+procedure TOptimumShunt.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.SaveToStream }
+procedure TOptimumShunt.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FLowSpan, sizeof(shortstring));
+  Stream.SaveBuffer(FLowRBridge, sizeof(shortstring));
+  Stream.SaveBuffer(FLowRmod, sizeof(shortstring));
+  Stream.SaveBuffer(FHighSpan, sizeof(shortstring));
+  Stream.SaveBuffer(FHighRBridge, sizeof(shortstring));
+  Stream.SaveBuffer(FHighRmod, sizeof(shortstring));
+  Stream.SaveBuffer(FAmbientSpan, sizeof(shortstring));
+  Stream.SaveBuffer(FAmbientRBridge, sizeof(shortstring));
+  Stream.SaveBuffer(FAmbientRmod, sizeof(shortstring));
+  Stream.SaveBuffer(FResistors, sizeof(shortstring));
+  Stream.SaveBuffer(FRShunt, sizeof(shortstring));
+  Stream.SaveBuffer(FSpanLow, sizeof(shortstring));
+  Stream.SaveBuffer(FSpanAmbient, sizeof(shortstring));
+  Stream.SaveBuffer(FSpanHigh, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************************************* *)
+{ TOptimumShunt.ReadFromStream }
+procedure TOptimumShunt.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FLowSpan, sizeof(shortstring));
+  Stream.ReadBuffer(FLowRBridge, sizeof(shortstring));
+  Stream.ReadBuffer(FLowRmod, sizeof(shortstring));
+  Stream.ReadBuffer(FHighSpan, sizeof(shortstring));
+  Stream.ReadBuffer(FHighRBridge, sizeof(shortstring));
+  Stream.ReadBuffer(FHighRmod, sizeof(shortstring));
+  Stream.ReadBuffer(FAmbientSpan, sizeof(shortstring));
+  Stream.ReadBuffer(FAmbientRBridge, sizeof(shortstring));
+  Stream.ReadBuffer(FAmbientRmod, sizeof(shortstring));
+  Stream.ReadBuffer(FResistors, sizeof(shortstring));
+  Stream.ReadBuffer(FRShunt, sizeof(shortstring));
+  Stream.ReadBuffer(FSpanLow, sizeof(shortstring));
+  Stream.ReadBuffer(FSpanAmbient, sizeof(shortstring));
+  Stream.ReadBuffer(FSpanHigh, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+end;
+
+(* ********************************************* *)
+(* Span vs. Temperature Opt Shunt Form Methods *)
+(* ********************************************* *)
+
+(* ********************************************************************* *)
+{ TOptShuntForm.RB_APatternClick }
+procedure TOptShuntForm.RB_APatternClick(Sender: TObject);
+begin
+  RB_APattern.checked := true;
+  ImageAPattern.visible := true;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.RB_BPatternClick }
+procedure TOptShuntForm.RB_BPatternClick(Sender: TObject);
+begin
+  RB_BPattern.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := true;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.RB_C01Click }
+procedure TOptShuntForm.RB_C01Click(Sender: TObject);
+begin
+  RB_C01.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := false;
+  ImageC01.visible := true;
+  ImageD01.visible := false;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.RB_D01Click }
+procedure TOptShuntForm.RB_D01Click(Sender: TObject);
+begin
+  RB_D01.checked := true;
+  ImageAPattern.visible := false;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := true;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.BN_CutClick }
+procedure TOptShuntForm.BN_SelectClick(Sender: TObject);
+begin
+  if RB_APattern.checked = true then
+  begin
+    Application.CreateForm(TAPatternForm, APatternForm);
+    APatternForm.showmodal;
+  end
+  else if RB_BPattern.checked = true then
+  begin
+    Application.CreateForm(TBPatternForm, BPatternForm);
+    BPatternForm.showmodal;
+  end
+  else if RB_D01.checked = true then
+  begin
+    Application.CreateForm(TDPatternForm, DPatternForm);
+    DPatternForm.ShowFormModal(OptShuntForm);
+  end
+  else if RB_C01.checked = true then
+  begin
+    Application.CreateForm(TCPatternForm, CPatternForm);
+    CPatternForm.ShowFormModal(OptShuntForm);
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.BN_CancelClick }
+procedure TOptShuntForm.BN_CancelClick(Sender: TObject);
+begin
+  { ...placing old value in Edit box }
+  EB_LowRMod.text := OldLowRMod;
+  EB_LowRbridge.text := OldLowRBridge;
+  EB_LowSpan.text := OldLowSpan;
+  EB_HighRMod.text := OldHighRMod;
+  EB_HighRBridge.text := OldHighRBridge;
+  EB_HighSpan.text := OldHighSpan;
+  EB_AmbientRMod.text := OldAmbientRMod;
+  EB_AmbientRBridge.text := OldAmbientRBridge;
+  EB_AmbientSpan.text := OldAmbientSpan;
+  St_RShunt.caption := Old_RShunt;
+  ST_LowSpan.caption := Old_SpanLow;
+  ST_AmbientSpan.caption := Old_SpanAmbient;
+  ST_HighSpan.caption := Old_SpanHigh;
+  close;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.FormCreate }
+procedure TOptShuntForm.FormCreate(Sender: TObject);
+begin
+  RB_APattern.checked := true;
+  ImageAPattern.visible := true;
+  ImageBPattern.visible := false;
+  ImageC01.visible := false;
+  ImageD01.visible := false;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+procedure TOptShuntForm.Image1Click(Sender: TObject);
+begin
+
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.BN_ComputeClick }
+procedure TOptShuntForm.BN_ComputeClick(Sender: TObject);
+const
+  MINSPAN_US = 0.0001;
+  MAXSPAN_US = 10;
+  MINRBRIDGE_US = 50;
+  MAXRBRIDGE_US = 10000;
+  MINRMOD_US = 0.01;
+  MAXRMOD_US = 1000;
+  MN = 9;
+  NUM = -0.123456789;
+var
+  ErrorMsg: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorUnit: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorAnd: array [0 .. MAXERRORLENGTH - 1] of char;
+  ErrorCaption: array [0 .. MAXERRORLENGTH - 1] of char;
+  ARShunt: array [1 .. 5] of RealType;
+  S: array [0 .. 2] of RealType;
+  Rm: array [0 .. 2] of RealType;
+  Rb: array [0 .. 2] of RealType;
+  A: array [0 .. 2] of RealType;
+  B: array [0 .. 2] of RealType;
+  C: array [0 .. 2] of RealType;
+  D: array [0 .. 2] of RealType;
+  Dev: array [0 .. 2] of RealType;
+  Tc: array [0 .. 2] of RealType;
+  Solution: array [0 .. 3] of RealType;
+  TextOut: array [0 .. 10] of string;
+  StrUnit: string;
+  StrAnd: string;
+  StrMsg: string;
+  StrMin: string;
+  StrMax: string;
+  EditStrings: string;
+  answer: boolean;
+  F: RealType;
+  G: RealType;
+  H: RealType;
+  M: RealType;
+  N: RealType;
+  O: RealType;
+  P: RealType;
+  Q: RealType;
+  R: RealType;
+  T: RealType;
+  U: RealType;
+  V: RealType;
+  W: RealType;
+  Term1: RealType;
+  Term2: RealType;
+  Term3: RealType;
+  Term4: RealType;
+  Term5: RealType;
+  Term6: RealType;
+  Term7: RealType;
+  Term8: RealType;
+  Term9: RealType;
+  X: RealType;
+  Y: RealType;
+  Z: RealType;
+  Rs0: RealType;
+  Rs1: RealType;
+  Rs2: RealType;
+  D0: RealType;
+  D1: RealType;
+  D2: RealType;
+  S1: RealType;
+  S2: RealType;
+  S3: RealType;
+  Shunt: RealType;
+  Span: RealType;
+  MinSpan: RealType;
+  MaxSpan: RealType;
+  MinRBridge: RealType;
+  MaxRBridge: RealType;
+  MinRMod: RealType;
+  MaxRMod: RealType;
+  i: integer;
+  j: integer;
+  k: integer;
+  l: integer;
+  ErrorCode: integer;
+  Button: integer;
+begin
+  MinSpan := MINSPAN_US;
+  MaxSpan := MAXSPAN_US;
+  MinRBridge := MINRBRIDGE_US;
+  MaxRBridge := MAXRBRIDGE_US;
+  MinRMod := MINRMOD_US;
+  MaxRMod := MAXRMOD_US;
+  St_RShunt.caption := '';
+  ST_LowSpan.caption := '';
+  ST_AmbientSpan.caption := '';
+  ST_HighSpan.caption := '';
+  IsThereAnError := false;
+  { ..checking to see if LowTemperature Span is valid }
+  EditStrings := EB_LowSpan.text;
+  val(EditStrings, TheLowSpan, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowSpan.setfocus;
+    EB_LowSpan.clearselection;
+    exit;
+  end
+  else if (TheLowSpan < MinSpan) or (TheLowSpan > MaxSpan) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_MV, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_LowSpan, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinSpan, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxSpan, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowSpan.setfocus;
+    EB_LowSpan.clearselection;
+    exit;
+  end;
+  { ..checking to see if Low RBridge is valid }
+  EditStrings := EB_LowRbridge.text;
+  val(EditStrings, TheLowRBridge, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowRbridge.setfocus;
+    EB_LowRbridge.clearselection;
+    exit;
+  end
+  else if (TheLowRBridge < MinRBridge) or (TheLowRBridge > MaxRBridge) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_LowRBridge, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRBridge, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxRBridge, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowRbridge.setfocus;
+    EB_LowRbridge.clearselection;
+    exit;
+  end;
+  { ..checking to see if Low RMod is valid }
+  EditStrings := EB_LowRMod.text;
+  val(EditStrings, TheLowRMod, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowRMod.setfocus;
+    EB_LowRMod.clearselection;
+    exit;
+  end
+  else if (TheLowRMod < MinRMod) or (TheLowRMod > MaxRMod) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_LowRMod, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRMod, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxRMod, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_LowRMod.setfocus;
+    EB_LowRMod.clearselection;
+    exit;
+  end;
+  { ..checking to see if Ambient Temperature Span is valid }
+  EditStrings := EB_AmbientSpan.text;
+  val(EditStrings, TheAmbientSpan, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AmbientSpan.setfocus;
+    EB_AmbientSpan.clearselection;
+    exit;
+  end
+  else if (TheAmbientSpan < MinSpan) or (TheAmbientSpan > MaxSpan) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_MV, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_AmbientSpan, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinSpan, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxSpan, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AmbientSpan.setfocus;
+    EB_AmbientSpan.clearselection;
+    exit;
+  end;
+  { ..checking to see if Ambient RBridge is valid }
+  EditStrings := EB_AmbientRBridge.text;
+  val(EditStrings, TheAmbientRBridge, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AmbientRBridge.setfocus;
+    EB_AmbientRBridge.clearselection;
+    exit;
+  end
+  else if (TheAmbientRBridge < MinRBridge) or (TheAmbientRBridge > MaxRBridge)
+  then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_AmbientRBridge, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRBridge, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxRBridge, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AmbientRBridge.setfocus;
+    EB_AmbientRBridge.clearselection;
+    exit;
+  end;
+  { ..checking to see if Ambient RMod is valid }
+  EditStrings := EB_AmbientRMod.text;
+  val(EditStrings, TheAmbientRMod, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AmbientRMod.setfocus;
+    EB_AmbientRMod.clearselection;
+    exit;
+  end
+  else if (TheAmbientRMod < MinRMod) or (TheAmbientRMod > MaxRMod) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_AmbientRMod, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRMod, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxRMod, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_AmbientRMod.setfocus;
+    EB_AmbientRMod.clearselection;
+    exit;
+  end;
+  { ..checking to see if HighTemperature Span is valid }
+  EditStrings := EB_HighSpan.text;
+  val(EditStrings, TheHighSpan, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighSpan.setfocus;
+    EB_HighSpan.clearselection;
+    exit;
+  end
+  else if (TheHighSpan < MinSpan) or (TheHighSpan > MaxSpan) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_MV, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_HighSpan, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinSpan, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxSpan, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighSpan.setfocus;
+    EB_HighSpan.clearselection;
+    exit;
+  end;
+  { ..checking to see if High RBridge is valid }
+  EditStrings := EB_HighRBridge.text;
+  val(EditStrings, TheHighRBridge, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighRBridge.setfocus;
+    EB_HighRBridge.clearselection;
+    exit;
+  end
+  else if (TheHighRBridge < MinRBridge) or (TheHighRBridge > MaxRBridge) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_HighRBridge, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRBridge, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxRBridge, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighRBridge.setfocus;
+    EB_HighRBridge.clearselection;
+    exit;
+  end;
+  { ..checking to see if High RMod is valid }
+  EditStrings := EB_HighRMod.text;
+  val(EditStrings, TheHighRMod, ErrorCode);
+  if ErrorCode <> 0 then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighRMod.setfocus;
+    EB_HighRMod.clearselection;
+    exit;
+  end
+  else if (TheHighRMod < MinRMod) or (TheHighRMod > MaxRMod) then
+  begin
+    IsThereAnError := true;
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    LoadString(hinstance, ID_SZ_HighRMod, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    StrMin := floattostrf(MinRMod, ffFixed, 8, 3);
+    StrMax := floattostrf(MaxRMod, ffFixed, 8, 3);
+    EditStrings := StrMsg + ' ' + StrMin + ' ' + StrAnd + ' ' + StrMax + ' '
+      + StrUnit;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ModalResult := 0;
+    EB_HighRMod.setfocus;
+    EB_HighRMod.clearselection;
+    exit;
+  end;
+  if (TheLowSpan > TheAmbientSpan) then
+  begin
+    { ..display message telling user the low span must be lower than ambient span }
+    LoadString(hinstance, ID_SZ_LowOutAmbientOut, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    IsThereAnError := true;
+    EB_AmbientSpan.setfocus;
+    exit;
+  end;
+  if (TheAmbientSpan > TheHighSpan) then
+  begin
+    { ..display message telling user the ambient span must be lower than high span }
+    LoadString(hinstance, ID_SZ_AmbientOutHighOut, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    IsThereAnError := true;
+    EB_HighSpan.setfocus;
+    exit;
+  end;
+  ExceptionRaised := false;
+  { ...placing values in arrays for easier calculations }
+  S[0] := TheLowSpan;
+  Rm[0] := TheLowRMod;
+  Rb[0] := TheLowRBridge;
+  S[1] := TheAmbientSpan;
+  Rm[1] := TheAmbientRMod;
+  Rb[1] := TheAmbientRBridge;
+  S[2] := TheHighSpan;
+  Rm[2] := TheHighRMod;
+  Rb[2] := TheHighRBridge;
+  { ...set up first equation }
+  for i := 0 to 2 do
+  begin
+    try
+      A[i] := S[i] * Rb[i];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      B[i] := Rm[i] * A[i];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      C[i] := Rm[i] + Rb[i];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      D[i] := Rm[i] * Rb[i];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+  end;
+  { Calculate Quadratic Solutions }
+  try
+    F := A[0] * C[2] - A[2] * C[0];
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    G := B[0] * C[2] + A[0] * D[2] - B[2] * C[0] - A[2] * D[0];
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    H := B[0] * D[2] - B[2] * D[0];
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  try
+    M := Sqr(G) - (4 * F * H);
+  except
+    on EMathError do
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end;
+  if ((M > 0) or (F <> 0)) then
+  begin
+    try
+      Rs0 := (-G + Sqrt(M)) / (2 * F);
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    if (Rs0 > 0.0) then
+    begin
+      try
+        ARShunt[2] := (-G - Sqrt(M)) / (2 * F);
+      except
+        on EMathError do
+        begin
+          LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+            sizeof(ErrorMsg));
+          LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+            sizeof(ErrorCaption));
+          Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+            mb_OK or mb_IconExclamation);
+          ExceptionRaised := true;
+          exit;
+        end;
+      end;
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+    for i := 0 to 2 do
+    begin
+      try
+        S[i] := (Rs0 * A[i] + B[i]) / (Rs0 * C[i] + D[i]);
+      except
+        on EMathError do
+        begin
+          LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+            sizeof(ErrorMsg));
+          LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+            sizeof(ErrorCaption));
+          Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+            mb_OK or mb_IconExclamation);
+          ExceptionRaised := true;
+          exit;
+        end;
+      end;
+    end;
+    try
+      D0 := 100 * (S[0] - S[1]) / S[1];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      D1 := 100 * (S[1] - S[1]) / S[1];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    try
+      D2 := 100 * (S[2] - S[1]) / S[1];
+    except
+      on EMathError do
+      begin
+        LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg,
+          sizeof(ErrorMsg));
+        LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption,
+          sizeof(ErrorCaption));
+        Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+          mb_OK or mb_IconExclamation);
+        ExceptionRaised := true;
+        exit;
+      end;
+    end;
+    if (Rs0 >= 0) then
+    begin
+      TheRShunt := floattostrf(Rs0, ffFixed, 4, 1);
+      St_RShunt.caption := TheRShunt;
+      TheSpanLow := floattostrf(S[0], ffFixed, 6, 5);
+      ST_LowSpan.caption := TheSpanLow;
+      TheSpanAmbient := floattostrf(S[1], ffFixed, 6, 5);
+      ST_AmbientSpan.caption := TheSpanAmbient;
+      TheSpanHigh := floattostrf(S[2], ffFixed, 6, 5);
+      ST_HighSpan.caption := TheSpanHigh;
+    end
+    else
+    begin
+      LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+      LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+      Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+        mb_OK or mb_IconExclamation);
+      ExceptionRaised := true;
+      exit;
+    end;
+  end
+  else
+  begin
+    LoadString(hinstance, ID_SZ_CompImpraticable, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption,
+      mb_OK or mb_IconExclamation);
+    ExceptionRaised := true;
+    exit;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.FormActivate }
+procedure TOptShuntForm.FormActivate(Sender: TObject);
+var
+  EditStrings: string;
+  i: integer;
+  TheItem: TacStreamable;
+begin
+  { ...getting the object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    If MainForm.Flog.AtIndex(i) is TOptimumShunt then
+    begin
+      TheItem := MainForm.Flog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  { ...if there is an object, then place values in edit boxes }
+  if TheItem <> nil then
+  begin
+    EB_LowSpan.text := (TheItem as TOptimumShunt).LowSpan;
+    EB_LowRbridge.text := (TheItem as TOptimumShunt).LowRBridge;
+    EB_LowRMod.text := (TheItem as TOptimumShunt).LowRmod;
+    EB_HighSpan.text := (TheItem as TOptimumShunt).HighSpan;
+    EB_HighRBridge.text := (TheItem as TOptimumShunt).HighRBridge;
+    EB_HighRMod.text := (TheItem as TOptimumShunt).HighRmod;
+    EB_AmbientSpan.text := (TheItem as TOptimumShunt).AmbientSpan;
+    EB_AmbientRBridge.text := (TheItem as TOptimumShunt).AmbientRBridge;
+    EB_AmbientRMod.text := (TheItem as TOptimumShunt).AmbientRmod;
+    St_RShunt.caption := (TheItem as TOptimumShunt).RShunt;
+    ST_LowSpan.caption := (TheItem as TOptimumShunt).SpanLow;
+    ST_AmbientSpan.caption := (TheItem as TOptimumShunt).SpanAmbient;
+    ST_HighSpan.caption := (TheItem as TOptimumShunt).SpanHigh;
+  end;
+  { ...placing value in old value in case cancel clicked }
+  OldLowRMod := EB_LowRMod.text;
+  OldLowRBridge := EB_LowRbridge.text;
+  OldLowSpan := EB_LowSpan.text;
+  OldHighRMod := EB_HighRMod.text;
+  OldHighRBridge := EB_HighRBridge.text;
+  OldHighSpan := EB_HighSpan.text;
+  OldAmbientRMod := EB_AmbientRMod.text;
+  OldAmbientRBridge := EB_AmbientRBridge.text;
+  OldAmbientSpan := EB_AmbientSpan.text;
+  Old_RShunt := St_RShunt.caption;
+  Old_SpanLow := ST_LowSpan.caption;
+  Old_SpanAmbient := ST_AmbientSpan.caption;
+  Old_SpanHigh := ST_HighSpan.caption;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.BN_OKClick }
+procedure TOptShuntForm.BN_OKClick(Sender: TObject);
+var
+  TheItem: TacStreamable;
+  i: integer;
+  j: integer;
+begin
+  { ...placing values in object }
+  BN_ComputeClick(Sender);
+  if (IsThereAnError = true) or (ExceptionRaised = true) then
+  begin
+    exit;
+  end;
+  { ...getting the object if there is one }
+  TheItem := nil;
+  i := 0;
+  Repeat
+    If MainForm.Flog.AtIndex(i) is TOptimumShunt then
+    begin
+      TheItem := MainForm.Flog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  { ...if there is an object, then place values in edit boxes }
+  if TheItem = nil then
+  begin
+    OptimumShuntObject := TOptimumShunt.create;
+    OptimumShuntObject.LowSpan := EB_LowSpan.text;
+    OptimumShuntObject.LowRBridge := EB_LowRbridge.text;
+    OptimumShuntObject.LowRmod := EB_LowRMod.text;
+    OptimumShuntObject.HighSpan := EB_HighSpan.text;
+    OptimumShuntObject.HighRBridge := EB_HighRBridge.text;
+    OptimumShuntObject.HighRmod := EB_HighRMod.text;
+    OptimumShuntObject.AmbientSpan := EB_AmbientSpan.text;
+    OptimumShuntObject.AmbientRBridge := EB_AmbientRBridge.text;
+    OptimumShuntObject.AmbientRmod := EB_AmbientRMod.text;
+    OptimumShuntObject.RShunt := St_RShunt.caption;
+    OptimumShuntObject.SpanLow := ST_LowSpan.caption;
+    OptimumShuntObject.SpanAmbient := ST_AmbientSpan.caption;
+    OptimumShuntObject.SpanHigh := ST_HighSpan.caption;
+    MainForm.AddToLog(OptimumShuntObject);
+    j := 0;
+    { ...placing object string in outline }
+    Repeat
+      inc(j);
+    until (MainForm.XCalcOutline.Items[j].text = 'Circuit Refinements') or
+      (j > MainForm.XCalcOutline.ItemCount);
+    MainForm.XCalcOutline.AddChild(j, OptimumShuntObject.GetAsString);
+  end
+  else
+  begin
+    (TheItem as TOptimumShunt).LowSpan := EB_LowSpan.text;
+    (TheItem as TOptimumShunt).LowRBridge := EB_LowRbridge.text;
+    (TheItem as TOptimumShunt).LowRmod := EB_LowRMod.text;
+    (TheItem as TOptimumShunt).HighSpan := EB_HighSpan.text;
+    (TheItem as TOptimumShunt).HighRBridge := EB_HighRBridge.text;
+    (TheItem as TOptimumShunt).HighRmod := EB_HighRMod.text;
+    (TheItem as TOptimumShunt).AmbientSpan := EB_AmbientSpan.text;
+    (TheItem as TOptimumShunt).AmbientRBridge := EB_AmbientRBridge.text;
+    (TheItem as TOptimumShunt).AmbientRmod := EB_AmbientRMod.text;
+    (TheItem as TOptimumShunt).RShunt := St_RShunt.caption;
+    (TheItem as TOptimumShunt).SpanLow := ST_LowSpan.caption;
+    (TheItem as TOptimumShunt).SpanAmbient := ST_AmbientSpan.caption;
+    (TheItem as TOptimumShunt).SpanHigh := ST_HighSpan.caption;
+  end;
+  MainForm.IsDirty := true;
+  close;
+  if MainForm.CompDlgShowing = true then
+  begin
+    CompensationDlg.close;
+  end;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.FormClose }
+procedure TOptShuntForm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.BN_PrintClick }
+procedure TOptShuntForm.BN_PrintClick(Sender: TObject);
+var
+  GridSelection: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderPChar: array [0 .. MAXTEXTLENGTH - 1] of char;
+  HeaderString: string;
+  DateString: string;
+  id: longint;
+  MetaHandle: Thandle;
+  sserror: integer;
+  htmlText: string;
+  Stream: tResourceStream;
+  strstream: tStringStream;
+
+begin
+  Stream := tResourceStream.create(hinstance, 'OptShunt', RT_RCDATA);
+  strstream := tStringStream.create();
+
+  try
+    strstream.LoadFromStream(Stream);
+    htmlText := strstream.DataString;
+  finally
+    strstream.Free();
+    Stream.Free();
+  end;
+
+  htmlText := StringReplace(htmlText, '$ls1', EB_LowSpan.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$lb1', EB_LowRbridge.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$lm1', EB_LowRMod.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$as1', EB_AmbientSpan.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$ab1', EB_AmbientRBridge.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$am1', EB_AmbientRMod.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$hs1', EB_HighSpan.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$hb1', EB_HighRBridge.text,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$hm1', EB_HighRMod.text,
+    [rfReplaceAll, rfIgnoreCase]);
+
+  htmlText := StringReplace(htmlText, '$rs1', St_RShunt.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sl1', ST_LowSpan.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sa1', ST_AmbientSpan.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  htmlText := StringReplace(htmlText, '$sh1', ST_HighSpan.caption,
+    [rfReplaceAll, rfIgnoreCase]);
+  SaveDialogPrint.FileName := '';
+  SaveDialogPrint.InitialDir := tPath.GetDocumentsPath;
+  if SaveDialogPrint.Execute
+  then
+  begin
+    tfile.writeAllText(SaveDialogPrint.FileName, htmlText);
+    ShellExecute(Handle, 'open', PChar(SaveDialogPrint.FileName), nil, nil,
+      SW_SHOWNORMAL);
+  end;
+
+  (* id := 0;
+    {...clearing sheet for new values}
+    SSClearRange(Sheet1.SS, 5, 4, 21, 4, 3);
+    SSSetActiveCell(Sheet1.SS, 5, 4);
+    Sheet1.text := EB_LowSpan.text;
+    SSSetActiveCell(Sheet1.SS, 6, 4);
+    Sheet1.text := EB_LowRBridge.text;
+    SSSetActiveCell(Sheet1.SS, 7, 4);
+    Sheet1.text := EB_LowRMod.text;
+    SSSetActiveCell(Sheet1.SS, 9, 4);
+    Sheet1.text := EB_AmbientSpan.text;
+    SSSetActiveCell(Sheet1.SS, 10, 4);
+    Sheet1.text := EB_AmbientRBridge.text;
+    SSSetActiveCell(Sheet1.SS, 11, 4);
+    Sheet1.text := EB_AmbientRMod.text;
+    SSSetActiveCell(Sheet1.SS, 13, 4);
+    Sheet1.text := EB_HighSpan.text;
+    SSSetActiveCell(Sheet1.SS, 14, 4);
+    Sheet1.text := EB_HighRBridge.text;
+    SSSetActiveCell(Sheet1.SS, 15, 4);
+    Sheet1.text := EB_HighRMod.text;
+    SSSetActiveCell(Sheet1.SS, 18, 4);
+    Sheet1.text := ST_RShunt.caption;
+    SSSetActiveCell(Sheet1.SS, 19, 4);
+    Sheet1.text := ST_LowSpan.caption;
+    SSSetActiveCell(Sheet1.SS, 20, 4);
+    Sheet1.text := ST_AmbientSpan.caption;
+    SSSetActiveCell(Sheet1.SS, 21, 4);
+    Sheet1.text := ST_HighSpan.caption;
+    sserror := SSObjNewPicture(Sheet1.ss, 1, 23, 6, 30, id, Image1.Picture.Metafile.handle, 8, 0, 0);
+    SSSetPrintFooter(Sheet1.SS, '&04&LTransCalc™' + #13#10 + 'Measurements Group, Inc.');
+    DateString := FormatDateTime('mmmm dd, yyyy' , Date);
+    HeaderString := '&04&L' + MainForm.SaveFileName +  + '&R' + DateString;
+    strpcopy(HeaderPChar, HeaderString);
+    SSSetPrintHeader(Sheet1.SS, HeaderPChar);
+    SSSetPrintArea(Sheet1.ss, '$A$1:$G$30');
+    SSFilePrint(Sheet1.ss, 0); *)
+end;
+
+(* ********************************************************************* *)
+{ TOptShuntForm.BN_HelpClick }
+procedure TOptShuntForm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(2050);
+end;
+
+begin
+  { ...registering object }
+  RegisterClasses([TOptimumShunt]);
+
+end.

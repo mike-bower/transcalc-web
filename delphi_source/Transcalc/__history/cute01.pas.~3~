@@ -1,0 +1,1712 @@
+(************************************************)
+(*  Cut E01 Zero vs Temperature Unit            *)
+(************************************************)
+unit Cute01;
+
+interface
+
+uses
+  SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+  Forms, Dialogs, ExtCtrls, StdCtrls, Buttons, acStream, acList, Log, LogItem,
+  LogStrm, Printers;
+
+type
+  RealType = double;
+
+(********************************)
+(* Rung Object                  *)
+(********************************)
+
+type
+  TRung = class(TLogItem)
+  private
+    CuttingArea : TRect;
+  public
+    RungIsCut   : Boolean;
+    constructor create(left, top, right, bottom : integer);
+    destructor done; virtual;
+    function IsClicked(p : TPoint):boolean;
+    procedure Cut(TheCanvas: TCanvas);
+    function IsCut: integer;
+    procedure Fix(TheCanvas: TCanvas);
+    procedure SaveToStream(Stream : TacObjStream); override;
+    procedure ReadFromStream(Stream : TacObjStream); override;
+    procedure Redraw(TheCanvas: TCanvas);
+end;
+
+(********************************)
+(* E01 Resistor Object          *)
+(********************************)
+type
+  TE01Resistor = class(TLogItem)
+  private
+   FStartResistance12 : shortstring;
+   FStartResistance23 : shortstring;
+   TheString          : shortstring;
+  protected
+    procedure AssignTo(Dest: TPersistent); override;
+    procedure ShowTheForm; override;
+    function GetAsString : string; override;
+    procedure InitFields; override;
+    procedure SaveToStream(Stream: TacObjStream); override;
+    procedure ReadFromStream(Stream: TacObjStream); override;
+  public
+ {property and functions here}
+    A1, A2, A3, A4, A5, A6, A7, A8, A9 : TRung;
+    B1, B2, B3, B4, B5, B6, B7         : TRung;
+    C1, C2, C3, C4, C5, C6, C7         : TRung;
+    D1, D2, D3, D4, D5, D6, D7         : TRung;
+    E1, E2, E3, E4, E5, E6, E7         : TRung;
+    F1, F2, F3, F4, F5, F6, F7, F8, F9 : TRung;
+    G1, G12, G2, G23                   : TRung;
+    constructor create;
+    destructor destroy; override ;
+    property StartResistance12 : shortstring read FStartResistance12 write FStartResistance12;
+    property StartResistance23 : shortstring read FStartResistance23 write FStartResistance23;
+    property TheStringText: shortstring read TheString write TheString;
+end;
+
+(********************************)
+(* E01Adjustment Form Object    *)
+(********************************)
+type
+  TE01AdjustmentFrm = class(TForm)
+    Image1: TImage;
+    BN_OK: TBitBtn;
+    BN_Cancel: TBitBtn;
+    BN_Restore: TBitBtn;
+    BN_Help: TBitBtn;
+    BN_Print: TBitBtn;
+    GroupBox1: TGroupBox;
+    Label2: TLabel;
+    EB_StartingRes12: TEdit;
+    GroupBox2: TGroupBox;
+    ST_CalculatedRes12: TLabel;
+    Label1: TLabel;
+    EB_StartingRes23: TEdit;
+    Label3: TLabel;
+    ST_CalculatedRes23: TLabel;
+    Label5: TLabel;
+    Label4: TLabel;
+    Label6: TLabel;
+    Label7: TLabel;
+    Label8: TLabel;
+    Label9: TLabel;
+    Label10: TLabel;
+    ST_Difference: TLabel;
+    procedure BN_CancelClick(Sender: TObject);
+    procedure Image1MouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure FormCreate(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure BN_OKClick(Sender: TObject);
+    procedure BN_RestoreClick(Sender: TObject);
+    procedure ReCalculate;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure PrintForm;
+    function GotFormImage: TBitmap;
+    procedure BN_PrintClick(Sender: TObject);
+    procedure BN_HelpClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    E01Resistor   : TE01Resistor;
+  end;
+
+var
+  E01AdjustmentFrm: TE01AdjustmentFrm;
+
+implementation
+uses MainMenu;
+{$R *.DFM}
+
+(***********************************************)
+(*              TRung Methods                  *)
+(***********************************************)
+
+(***********************************************************************)
+{TRung.create}
+constructor TRung.create(left, top, right, bottom : integer);
+begin
+  inherited create;
+  {...creating the TRung object setting the cutting area and intializing RungIsCut}
+  RungIsCut := false;
+  CuttingArea.left := left;
+  CuttingArea.top := top;
+  CuttingArea.right := right;
+  CuttingArea.bottom := bottom;
+end;
+
+(***********************************************************************)
+{TRung.done}
+destructor TRung.done;
+begin
+  {...destroying the object}
+  Done;
+end;
+
+(***********************************************************************)
+{TRung.Redraw}
+procedure TRung.Redraw(TheCanvas: TCanvas);
+begin
+  {..deciding whether to cut or fix the rung depending on whether it was fixed or cut}
+  with TheCanvas do begin
+    if RungIsCut = False then begin {...we need to restore the rung}
+      pen.Color := clGray;
+      brush.color := clGray;
+    end
+    else begin          {...we need to cut rung}
+      pen.Color := clYellow;
+      brush.color := clYellow;
+    end;
+    {...setting pen and  brush attributes}
+    brush.Style := bsSolid;
+    pen.style := psSolid;
+    Rectangle(CuttingArea.Left, CuttingArea.top, CuttingArea.right, CuttingArea.Bottom);
+  end;
+end;
+
+(***********************************************************************)
+{TRung.SaveToStream}
+procedure TRung.SaveToStream(Stream : TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveTRect(CuttingArea);
+  Stream.SaveBuffer(RungIsCut, sizeof(Boolean));
+end;
+
+(***********************************************************************)
+{TRung.ReadFromStream}
+procedure TRung.ReadFromStream(Stream : TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadTRect(CuttingArea);
+  Stream.ReadBuffer(RungIsCut, sizeof(Boolean));
+end;
+
+(***********************************************************************)
+{TRung.IsClicked}
+function TRung.IsClicked(p : TPoint): boolean;
+begin
+  {...determines if the point clicked is in which rectangle}
+  Result := PtInRect(CuttingArea, p);
+end;
+
+(***********************************************************************)
+{TRung.IsCut}
+function TRung.IsCut: integer;
+begin
+  if RungIsCut then begin
+    IsCut := 0;
+  end
+  else begin
+    IsCut  := 1;
+  end;
+end;
+
+(***********************************************************************)
+{TRung.Cut}
+procedure TRung.Cut(TheCanvas: TCanvas);
+begin
+  {...setting the RungIsCut Value}
+  RungIsCut := true;
+  {...Cutting the rung}
+  Redraw(TheCanvas);
+end;
+
+(***********************************************************************)
+{TRung.Fix}
+procedure TRung.Fix(TheCanvas: TCanvas);
+begin
+  {...setting RungIsCut}
+  RungIsCut := false;
+  {...fixing the rung}
+  Redraw(TheCanvas);
+end;
+
+(***********************************************)
+(*          TE01Resistor Methods               *)
+(***********************************************)
+
+(***********************************************************************)
+{TE01Resistor.create}
+constructor TE01Resistor.create;
+begin
+  inherited create;
+  {...setting the string so can identify which object it is}
+  TheString := 'E01 Resistor (Zero vs. Temp)';
+  {...setting the cutting area of each rung}
+  A9 := TRung.Create(22, 178, 31, 188);
+  A8 := TRung.Create(22, 166, 31, 171);
+  A7 := TRung.Create(22, 152, 31, 156);
+  A6 := TRung.Create(22, 136, 31, 140);
+  A5 := TRung.Create(22, 120, 31, 124);
+  A4 := TRung.Create(22, 102, 31, 107);
+  A3 := TRung.Create(22, 85, 31, 89);
+  A2 := TRung.Create(22, 66, 31, 71);
+  A1 := TRung.Create(22, 46, 31, 50);
+  B7 := TRung.Create(59, 178, 68, 188);
+  B6 := TRung.Create(59, 156, 68, 166);
+  B5 := TRung.Create(59, 133, 68, 143);
+  B4 := TRung.Create(59, 110, 68, 120);
+  B3 := TRung.Create(59, 88, 68, 98);
+  B2 := TRung.Create(59, 66, 68, 76);
+  B1 := TRung.Create(59, 46, 68, 56);
+  C7 := TRung.Create(99, 178, 108, 188);
+  C6 := TRung.Create(99, 156, 108, 166);
+  C5 := TRung.Create(99, 133, 108, 143);
+  C4 := TRung.Create(99, 110, 108, 120);
+  C3 := TRung.Create(99, 88, 108, 98);
+  C2 := TRung.Create(99, 66, 108, 76);
+  C1 := TRung.Create(99, 46, 108, 56);
+  D7 := TRung.Create(152, 178, 162, 188);
+  D6 := TRung.Create(152, 156, 162, 166);
+  D5 := TRung.Create(152, 133, 162, 143);
+  D4 := TRung.Create(152, 110, 162, 120);
+  D3 := TRung.Create(152, 88, 162, 98);
+  D2 := TRung.Create(152, 66, 162, 76);
+  D1 := TRung.Create(152, 46, 162, 56);
+  E7 := TRung.Create(192, 178, 202, 188);
+  E6 := TRung.Create(192, 156, 202, 166);
+  E5 := TRung.Create(192, 133, 202, 143);
+  E4 := TRung.Create(192, 110, 202, 120);
+  E3 := TRung.Create(192, 88, 202, 98);
+  E2 := TRung.Create(192, 66, 202, 76);
+  E1 := TRung.Create(192, 46, 202, 56);
+  F9 := TRung.Create(230, 178, 239, 188);
+  F8 := TRung.Create(230, 166, 239, 171);
+  F7 := TRung.Create(230, 152, 239, 156);
+  F6 := TRung.Create(230, 136, 239, 140);
+  F5 := TRung.Create(230, 120, 239, 124);
+  F4 := TRung.Create(230, 102, 239, 107);
+  F3 := TRung.Create(230, 85, 239, 89);
+  F2 := TRung.Create(230, 66, 239, 71);
+  F1 := TRung.Create(230, 46, 239, 50);
+  G1 := TRung.Create(85, 195, 87, 211);
+  G12 := TRung.Create(69, 209, 86, 211);
+  G2 := TRung.Create(177, 209, 195, 211);
+  G23 := TRung.Create(177, 193, 179, 210);
+end;
+
+(***********************************************************************)
+{TE01Resistor.destroy}
+destructor TE01Resistor.destroy;
+begin
+  {...destroying object}
+  inherited destroy;
+end;
+
+(***********************************************************************)
+{TE01Resistor.GetAsString}
+function TE01Resistor.GetAsString: string;
+begin
+  Result := TheString;
+end;
+
+(***********************************************************************)
+{TE01Resistor.ShowTheForm}
+procedure TE01Resistor.ShowTheForm;
+begin
+  Application.CreateForm(TE01AdjustmentFrm, E01AdjustmentFrm);
+  E01AdjustmentFrm.showmodal;
+end;
+
+(***********************************************************************)
+{TE01Resistor.AssignTo}
+procedure TE01Resistor.AssignTo(Dest: TPersistent);
+begin
+  if (Dest is TE01Resistor) and (Self is Dest.ClassType) then begin
+    inherited AssignTo(TLogItem(Dest));
+    with Dest as TE01Resistor do begin
+      FStartResistance12 := self.FStartResistance12;
+      FStartResistance23 := self.FStartResistance23;
+      TheString := self.TheString;
+      {Intializing A Rungs}
+      A1 := self.A1;
+      A2 := self.A2;
+      A3 := self.A3;
+      A4 := self.A4;
+      A5 := self.A5;
+      A6 := self.A6;
+      A7 := self.A7;
+      A8 := self.A8;
+      A9 := self.A9;
+      {Intializing B Rungs}
+      B1 := self.B1;
+      B2 := self.B2;
+      B3 := self.B3;
+      B4 := self.B4;
+      B5 := self.B5;
+      B6 := self.B6;
+      B7 := self.B7;
+      {Intializing C Rungs}
+      C1 := self.C1;
+      C2 := self.C2;
+      C3 := self.C3;
+      C4 := self.C4;
+      C5 := self.C5;
+      C6 := self.C6;
+      C7 := self.C7;
+      {Intializing D Rungs}
+      D1 := self.D1;
+      D2 := self.D2;
+      D3 := self.D3;
+      D4 := self.D4;
+      D5 := self.D5;
+      D6 := self.D6;
+      D7 := self.D7;
+      {Intializing E Rungs}
+      E1 := self.E1;
+      E2 := self.E2;
+      E3 := self.E3;
+      E4 := self.E4;
+      E5 := self.E5;
+      E6 := self.E6;
+      E7 := self.E7;
+      {Intializing F Rungs}
+      F1 := self.F1;
+      F2 := self.F2;
+      F3 := self.F3;
+      F4 := self.F4;
+      F5 := self.F5;
+      F6 := self.F6;
+      F7 := self.F7;
+      F8 := self.F8;
+      F9 := self.F9;
+      G2   := self.G2;
+      G23 := self.G23;
+      G1   := self.G1;
+      G12 := self.G12;
+    end;
+  end
+  else begin
+    inherited AssignTo(Dest);
+  end;
+end;
+
+(***********************************************************************)
+{TE01Resistor.InitFields}
+procedure TE01Resistor.InitFields;
+begin
+  inherited InitFields;
+end;
+
+(***********************************************************************)
+{TE01Resistor.SaveToStream}
+procedure TE01Resistor.SaveToStream(Stream: TacObjStream);
+begin
+  inherited SaveToStream(Stream);
+  Stream.SaveBuffer(FStartResistance12, sizeof(shortstring));
+  Stream.SaveBuffer(FStartResistance23, sizeof(shortstring));
+  Stream.SaveBuffer(TheString, sizeof(shortstring));
+  A1.SaveToStream(Stream);
+  A2.SaveToStream(Stream);
+  A3.SaveToStream(Stream);
+  A4.SaveToStream(Stream);
+  A5.SaveToStream(Stream);
+  A6.SaveToStream(Stream);
+  A7.SaveToStream(Stream);
+  A8.SaveToStream(Stream);
+  A9.SaveToStream(Stream);
+  B1.SaveToStream(Stream);
+  B2.SaveToStream(Stream);
+  B3.SaveToStream(Stream);
+  B4.SaveToStream(Stream);
+  B5.SaveToStream(Stream);
+  B6.SaveToStream(Stream);
+  B7.SaveToStream(Stream);
+  C1.SaveToStream(Stream);
+  C2.SaveToStream(Stream);
+  C3.SaveToStream(Stream);
+  C4.SaveToStream(Stream);
+  C5.SaveToStream(Stream);
+  C6.SaveToStream(Stream);
+  C7.SaveToStream(Stream);
+  D1.SaveToStream(Stream);
+  D2.SaveToStream(Stream);
+  D3.SaveToStream(Stream);
+  D4.SaveToStream(Stream);
+  D5.SaveToStream(Stream);
+  D6.SaveToStream(Stream);
+  D7.SaveToStream(Stream);
+  E1.SaveToStream(Stream);
+  E2.SaveToStream(Stream);
+  E3.SaveToStream(Stream);
+  E4.SaveToStream(Stream);
+  E5.SaveToStream(Stream);
+  E6.SaveToStream(Stream);
+  E7.SaveToStream(Stream);
+  F1.SaveToStream(Stream);
+  F2.SaveToStream(Stream);
+  F3.SaveToStream(Stream);
+  F4.SaveToStream(Stream);
+  F5.SaveToStream(Stream);
+  F6.SaveToStream(Stream);
+  F7.SaveToStream(Stream);
+  F8.SaveToStream(Stream);
+  F9.SaveToStream(Stream);
+  G2.SaveToStream(Stream);
+  G23.SaveToStream(Stream);
+  G1.SaveToStream(Stream);
+  G12.SaveToStream(Stream);
+end;
+
+(***********************************************************************)
+{TE01Resistor.ReadFromStream}
+procedure TE01Resistor.ReadFromStream(Stream: TacObjStream);
+begin
+  inherited ReadFromStream(Stream);
+  Stream.ReadBuffer(FStartResistance12, sizeof(shortstring));
+  Stream.ReadBuffer(FStartResistance23, sizeof(shortstring));
+  Stream.ReadBuffer(TheString, sizeof(shortstring));
+  A1 := TRung.CreateFromStream(Stream);
+  A2 := TRung.CreateFromStream(Stream);
+  A3 := TRung.CreateFromStream(Stream);
+  A4 := TRung.CreateFromStream(Stream);
+  A5 := TRung.CreateFromStream(Stream);
+  A6 := TRung.CreateFromStream(Stream);
+  A7 := TRung.CreateFromStream(Stream);
+  A8 := TRung.CreateFromStream(Stream);
+  A9 := TRung.CreateFromStream(Stream);
+  B1 := TRung.CreateFromStream(Stream);
+  B2 := TRung.CreateFromStream(Stream);
+  B3 := TRung.CreateFromStream(Stream);
+  B4 := TRung.CreateFromStream(Stream);
+  B5 := TRung.CreateFromStream(Stream);
+  B6 := TRung.CreateFromStream(Stream);
+  B7 := TRung.CreateFromStream(Stream);
+  C1 := TRung.CreateFromStream(Stream);
+  C2 := TRung.CreateFromStream(Stream);
+  C3 := TRung.CreateFromStream(Stream);
+  C4 := TRung.CreateFromStream(Stream);
+  C5 := TRung.CreateFromStream(Stream);
+  C6 := TRung.CreateFromStream(Stream);
+  C7 := TRung.CreateFromStream(Stream);
+  D1 := TRung.CreateFromStream(Stream);
+  D2 := TRung.CreateFromStream(Stream);
+  D3 := TRung.CreateFromStream(Stream);
+  D4 := TRung.CreateFromStream(Stream);
+  D5 := TRung.CreateFromStream(Stream);
+  D6 := TRung.CreateFromStream(Stream);
+  D7 := TRung.CreateFromStream(Stream);
+  E1 := TRung.CreateFromStream(Stream);
+  E2 := TRung.CreateFromStream(Stream);
+  E3 := TRung.CreateFromStream(Stream);
+  E4 := TRung.CreateFromStream(Stream);
+  E5 := TRung.CreateFromStream(Stream);
+  E6 := TRung.CreateFromStream(Stream);
+  E7 := TRung.CreateFromStream(Stream);
+  F1 := TRung.CreateFromStream(Stream);
+  F2 := TRung.CreateFromStream(Stream);
+  F3 := TRung.CreateFromStream(Stream);
+  F4 := TRung.CreateFromStream(Stream);
+  F5 := TRung.CreateFromStream(Stream);
+  F6 := TRung.CreateFromStream(Stream);
+  F7 := TRung.CreateFromStream(Stream);
+  F8 := TRung.CreateFromStream(Stream);
+  F9 := TRung.CreateFromStream(Stream);
+  G2 := TRung.CreateFromStream(Stream);
+  G23 := TRung.CreateFromStream(Stream);
+  G1 := TRung.CreateFromStream(Stream);
+  G12 := TRung.CreateFromStream(Stream);
+end;
+
+(********************************)
+(* E01AdJustment Form Methods   *)
+(********************************)
+
+(***********************************************************************)
+{TE01AdjustmentFrm.BN_RestoreClick}
+procedure TE01AdjustmentFrm.BN_RestoreClick(Sender: TObject);
+begin
+  with E01Resistor do begin
+    A1.Fix(Image1.Canvas);
+    A2.Fix(Image1.Canvas);
+    A3.Fix(Image1.Canvas);
+    A4.Fix(Image1.Canvas);
+    A5.Fix(Image1.Canvas);
+    A6.Fix(Image1.Canvas);
+    A7.Fix(Image1.Canvas);
+    A8.Fix(Image1.Canvas);
+    A9.Fix(Image1.Canvas);
+    B1.Fix(Image1.Canvas);
+    B2.Fix(Image1.Canvas);
+    B3.Fix(Image1.Canvas);
+    B4.Fix(Image1.Canvas);
+    B5.Fix(Image1.Canvas);
+    B6.Fix(Image1.Canvas);
+    B7.Fix(Image1.Canvas);
+    C1.Fix(Image1.Canvas);
+    C2.Fix(Image1.Canvas);
+    C3.Fix(Image1.Canvas);
+    C4.Fix(Image1.Canvas);
+    C5.Fix(Image1.Canvas);
+    C6.Fix(Image1.Canvas);
+    C7.Fix(Image1.Canvas);
+    D1.Fix(Image1.Canvas);
+    D2.Fix(Image1.Canvas);
+    D3.Fix(Image1.Canvas);
+    D4.Fix(Image1.Canvas);
+    D5.Fix(Image1.Canvas);
+    D6.Fix(Image1.Canvas);
+    D7.Fix(Image1.Canvas);
+    E1.Fix(Image1.Canvas);
+    E2.Fix(Image1.Canvas);
+    E3.Fix(Image1.Canvas);
+    E4.Fix(Image1.Canvas);
+    E5.Fix(Image1.Canvas);
+    E6.Fix(Image1.Canvas);
+    E7.Fix(Image1.Canvas);
+    F1.Fix(Image1.Canvas);
+    F2.Fix(Image1.Canvas);
+    F3.Fix(Image1.Canvas);
+    F4.Fix(Image1.Canvas);
+    F5.Fix(Image1.Canvas);
+    F6.Fix(Image1.Canvas);
+    F7.Fix(Image1.Canvas);
+    F8.Fix(Image1.Canvas);
+    F9.Fix(Image1.Canvas);
+    G2.Fix(Image1.Canvas);
+    G23.Fix(Image1.Canvas);
+    G1.Fix(Image1.Canvas);
+    G12.Fix(Image1.Canvas);
+    ReCalculate;
+  end;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.Recalculate}
+procedure TE01AdjustmentFrm.Recalculate;
+const
+  {FOIL SQUARES - SEE CCP's Data Sheet}
+  {FOIL SQUARES - SEE CCP's Data Sheet}
+  S1  = 2.38;
+  S2  = 2.678571;
+  S3  = 4.76;
+  S4  = 4.464286;
+  S5  = 4.464286;
+  S6  = 2.94;
+  S7  = 1.176471;
+  S8  = 2.678571;
+  S9  = 1.76;
+  S10 = 2.678571;
+  S11 = 1.84;
+  S12 = 2.678571;
+  S13 = 1.85;
+  S14 = 2.410714;
+  {NEW FOIL SQUARES FOR FOR E01 RESISTOR}
+  S15 = 18;(*10.8697;*) {SHUNT}
+  S16 = 2.12;
+  S17 = 2.12;
+  S18 = 0.4;
+  S19 = 1.85;
+  TOTALSQUARES = 11.407340954(*10.091476859*);
+var
+  ErrorMsg         : array[0..MAXERRORLENGTH-1] of char;
+  ErrorCaption     : array[0..MAXERRORLENGTH-1] of char;
+  ErrorAnd         : array[0..MAXERRORLENGTH-1] of char;
+  ErrorUnit        : array[0..MAXERRORLENGTH-1] of char;
+  cs               : array[0..255] of char;
+  EditStrings      : string;
+  s                : string;
+  StrMsg           : string;
+  StrUnit          : string;
+  StrAnd           : string;
+  Resist12         : RealType;
+  Resist23         : RealType;
+  TheDifference    : RealType;
+  ErrorCode        : integer;
+  C,
+  CA,
+  CB,
+  CC,
+  CD,
+  CE,
+  CF,
+  Rp1,
+  Rp2,
+  Rs1,
+  Squares,
+  OhmsPerSquare :RealType;
+  Rtotal,
+  RStart   : real;
+  code: Integer;
+  Button : integer;
+begin
+  ohmspersquare := 0;
+  {Calculate Ladder "A"}
+  C  := (E01Resistor.A1.IsCut / S3) + (1 / (2 * S2 + S1));
+  C  := (E01Resistor.A2.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.A3.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.A4.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.A5.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.A6.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.A7.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.A8.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  CA := (E01Resistor.A9.IsCut / S6) + (1 / (2 * S5 + 1/C));
+  {Calculate Ladder "B"}
+  C  := (E01Resistor.B1.IsCut / S9) + (1 / (2 * S8 + S7));
+  C  := (E01Resistor.B2.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.B3.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.B4.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.B5.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.B6.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  CB := (E01Resistor.B7.IsCut / S9) + (1 / (2 * S14+ 1/C));
+  {Calculate Ladder "C"}
+  C  := (E01Resistor.C1.IsCut / S9) + (1 / (2 * S8 + S7));
+  C  := (E01Resistor.C2.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.C3.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.C4.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.C5.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.C6.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  CC := (E01Resistor.C7.IsCut / S9) + (1 / (2 * S14+ 1/C));
+  { Calculate total resistance}
+  Rp1 := S13 + S12 + 1/CA + S11 + 1/CB + S16;
+  Rp2 := S19 + S15;
+  Rs1 := S17 + 1/CC + S18;
+  if E01Resistor.G1.IsCut = 1 then
+    Squares := ((Rp1 * Rp2) / (Rp1 + Rp2)) + Rs1
+  else
+    Squares := Rp1 + Rs1;
+  { Read Starting Resistance}
+  s := Eb_StartingRes12.Text;
+  val(s,Rstart,code);
+  if code <> 0 then begin
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    Rstart := 0;
+    ST_CalculatedRes12.caption := '';
+    exit;
+  end
+  else if (Rstart < 0.00) or (RStart > 0.50) then begin
+    LoadString(hinstance, ID_SZ_E01WrongResistor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    EditStrings := StrMsg;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    Rstart := 0;
+    ST_CalculatedRes12.caption := '';
+    exit;
+  end;
+  OhmsPerSquare := Rstart / TOTALSQUARES;
+  RTotal := OhmsPerSquare * Squares;
+  {Display}
+  if RTotal > 0 then
+  begin
+ //   Str(Rtotal:7:2, s);
+    s  := format('%7.2f',[Rtotal]) ;
+    st_CalculatedRes12.caption := s;
+  end
+  else
+    st_CalculatedRes12.caption := '';
+  {- - - - Right Side - side 2 - - - - -}
+  { Read Starting Resistance}
+  S := eb_StartingRes23.Text;
+  val(s,Rstart,code);
+  if code <> 0 then begin
+    LoadString(hinstance, ID_SZ_NotValidNo, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    Rstart := 0;
+    ST_CalculatedRes23.caption := '';
+    exit;
+  end
+  else if (Rstart < 0.00) or (RStart > 0.50) then begin
+    LoadString(hinstance, ID_SZ_E01WrongResistor, ErrorMsg, sizeof(ErrorMsg));
+    LoadString(hinstance, ID_SZ_And, ErrorAnd, sizeof(ErrorAnd));
+    LoadString(hinstance, ID_SZ_Ohms, ErrorUnit, sizeof(ErrorUnit));
+    StrMsg := strpas(ErrorMsg);
+    StrUnit := strpas(ErrorUnit);
+    StrAnd := strpas(ErrorAnd);
+    EditStrings := StrMsg;
+    StrPCopy(ErrorMsg, EditStrings);
+    LoadString(hinstance, ID_SZ_ErrorMsg, ErrorCaption, sizeof(ErrorCaption));
+    Button := Application.MessageBox(ErrorMsg, ErrorCaption, mb_OK or mb_IconExclamation);
+    Rstart := 0;
+    ST_CalculatedRes23.caption := '';
+    exit;
+  end;
+  OhmsPerSquare := Rstart / TOTALSQUARES;
+  {Calculate Ladder "F"}
+  C  := (E01Resistor.F1.IsCut / S3) + (1 / (2 * S2 + S1));
+  C  := (E01Resistor.F2.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.F3.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.F4.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.F5.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.F6.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.F7.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  C  := (E01Resistor.F8.IsCut / S3) + (1 / (2 * S4 + 1/C));
+  CF := (E01Resistor.F9.IsCut / S6) + (1 / (2 * S5 + 1/C));
+  {Calculate Ladder "E"}
+  C  := (E01Resistor.E1.IsCut / S9) + (1 / (2 * S8 + S7));
+  C  := (E01Resistor.E2.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.E3.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.E4.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.E5.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.E6.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  CE := (E01Resistor.E7.IsCut / S9) + (1 / (2 * S14+ 1/C));
+  {Calculate Ladder "C"}
+  C  := (E01Resistor.D1.IsCut / S9) + (1 / (2 * S8 + S7));
+  C  := (E01Resistor.D2.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.D3.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.D4.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.D5.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  C  := (E01Resistor.D6.IsCut / S9) + (1 / (2 * S10+ 1/C));
+  CD := (E01Resistor.D7.IsCut / S9) + (1 / (2 * S14+ 1/C));
+  { Calculate total resistance}
+  Rp1 := S13 + S12 + 1/CF + S11 + 1/CE + S16;
+  Rp2 := S19 + S15;
+  Rs1 := S17 + 1/CD + S18;
+  if E01Resistor.G2.IsCut = 1 then
+    Squares := ((Rp1 * Rp2) / (Rp1 + Rp2)) + Rs1
+  else
+    Squares := Rp1 + Rs1;
+  RTotal := OhmsPerSquare * Squares;
+  {Display}
+  if RTotal > 0 then
+  begin
+//    Str(Rtotal:7:2, s);
+    s  := format('%7.2f',[Rtotal]) ;
+    st_CalculatedRes23.caption := s
+  end
+  else
+    st_CalculatedRes23.Caption := '';
+  val(ST_CalculatedRes12.caption, Resist12, ErrorCode);
+  val(ST_CalculatedRes23.caption, Resist23, ErrorCode);
+  TheDifference := abs(Resist12 - Resist23);
+//  str(TheDifference:6:2, EditStrings);
+  EditStrings := format('%6.2f',[TheDifference]) ;
+  ST_Difference.caption := EditStrings;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.BN_CancelClick}
+procedure TE01AdjustmentFrm.BN_CancelClick(Sender: TObject);
+begin
+  close;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.Image1MouseDown}
+procedure TE01AdjustmentFrm.Image1MouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  p : TPoint;
+begin
+  {...getting point clicked}
+  p.x := x;
+  p.y := y;
+  with E01Resistor do begin
+    {...Checking whether to cut or fix A1 depending on if it is already cut or fixed}
+    if A1.isClicked(p) then
+      if A1.RungIsCut then
+        A1.Fix(Image1.Canvas)
+      else
+        A1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A2 depending on if it is already cut or fixed}
+    if A2.isClicked(p) then
+      if A2.RungIsCut then
+        A2.Fix(Image1.Canvas)
+      else
+        A2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A3 depending on if it is already cut or fixed}
+    if A3.isClicked(p) then
+      if A3.RungIsCut then
+        A3.Fix(Image1.Canvas)
+      else
+        A3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A4 depending on if it is already cut or fixed}
+    if A4.isClicked(p) then
+      if A4.RungIsCut then
+        A4.Fix(Image1.Canvas)
+      else
+        A4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A5 depending on if it is already cut or fixed}
+    if A5.isClicked(p) then
+      if A5.RungIsCut then
+        A5.Fix(Image1.Canvas)
+      else
+        A5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A6 depending on if it is already cut or fixed}
+    if A6.isClicked(p) then
+      if A6.RungIsCut then
+        A6.Fix(Image1.Canvas)
+      else
+        A6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A7 depending on if it is already cut or fixed}
+    if A7.isClicked(p) then
+      if A7.RungIsCut then
+        A7.Fix(Image1.Canvas)
+      else
+        A7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A8 depending on if it is already cut or fixed}
+    if A8.isClicked(p) then
+      if A8.RungIsCut then
+        A8.Fix(Image1.Canvas)
+      else
+        A8.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix A9 depending on if it is already cut or fixed}
+    if A9.isClicked(p) then
+      if A9.RungIsCut then
+        A9.Fix(Image1.Canvas)
+      else
+        A9.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B1 depending on if it is already cut or fixed}
+    if B1.isClicked(p) then
+      if B1.RungIsCut then
+        B1.Fix(Image1.Canvas)
+      else
+        B1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B2 depending on if it is already cut or fixed}
+    if B2.isClicked(p) then
+      if B2.RungIsCut then
+        B2.Fix(Image1.Canvas)
+      else
+        B2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B3 depending on if it is already cut or fixed}
+    if B3.isClicked(p) then
+      if B3.RungIsCut then
+        B3.Fix(Image1.Canvas)
+      else
+        B3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B4 depending on if it is already cut or fixed}
+    if B4.isClicked(p) then
+      if B4.RungIsCut then
+        B4.Fix(Image1.Canvas)
+      else
+        B4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B5 depending on if it is already cut or fixed}
+    if B5.isClicked(p) then
+      if B5.RungIsCut then
+        B5.Fix(Image1.Canvas)
+      else
+        B5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B6 depending on if it is already cut or fixed}
+    if B6.isClicked(p) then
+      if B6.RungIsCut then
+        B6.Fix(Image1.Canvas)
+      else
+        B6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix B7 depending on if it is already cut or fixed}
+    if B7.isClicked(p) then
+      if B7.RungIsCut then
+        B7.Fix(Image1.Canvas)
+      else
+        B7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C1 depending on if it is already cut or fixed}
+    if C1.isClicked(p) then
+      if C1.RungIsCut then
+        C1.Fix(Image1.Canvas)
+      else
+        C1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C2 depending on if it is already cut or fixed}
+    if C2.isClicked(p) then
+      if C2.RungIsCut then
+        C2.Fix(Image1.Canvas)
+      else
+        C2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C3 depending on if it is already cut or fixed}
+    if C3.isClicked(p) then
+      if C3.RungIsCut then
+        C3.Fix(Image1.Canvas)
+      else
+        C3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C4 depending on if it is already cut or fixed}
+    if C4.isClicked(p) then
+      if C4.RungIsCut then
+        C4.Fix(Image1.Canvas)
+      else
+        C4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C5 depending on if it is already cut or fixed}
+    if C5.isClicked(p) then
+      if C5.RungIsCut then
+        C5.Fix(Image1.Canvas)
+      else
+        C5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C6 depending on if it is already cut or fixed}
+    if C6.isClicked(p) then
+      if C6.RungIsCut then
+        C6.Fix(Image1.Canvas)
+      else
+        C6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix C7 depending on if it is already cut or fixed}
+    if C7.isClicked(p) then
+      if C7.RungIsCut then
+        C7.Fix(Image1.Canvas)
+      else
+        C7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D1 depending on if it is already cut or fixed}
+    if D1.isClicked(p) then
+      if D1.RungIsCut then
+        D1.Fix(Image1.Canvas)
+      else
+        D1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D2 depending on if it is already cut or fixed}
+    if D2.isClicked(p) then
+      if D2.RungIsCut then
+        D2.Fix(Image1.Canvas)
+      else
+        D2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D3 depending on if it is already cut or fixed}
+    if D3.isClicked(p) then
+      if D3.RungIsCut then
+        D3.Fix(Image1.Canvas)
+      else
+        D3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D4 depending on if it is already cut or fixed}
+    if D4.isClicked(p) then
+      if D4.RungIsCut then
+        D4.Fix(Image1.Canvas)
+      else
+        D4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D5 depending on if it is already cut or fixed}
+    if D5.isClicked(p) then
+      if D5.RungIsCut then
+        D5.Fix(Image1.Canvas)
+      else
+        D5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D6 depending on if it is already cut or fixed}
+    if D6.isClicked(p) then
+      if D6.RungIsCut then
+        D6.Fix(Image1.Canvas)
+      else
+        D6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix D7 depending on if it is already cut or fixed}
+    if D7.isClicked(p) then
+      if D7.RungIsCut then
+        D7.Fix(Image1.Canvas)
+      else
+        D7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E1 depending on if it is already cut or fixed}
+    if E1.isClicked(p) then
+      if E1.RungIsCut then
+        E1.Fix(Image1.Canvas)
+      else
+        E1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E2 depending on if it is already cut or fixed}
+    if E2.isClicked(p) then
+      if E2.RungIsCut then
+        E2.Fix(Image1.Canvas)
+      else
+        E2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E3 depending on if it is already cut or fixed}
+    if E3.isClicked(p) then
+      if E3.RungIsCut then
+        E3.Fix(Image1.Canvas)
+      else
+        E3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E4 depending on if it is already cut or fixed}
+    if E4.isClicked(p) then
+      if E4.RungIsCut then
+        E4.Fix(Image1.Canvas)
+      else
+        E4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E5 depending on if it is already cut or fixed}
+    if E5.isClicked(p) then
+      if E5.RungIsCut then
+        E5.Fix(Image1.Canvas)
+      else
+        E5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E6 depending on if it is already cut or fixed}
+    if E6.isClicked(p) then
+      if E6.RungIsCut then
+        E6.Fix(Image1.Canvas)
+      else
+        E6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix E7 depending on if it is already cut or fixed}
+    if E7.isClicked(p) then
+      if E7.RungIsCut then
+        E7.Fix(Image1.Canvas)
+      else
+        E7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F1 depending on if it is already cut or fixed}
+    if F1.isClicked(p) then
+      if F1.RungIsCut then
+        F1.Fix(Image1.Canvas)
+      else
+        F1.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F2 depending on if it is already cut or fixed}
+    if F2.isClicked(p) then
+      if F2.RungIsCut then
+        F2.Fix(Image1.Canvas)
+      else
+        F2.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F3 depending on if it is already cut or fixed}
+    if F3.isClicked(p) then
+      if F3.RungIsCut then
+        F3.Fix(Image1.Canvas)
+      else
+        F3.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F4 depending on if it is already cut or fixed}
+    if F4.isClicked(p) then
+      if F4.RungIsCut then
+        F4.Fix(Image1.Canvas)
+      else
+        F4.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F5 depending on if it is already cut or fixed}
+    if F5.isClicked(p) then
+      if F5.RungIsCut then
+        F5.Fix(Image1.Canvas)
+      else
+        F5.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F6 depending on if it is already cut or fixed}
+    if F6.isClicked(p) then
+      if F6.RungIsCut then
+        F6.Fix(Image1.Canvas)
+      else
+        F6.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F7 depending on if it is already cut or fixed}
+    if F7.isClicked(p) then
+      if F7.RungIsCut then
+        F7.Fix(Image1.Canvas)
+      else
+        F7.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F8 depending on if it is already cut or fixed}
+    if F8.isClicked(p) then
+      if F8.RungIsCut then
+        F8.Fix(Image1.Canvas)
+      else
+        F8.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix F9 depending on if it is already cut or fixed}
+    if F9.isClicked(p) then
+      if F9.RungIsCut then
+        F9.Fix(Image1.Canvas)
+      else
+        F9.Cut(Image1.Canvas);
+    {...Checking whether to cut or fix Shunt23TopCut depending on if it is already cut or fixed}
+    if G23.isClicked(p) then begin
+      if G23.RungIsCut then begin
+        G23.Fix(Image1.Canvas);
+        G2.Fix(Image1.Canvas);
+      end
+      else begin
+        G23.Cut(Image1.Canvas);
+        G2.Cut(Image1.Canvas);
+      end;
+    end;
+    {...Checking whether to cut or fix Shunt12TopCut depending on if it is already cut or fixed}
+    if G1.isClicked(p) then begin
+      if G1.RungIsCut then begin
+        G1.Fix(Image1.Canvas);
+        G12.Fix(Image1.Canvas);
+      end
+      else begin
+        G1.Cut(Image1.Canvas);
+        G12.Cut(Image1.Canvas);
+      end;
+    end;
+    {...Checking whether to cut or fix Shunt23BottomCut depending on if it is already cut or fixed}
+    if G2.isClicked(p) then begin
+      if G2.RungIsCut then begin
+        G2.Fix(Image1.Canvas);
+        G23.Fix(Image1.Canvas);
+      end
+      else begin
+        G2.Cut(Image1.Canvas);
+        G23.Cut(Image1.Canvas);
+      end;
+    end;
+    {...Checking whether to cut or fix Shunt12BottomCut depending on if it is already cut or fixed}
+    if G12.isClicked(p) then begin
+      if G12.RungIsCut then begin
+        G12.Fix(Image1.Canvas);
+        G1.Fix(Image1.Canvas);
+      end
+      else begin
+        G12.Cut(Image1.Canvas);
+        G1.Cut(Image1.Canvas);
+      end;
+    end;
+  ReCalculate;
+  end;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.FormCreate}
+procedure TE01AdjustmentFrm.FormCreate(Sender: TObject);
+begin
+  E01Resistor := TE01Resistor.create;
+  Font.Name := 'MS Sans Serif';
+  Font.Size := 8;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.FormActivate}
+procedure TE01AdjustmentFrm.FormActivate(Sender: TObject);
+var
+  TheItem : TacStreamable;
+  i       : integer;
+begin
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TE01Resistor then begin
+      TheItem := MainForm.FLog.atIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.FLog.Count);
+  if TheItem <> nil then begin
+    {..getting the starting resistance rom object and place in edit box}
+    EB_StartingRes12.text := (TheItem as TE01Resistor).StartResistance12;
+    EB_StartingRes23.text := (TheItem as TE01Resistor).StartResistance23;
+    {...Getting A1 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A1.RungIsCut then
+      E01Resistor.A1.Cut(Image1.Canvas)
+    else
+      E01Resistor.A1.Fix(Image1.Canvas);
+    {...Getting A2 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A2.RungIsCut then
+      E01Resistor.A2.Cut(Image1.Canvas)
+    else
+      E01Resistor.A2.Fix(Image1.Canvas);
+    {...Getting A3 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A3.RungIsCut then
+      E01Resistor.A3.Cut(Image1.Canvas)
+    else
+      E01Resistor.A3.Fix(Image1.Canvas);
+    {...Getting A4 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A4.RungIsCut then
+      E01Resistor.A4.Cut(Image1.Canvas)
+    else
+      E01Resistor.A4.Fix(Image1.Canvas);
+    {...Getting A5 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A5.RungIsCut then
+      E01Resistor.A5.Cut(Image1.Canvas)
+    else
+      E01Resistor.A5.Fix(Image1.Canvas);
+    {...Getting A6 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A6.RungIsCut then
+      E01Resistor.A6.Cut(Image1.Canvas)
+    else
+      E01Resistor.A6.Fix(Image1.Canvas);
+    {...Getting A7 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A7.RungIsCut then
+      E01Resistor.A7.Cut(Image1.Canvas)
+    else
+      E01Resistor.A7.Fix(Image1.Canvas);
+    {...Getting A8 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A8.RungIsCut then
+      E01Resistor.A8.Cut(Image1.Canvas)
+    else
+      E01Resistor.A8.Fix(Image1.Canvas);
+    {...Getting A9 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).A9.RungIsCut then
+      E01Resistor.A9.Cut(Image1.Canvas)
+    else
+      E01Resistor.A9.Fix(Image1.Canvas);
+    {...Getting B1 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B1.RungIsCut then
+      E01Resistor.B1.Cut(Image1.Canvas)
+    else
+      E01Resistor.B1.Fix(Image1.Canvas);
+    {...Getting B2 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B2.RungIsCut then
+      E01Resistor.B2.Cut(Image1.Canvas)
+    else
+      E01Resistor.B2.Fix(Image1.Canvas);
+    {...Getting B3 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B3.RungIsCut then
+      E01Resistor.B3.Cut(Image1.Canvas)
+    else
+      E01Resistor.B3.Fix(Image1.Canvas);
+    {...Getting B4 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B4.RungIsCut then
+      E01Resistor.B4.Cut(Image1.Canvas)
+    else
+      E01Resistor.B4.Fix(Image1.Canvas);
+    {...Getting B5 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B5.RungIsCut then
+      E01Resistor.B5.Cut(Image1.Canvas)
+    else
+      E01Resistor.B5.Fix(Image1.Canvas);
+    {...Getting B6 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B6.RungIsCut then
+      E01Resistor.B6.Cut(Image1.Canvas)
+    else
+      E01Resistor.B6.Fix(Image1.Canvas);
+    {...Getting B7 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).B7.RungIsCut then
+      E01Resistor.B7.Cut(Image1.Canvas)
+    else
+      E01Resistor.B7.Fix(Image1.Canvas);
+    {...Getting C1 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C1.RungIsCut then
+      E01Resistor.C1.Cut(Image1.Canvas)
+    else
+      E01Resistor.C1.Fix(Image1.Canvas);
+    {...Getting C2 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C2.RungIsCut then
+      E01Resistor.C2.Cut(Image1.Canvas)
+    else
+      E01Resistor.C2.Fix(Image1.Canvas);
+    {...Getting C3 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C3.RungIsCut then
+      E01Resistor.C3.Cut(Image1.Canvas)
+    else
+      E01Resistor.C3.Fix(Image1.Canvas);
+    {...Getting C4 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C4.RungIsCut then
+      E01Resistor.C4.Cut(Image1.Canvas)
+    else
+      E01Resistor.C4.Fix(Image1.Canvas);
+    {...Getting C5 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C5.RungIsCut then
+      E01Resistor.C5.Cut(Image1.Canvas)
+    else
+      E01Resistor.C5.Fix(Image1.Canvas);
+    {...Getting C6 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C6.RungIsCut then
+      E01Resistor.C6.Cut(Image1.Canvas)
+    else
+      E01Resistor.C6.Fix(Image1.Canvas);
+    {...Getting C7 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).C7.RungIsCut then
+      E01Resistor.C7.Cut(Image1.Canvas)
+    else
+      E01Resistor.C7.Fix(Image1.Canvas);
+    {...Getting D1 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D1.RungIsCut then
+      E01Resistor.D1.Cut(Image1.Canvas)
+    else
+      E01Resistor.D1.Fix(Image1.Canvas);
+    {...Getting D2 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D2.RungIsCut then
+      E01Resistor.D2.Cut(Image1.Canvas)
+    else
+      E01Resistor.D2.Fix(Image1.Canvas);
+    {...Getting D3 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D3.RungIsCut then
+      E01Resistor.D3.Cut(Image1.Canvas)
+    else
+      E01Resistor.D3.Fix(Image1.Canvas);
+    {...Getting D4 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D4.RungIsCut then
+      E01Resistor.D4.Cut(Image1.Canvas)
+    else
+      E01Resistor.D4.Fix(Image1.Canvas);
+    {...Getting D5 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D5.RungIsCut then
+      E01Resistor.D5.Cut(Image1.Canvas)
+    else
+      E01Resistor.D5.Fix(Image1.Canvas);
+    {...Getting D6 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D6.RungIsCut then
+      E01Resistor.D6.Cut(Image1.Canvas)
+    else
+      E01Resistor.D6.Fix(Image1.Canvas);
+    {...Getting D7 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).D7.RungIsCut then
+      E01Resistor.D7.Cut(Image1.Canvas)
+    else
+      E01Resistor.D7.Fix(Image1.Canvas);
+    {...Getting E1 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E1.RungIsCut then
+      E01Resistor.E1.Cut(Image1.Canvas)
+    else
+      E01Resistor.E1.Fix(Image1.Canvas);
+    {...Getting E2 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E2.RungIsCut then
+      E01Resistor.E2.Cut(Image1.Canvas)
+    else
+      E01Resistor.E2.Fix(Image1.Canvas);
+    {...Getting E3 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E3.RungIsCut then
+      E01Resistor.E3.Cut(Image1.Canvas)
+    else
+      E01Resistor.E3.Fix(Image1.Canvas);
+    {...Getting E4 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E4.RungIsCut then
+      E01Resistor.E4.Cut(Image1.Canvas)
+    else
+      E01Resistor.E4.Fix(Image1.Canvas);
+    {...Getting E5 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E5.RungIsCut then
+      E01Resistor.E5.Cut(Image1.Canvas)
+    else
+      E01Resistor.E5.Fix(Image1.Canvas);
+    {...Getting E6 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E6.RungIsCut then
+      E01Resistor.E6.Cut(Image1.Canvas)
+    else
+      E01Resistor.E6.Fix(Image1.Canvas);
+    {...Getting E7 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).E7.RungIsCut then
+      E01Resistor.E7.Cut(Image1.Canvas)
+    else
+      E01Resistor.E7.Fix(Image1.Canvas);
+    {...Getting F1 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F1.RungIsCut then
+      E01Resistor.F1.Cut(Image1.Canvas)
+    else
+      E01Resistor.F1.Fix(Image1.Canvas);
+    {...Getting F2 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F2.RungIsCut then
+      E01Resistor.F2.Cut(Image1.Canvas)
+    else
+      E01Resistor.F2.Fix(Image1.Canvas);
+    {...Getting F3 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F3.RungIsCut then
+      E01Resistor.F3.Cut(Image1.Canvas)
+    else
+      E01Resistor.F3.Fix(Image1.Canvas);
+    {...Getting F4 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F4.RungIsCut then
+      E01Resistor.F4.Cut(Image1.Canvas)
+    else
+      E01Resistor.F4.Fix(Image1.Canvas);
+    {...Getting F5 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F5.RungIsCut then
+      E01Resistor.F5.Cut(Image1.Canvas)
+    else
+      E01Resistor.F5.Fix(Image1.Canvas);
+    {...Getting F6 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F6.RungIsCut then
+      E01Resistor.F6.Cut(Image1.Canvas)
+    else
+      E01Resistor.F6.Fix(Image1.Canvas);
+    {...Getting F7 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F7.RungIsCut then
+      E01Resistor.F7.Cut(Image1.Canvas)
+    else
+      E01Resistor.F7.Fix(Image1.Canvas);
+    {...Getting F8 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F8.RungIsCut then
+      E01Resistor.F8.Cut(Image1.Canvas)
+    else
+      E01Resistor.F8.Fix(Image1.Canvas);
+    {...Getting F9 item from object and Checking whether to cut or fix }
+    if (TheItem as TE01Resistor).F9.RungIsCut then
+      E01Resistor.F9.Cut(Image1.Canvas)
+    else
+      E01Resistor.F9.Fix(Image1.Canvas);
+    {...Checking whether to cut or fix Shunt23TopCut}
+    if (TheItem as TE01Resistor).G2.RungIsCut then
+      E01Resistor.G2.Cut(Image1.Canvas)
+    else
+      E01Resistor.G2.Fix(Image1.Canvas);
+    {...Checking whether to cut or fix Shunt23BottomCut}
+    if (TheItem as TE01Resistor).G23.RungIsCut then
+      E01Resistor.G23.Cut(Image1.Canvas)
+    else
+      E01Resistor.G23.Fix(Image1.Canvas);
+    {...Checking whether to cut or fix Shunt12TopCut}
+    if (TheItem as TE01Resistor).G1.RungIsCut then
+      E01Resistor.G1.Cut(Image1.Canvas)
+    else
+      E01Resistor.G1.Fix(Image1.Canvas);
+    {...Checking whether to cut or fix Shunt12BottomCut}
+    if (TheItem as TE01Resistor).G12.RungIsCut then
+      E01Resistor.G12.Cut(Image1.Canvas)
+    else
+      E01Resistor.G12.Fix(Image1.Canvas);
+    ReCalculate;
+  end;
+  EB_StartingRes12.setfocus;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.BN_OKClick}
+procedure TE01AdjustmentFrm.BN_OKClick(Sender: TObject);
+var
+  i            : integer;
+  TheItem      : TacStreamable;
+begin
+  {getting item from object if there is one}
+  TheItem := nil;
+  i := 0;
+  Repeat
+    if MainForm.FLog.AtIndex(i) is TE01Resistor then begin
+      TheItem := MainForm.FLog.AtIndex(i);
+    end;
+    inc(i);
+  until (TheItem <> nil) or (i > MainForm.Flog.Count);
+  {If there is an object, then placing values in edit boxes}
+  if TheItem = nil then begin
+    {...placing the fields in the object}
+    E01Resistor.StartResistance12 := EB_StartingRes12.text;
+    E01Resistor.StartResistance23 := EB_StartingRes23.text;
+    E01Resistor.A1.RungIsCut := E01Resistor.A1.RungIsCut;
+    E01Resistor.A2.RungIsCut := E01Resistor.A2.RungIsCut;
+    E01Resistor.A3.RungIsCut := E01Resistor.A3.RungIsCut;
+    E01Resistor.A4.RungIsCut := E01Resistor.A4.RungIsCut;
+    E01Resistor.A5.RungIsCut := E01Resistor.A5.RungIsCut;
+    E01Resistor.A6.RungIsCut := E01Resistor.A6.RungIsCut;
+    E01Resistor.A7.RungIsCut := E01Resistor.A7.RungIsCut;
+    E01Resistor.A8.RungIsCut := E01Resistor.A8.RungIsCut;
+    E01Resistor.A9.RungIsCut := E01Resistor.A9.RungIsCut;
+    E01Resistor.B1.RungIsCut := E01Resistor.B1.RungIsCut;
+    E01Resistor.B2.RungIsCut := E01Resistor.B2.RungIsCut;
+    E01Resistor.B3.RungIsCut := E01Resistor.B3.RungIsCut;
+    E01Resistor.B4.RungIsCut := E01Resistor.B4.RungIsCut;
+    E01Resistor.B5.RungIsCut := E01Resistor.B5.RungIsCut;
+    E01Resistor.B6.RungIsCut := E01Resistor.B6.RungIsCut;
+    E01Resistor.B7.RungIsCut := E01Resistor.B7.RungIsCut;
+    E01Resistor.C1.RungIsCut := E01Resistor.C1.RungIsCut;
+    E01Resistor.C2.RungIsCut := E01Resistor.C2.RungIsCut;
+    E01Resistor.C3.RungIsCut := E01Resistor.C3.RungIsCut;
+    E01Resistor.C4.RungIsCut := E01Resistor.C4.RungIsCut;
+    E01Resistor.C5.RungIsCut := E01Resistor.C5.RungIsCut;
+    E01Resistor.C6.RungIsCut := E01Resistor.C6.RungIsCut;
+    E01Resistor.C7.RungIsCut := E01Resistor.C7.RungIsCut;
+    E01Resistor.D1.RungIsCut := E01Resistor.D1.RungIsCut;
+    E01Resistor.D2.RungIsCut := E01Resistor.D2.RungIsCut;
+    E01Resistor.D3.RungIsCut := E01Resistor.D3.RungIsCut;
+    E01Resistor.D4.RungIsCut := E01Resistor.D4.RungIsCut;
+    E01Resistor.D5.RungIsCut := E01Resistor.D5.RungIsCut;
+    E01Resistor.D6.RungIsCut := E01Resistor.D6.RungIsCut;
+    E01Resistor.D7.RungIsCut := E01Resistor.D7.RungIsCut;
+    E01Resistor.E1.RungIsCut := E01Resistor.E1.RungIsCut;
+    E01Resistor.E2.RungIsCut := E01Resistor.E2.RungIsCut;
+    E01Resistor.E3.RungIsCut := E01Resistor.E3.RungIsCut;
+    E01Resistor.E4.RungIsCut := E01Resistor.E4.RungIsCut;
+    E01Resistor.E5.RungIsCut := E01Resistor.E5.RungIsCut;
+    E01Resistor.E6.RungIsCut := E01Resistor.E6.RungIsCut;
+    E01Resistor.E7.RungIsCut := E01Resistor.E7.RungIsCut;
+    E01Resistor.F1.RungIsCut := E01Resistor.F1.RungIsCut;
+    E01Resistor.F2.RungIsCut := E01Resistor.F2.RungIsCut;
+    E01Resistor.F3.RungIsCut := E01Resistor.F3.RungIsCut;
+    E01Resistor.F4.RungIsCut := E01Resistor.F4.RungIsCut;
+    E01Resistor.F5.RungIsCut := E01Resistor.F5.RungIsCut;
+    E01Resistor.F6.RungIsCut := E01Resistor.F6.RungIsCut;
+    E01Resistor.F7.RungIsCut := E01Resistor.F7.RungIsCut;
+    E01Resistor.F8.RungIsCut := E01Resistor.F8.RungIsCut;
+    E01Resistor.F9.RungIsCut := E01Resistor.F9.RungIsCut;
+    E01Resistor.G1.RungIsCut := E01Resistor.G1.RungIsCut;
+    E01Resistor.G12.RungIsCut := E01Resistor.G12.RungIsCut;
+    E01Resistor.G2.RungIsCut := E01Resistor.G2.RungIsCut;
+    E01Resistor.G23.RungIsCut := E01Resistor.G23.RungIsCut;
+    MainForm.AddToLog(E01Resistor);
+  end
+  else begin
+    (TheItem as TE01Resistor).StartResistance12 := EB_StartingRes12.text;
+    (TheItem as TE01Resistor).StartResistance23 := EB_StartingRes23.text;
+    (TheItem as TE01Resistor).A1.RungIsCut := E01Resistor.A1.RungIsCut;
+    (TheItem as TE01Resistor).A2.RungIsCut := E01Resistor.A2.RungIsCut;
+    (TheItem as TE01Resistor).A3.RungIsCut := E01Resistor.A3.RungIsCut;
+    (TheItem as TE01Resistor).A4.RungIsCut := E01Resistor.A4.RungIsCut;
+    (TheItem as TE01Resistor).A5.RungIsCut := E01Resistor.A5.RungIsCut;
+    (TheItem as TE01Resistor).A6.RungIsCut := E01Resistor.A6.RungIsCut;
+    (TheItem as TE01Resistor).A7.RungIsCut := E01Resistor.A7.RungIsCut;
+    (TheItem as TE01Resistor).A8.RungIsCut := E01Resistor.A8.RungIsCut;
+    (TheItem as TE01Resistor).A9.RungIsCut := E01Resistor.A9.RungIsCut;
+    (TheItem as TE01Resistor).B1.RungIsCut := E01Resistor.B1.RungIsCut;
+    (TheItem as TE01Resistor).B2.RungIsCut := E01Resistor.B2.RungIsCut;
+    (TheItem as TE01Resistor).B3.RungIsCut := E01Resistor.B3.RungIsCut;
+    (TheItem as TE01Resistor).B4.RungIsCut := E01Resistor.B4.RungIsCut;
+    (TheItem as TE01Resistor).B5.RungIsCut := E01Resistor.B5.RungIsCut;
+    (TheItem as TE01Resistor).B6.RungIsCut := E01Resistor.B6.RungIsCut;
+    (TheItem as TE01Resistor).B7.RungIsCut := E01Resistor.B7.RungIsCut;
+    (TheItem as TE01Resistor).C1.RungIsCut := E01Resistor.C1.RungIsCut;
+    (TheItem as TE01Resistor).C2.RungIsCut := E01Resistor.C2.RungIsCut;
+    (TheItem as TE01Resistor).C3.RungIsCut := E01Resistor.C3.RungIsCut;
+    (TheItem as TE01Resistor).C4.RungIsCut := E01Resistor.C4.RungIsCut;
+    (TheItem as TE01Resistor).C5.RungIsCut := E01Resistor.C5.RungIsCut;
+    (TheItem as TE01Resistor).C6.RungIsCut := E01Resistor.C6.RungIsCut;
+    (TheItem as TE01Resistor).C7.RungIsCut := E01Resistor.C7.RungIsCut;
+    (TheItem as TE01Resistor).D1.RungIsCut := E01Resistor.D1.RungIsCut;
+    (TheItem as TE01Resistor).D2.RungIsCut := E01Resistor.D2.RungIsCut;
+    (TheItem as TE01Resistor).D3.RungIsCut := E01Resistor.D3.RungIsCut;
+    (TheItem as TE01Resistor).D4.RungIsCut := E01Resistor.D4.RungIsCut;
+    (TheItem as TE01Resistor).D5.RungIsCut := E01Resistor.D5.RungIsCut;
+    (TheItem as TE01Resistor).D6.RungIsCut := E01Resistor.D6.RungIsCut;
+    (TheItem as TE01Resistor).D7.RungIsCut := E01Resistor.D7.RungIsCut;
+    (TheItem as TE01Resistor).E1.RungIsCut := E01Resistor.E1.RungIsCut;
+    (TheItem as TE01Resistor).E2.RungIsCut := E01Resistor.E2.RungIsCut;
+    (TheItem as TE01Resistor).E3.RungIsCut := E01Resistor.E3.RungIsCut;
+    (TheItem as TE01Resistor).E4.RungIsCut := E01Resistor.E4.RungIsCut;
+    (TheItem as TE01Resistor).E5.RungIsCut := E01Resistor.E5.RungIsCut;
+    (TheItem as TE01Resistor).E6.RungIsCut := E01Resistor.E6.RungIsCut;
+    (TheItem as TE01Resistor).E7.RungIsCut := E01Resistor.E7.RungIsCut;
+    (TheItem as TE01Resistor).F1.RungIsCut := E01Resistor.F1.RungIsCut;
+    (TheItem as TE01Resistor).F2.RungIsCut := E01Resistor.F2.RungIsCut;
+    (TheItem as TE01Resistor).F3.RungIsCut := E01Resistor.F3.RungIsCut;
+    (TheItem as TE01Resistor).F4.RungIsCut := E01Resistor.F4.RungIsCut;
+    (TheItem as TE01Resistor).F5.RungIsCut := E01Resistor.F5.RungIsCut;
+    (TheItem as TE01Resistor).F6.RungIsCut := E01Resistor.F6.RungIsCut;
+    (TheItem as TE01Resistor).F7.RungIsCut := E01Resistor.F7.RungIsCut;
+    (TheItem as TE01Resistor).F8.RungIsCut := E01Resistor.F8.RungIsCut;
+    (TheItem as TE01Resistor).F9.RungIsCut := E01Resistor.F9.RungIsCut;
+    (TheItem as TE01Resistor).G1.RungIsCut := E01Resistor.G1.RungIsCut;
+    (TheItem as TE01Resistor).G12.RungIsCut := E01Resistor.G12.RungIsCut;
+    (TheItem as TE01Resistor).G2.RungIsCut := E01Resistor.G2.RungIsCut;
+    (TheItem as TE01Resistor).G23.RungIsCut := E01Resistor.G23.RungIsCut;
+  end;
+  MainForm.IsDirty := true;
+  close;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.GotFormImage}
+procedure TE01AdjustmentFrm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Release;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.GotFormImage}
+function TE01AdjustmentFrm.GotFormImage: TBitmap;
+var
+  ScreenDC, PrintDC: HDC;
+  OldBits, PrintBits: HBITMAP;
+  PaintLParam: Longint;
+
+  procedure PrintHandle(Handle: HWND);
+  var
+    R: TRect;
+    Child: HWND;
+    SavedIndex: Integer;
+  begin
+    if {IsWindowVisible(Handle)} true then
+    begin
+      SavedIndex := SaveDC(PrintDC);
+      WinProcs.GetClientRect(Handle, R);
+      MapWindowPoints(Handle, Self.Handle, R, 2);
+      with R do
+      begin
+        SetWindowOrgEx(PrintDC, -Left, -Top, nil);
+        IntersectClipRect(PrintDC, 0, 0, Right - Left, Bottom - Top);
+      end;
+      SendMessage(Handle, WM_ERASEBKGND, PrintDC, 0);
+      SendMessage(Handle, WM_PAINT, PrintDC, PaintLParam);
+      Child := GetWindow(Handle, GW_CHILD);
+      if Child <> 0 then
+      begin
+        Child := GetWindow(Child, GW_HWNDLAST);
+        while Child <> 0 do
+        begin
+          PrintHandle(Child);
+          Child := GetWindow(Child, GW_HWNDPREV);
+        end;
+      end;
+      RestoreDC(PrintDC, SavedIndex);
+    end;
+  end;
+
+begin
+  Result := nil;
+  ScreenDC := GetDC(0);
+  PaintLParam := 0;
+  try
+    PrintDC := CreateCompatibleDC(ScreenDC);
+    { Work around an apparent bug in Windows NT }
+ //   if GetWinFlags and $4000 <> 0 then PaintLParam := PrintDC or $DEFE0000;
+    try
+      PrintBits := CreateCompatibleBitmap(ScreenDC, ClientWidth, ClientHeight);
+      try
+        OldBits := SelectObject(PrintDC, PrintBits);
+        try
+          { Clear the contents of the bitmap }
+          FillRect(PrintDC, ClientRect, Brush.Handle);
+          { Paint form into a bitmap }
+          PrintHandle(Handle);
+        finally
+          SelectObject(PrintDC, OldBits);
+        end;
+        Result := TBitmap.Create;
+        Result.Handle := PrintBits;
+        PrintBits := 0;
+      except
+        Result.Free;
+        if PrintBits <> 0 then DeleteObject(PrintBits);
+        raise;
+      end;
+    finally
+      DeleteDC(PrintDC);
+    end;
+  finally
+    ReleaseDC(0, ScreenDC);
+  end;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.PrintForm}
+procedure TE01AdjustmentFrm.PrintForm;
+var
+  FormImage: TBitmap;
+  Info: PBitmapInfo;
+  InfoSize: Longword;
+  Image: Pointer;
+  ImageSize: Longword;
+  Bits: HBITMAP;
+  DIBWidth, DIBHeight: Longint;
+  PrintWidth, PrintHeight: Longint;
+begin
+(*  Printer.BeginDoc;
+  try
+    FormImage := GotFormImage;
+    try
+      { Paint bitmap to the printer }
+      with Printer, Canvas do
+      begin
+        Bits := FormImage.Handle;
+        GetDIBSizes(Bits, InfoSize, ImageSize);
+        Info := MemAlloc(InfoSize);
+        try
+          Image := MemAlloc(ImageSize);
+          try
+            GetDIB(Bits, 0, Info^, Image^);
+            with Info^.bmiHeader do
+            begin
+              DIBWidth := biWidth;
+              DIBHeight := biHeight;
+            end;
+            PrintWidth := MulDiv(DIBWidth, PageHeight, DIBHeight);
+            if PrintWidth < PageWidth then
+              PrintHeight := PageHeight
+            else begin
+              PrintWidth := PageWidth;
+              PrintHeight := MulDiv(DIBHeight, PageWidth, DIBWidth);
+            end;
+            StretchDIBits(Canvas.Handle, 0, 0, PrintWidth, PrintHeight, 0, 0,
+            DIBWidth, DIBHeight, Image, Info^, DIB_RGB_COLORS, SRCCOPY);
+          finally
+            FreeMem(Image, ImageSize);
+          end;
+        finally
+          FreeMem(Info, InfoSize);
+        end;
+      end;
+    finally
+      FormImage.Free;
+    end;
+  finally
+    Printer.EndDoc;
+  end;    *)
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.BN_PrintClick}
+procedure TE01AdjustmentFrm.BN_PrintClick(Sender: TObject);
+begin
+  BN_OK.visible := false;
+  BN_Cancel.visible := false;
+  BN_Help.visible := false;
+  BN_Restore.visible := false;
+  BN_Print.Visible := false;
+  PrintForm;
+  BN_OK.visible := true;
+  BN_Cancel.visible := true;
+  BN_Help.visible := true;
+  BN_Restore.visible := true;
+  BN_Print.Visible := true;
+end;
+
+(***********************************************************************)
+{TE01AdjustmentFrm.BN_HelpClick}
+procedure TE01AdjustmentFrm.BN_HelpClick(Sender: TObject);
+begin
+  Application.HelpContext(3050);
+end;
+
+begin
+  {...Registering the object}
+  RegisterClasses([TE01resistor]);
+end.
