@@ -52,6 +52,8 @@ export interface BinobeamInput {
   gageFactor: number;
 }
 
+export type BinobeamUnitSystem = 'US' | 'SI';
+
 /**
  * Output results from binocular beam calculation
  */
@@ -70,6 +72,135 @@ export interface BinobeamOutput {
   fullSpanSensitivity: number;
 }
 
+function solveFromNormalizedSI(normalized: BinobeamInput): BinobeamOutput {
+  validateBinobeamGeometry(normalized);
+
+  const {
+    appliedLoad: F,
+    distanceBetweenHoles: L_d,
+    radius: r,
+    beamWidth: W,
+    beamHeight: H,
+    distanceLoadHole: L_hd,
+    minimumThickness: t_min,
+    modulus: E,
+    gageLength: L_gauge,
+    gageFactor: GF,
+  } = normalized;
+
+  const g = H / 2 - (r + t_min);
+  const K2 = H / 2 - g;
+  const K1 = L_hd / (H - (H - 2 * r - 2 * g) / 2);
+  const xMinValue = -L_gauge / 2;
+  const xMaxValue = L_gauge / 2;
+  const iterations = 1000;
+  const increment = (xMaxValue - xMinValue) / iterations;
+
+  let maxStrain = 0;
+  let minStrain = 0;
+  let maxStrainLocation = 0;
+  let currentX = xMinValue;
+
+  const firstTerm = F / (E * W);
+
+  for (let i = 0; i <= iterations; i++) {
+    const rSqMinXSq = Math.sqrt(Math.pow(r, 2) - Math.pow(currentX, 2));
+    const secondTerm = K1 / (K2 - rSqMinXSq);
+    const denominator = K2 - rSqMinXSq;
+    const thirdTerm = (3 * (L_d / 2 + currentX)) / Math.pow(denominator, 2);
+    const strain = (firstTerm * (secondTerm + thirdTerm)) * 1e6;
+
+    if (i === 0 || strain > maxStrain) {
+      maxStrain = strain;
+      maxStrainLocation = currentX;
+    }
+    if (i === 0 || strain < minStrain) {
+      minStrain = strain;
+    }
+
+    currentX += increment;
+  }
+
+  const xMin2 = xMinValue + maxStrainLocation;
+  const xMax2 = xMaxValue + maxStrainLocation;
+  let maxStrain2 = 0;
+  let minStrain2 = 0;
+  let strainSum = 0;
+  currentX = xMin2;
+
+  for (let i = 0; i <= iterations; i++) {
+    const rSqMinXSq = Math.sqrt(Math.pow(r, 2) - Math.pow(currentX, 2));
+    const secondTerm = K1 / (K2 - rSqMinXSq);
+    const denominator = K2 - rSqMinXSq;
+    const thirdTerm = (3 * (L_d / 2 + currentX)) / Math.pow(denominator, 2);
+    const strain = (firstTerm * (secondTerm + thirdTerm)) * 1e6;
+
+    strainSum += strain;
+
+    if (i === 0 || strain > maxStrain2) {
+      maxStrain2 = strain;
+    }
+    if (i === 0 || strain < minStrain2) {
+      minStrain2 = strain;
+    }
+
+    currentX += increment;
+  }
+
+  const avgStrain = Math.abs(strainSum / iterations);
+  const gradient = Math.abs((maxStrain2 - minStrain2) / maxStrain2) * 100;
+  const fullSpanSensitivity = avgStrain * GF * 1e-3;
+
+  return {
+    minStrain: minStrain2,
+    maxStrain: maxStrain2,
+    avgStrain,
+    zOffset: maxStrainLocation,
+    gradient,
+    fullSpanSensitivity,
+  };
+}
+
+/**
+ * Closed-form binocular beam solver with explicit units (recommended for UI/workflows).
+ * US mode expects: lbf, in, Mpsi. SI mode expects: N, mm, GPa.
+ */
+export function calculateBinobeamStrainExplicit(
+  params: BinobeamInput,
+  unitSystem: BinobeamUnitSystem
+): BinobeamOutput {
+  let normalized: BinobeamInput;
+  if (unitSystem === 'US') {
+    normalized = {
+      appliedLoad: params.appliedLoad * 4.448222,
+      distanceBetweenHoles: params.distanceBetweenHoles * 0.0254,
+      radius: params.radius * 0.0254,
+      beamWidth: params.beamWidth * 0.0254,
+      beamHeight: params.beamHeight * 0.0254,
+      distanceLoadHole: params.distanceLoadHole * 0.0254,
+      minimumThickness: params.minimumThickness * 0.0254,
+      // UI uses Mpsi in US mode: 1 Mpsi = 1e6 psi = 6.8947572932e9 Pa
+      modulus: params.modulus * 6.8947572932e9,
+      gageLength: params.gageLength * 0.0254,
+      gageFactor: params.gageFactor,
+    };
+  } else {
+    normalized = {
+      appliedLoad: params.appliedLoad,
+      distanceBetweenHoles: params.distanceBetweenHoles * 0.001,
+      radius: params.radius * 0.001,
+      beamWidth: params.beamWidth * 0.001,
+      beamHeight: params.beamHeight * 0.001,
+      distanceLoadHole: params.distanceLoadHole * 0.001,
+      minimumThickness: params.minimumThickness * 0.001,
+      modulus: params.modulus * 1e9,
+      gageLength: params.gageLength * 0.001,
+      gageFactor: params.gageFactor,
+    };
+  }
+  return solveFromNormalizedSI(normalized);
+}
+
 /**
  * Validates input geometry constraints for binocular beam
  * Throws error if constraints violated
@@ -82,9 +213,10 @@ export interface BinobeamOutput {
  */
 function validateBinobeamGeometry(params: BinobeamInput): void {
   const { radius, beamHeight, minimumThickness, beamWidth, distanceBetweenHoles, gageLength } = params;
+  const geoTol = Math.max(1e-9, beamHeight * 1e-5);
 
   // Check: Height >= 2*radius + 2*thickness
-  if (beamHeight < 2 * radius + 2 * minimumThickness) {
+  if (beamHeight + geoTol < 2 * radius + 2 * minimumThickness) {
     throw new Error(
       `Beam height ${beamHeight} must be >= 2*radius + 2*thickness = ${2 * radius + 2 * minimumThickness}`
     );
@@ -103,7 +235,7 @@ function validateBinobeamGeometry(params: BinobeamInput): void {
   }
 
   // Check: GageLength² <= Radius²
-  if (Math.pow(gageLength / 2, 2) > Math.pow(radius, 2)) {
+  if (gageLength / 2 > radius + geoTol) {
     throw new Error(`Gage length / 2 (${gageLength / 2}) must be <= radius (${radius})`);
   }
 
@@ -167,97 +299,7 @@ function normalizeToSI(params: BinobeamInput): BinobeamInput {
  */
 export function calculateBinobeamStrain(params: BinobeamInput): BinobeamOutput {
   const normalized = normalizeToSI(params);
-  validateBinobeamGeometry(normalized);
-
-  const {
-    appliedLoad: F,
-    distanceBetweenHoles: L_d,
-    radius: r,
-    beamWidth: W,
-    beamHeight: H,
-    distanceLoadHole: L_hd,
-    minimumThickness: t_min,
-    modulus: E,
-    gageLength: L_gauge,
-    gageFactor: GF,
-  } = normalized;
-
-  // Calculate derived geometry parameters
-  const g = H / 2 - (r + t_min); // beam hole distance
-  const K2 = H / 2 - g;
-  const K1 = L_hd / (H - (H - 2 * r - 2 * g) / 2);
-  const xMinValue = -L_gauge / 2;
-  const xMaxValue = L_gauge / 2;
-  const iterations = 1000;
-  const increment = (xMaxValue - xMinValue) / iterations;
-
-  // ===== FIRST PASS: Find location of maximum strain =====
-  let maxStrain = 0;
-  let minStrain = 0;
-  let maxStrainLocation = 0;
-  let currentX = xMinValue;
-
-  const firstTerm = F / (E * W);
-
-  for (let i = 0; i <= iterations; i++) {
-    const rSqMinXSq = Math.sqrt(Math.pow(r, 2) - Math.pow(currentX, 2));
-    const secondTerm = K1 / (K2 - rSqMinXSq);
-    const denominator = K2 - rSqMinXSq;
-    const thirdTerm = (3 * (L_d / 2 + currentX)) / Math.pow(denominator, 2);
-    const strain = (firstTerm * (secondTerm + thirdTerm)) * 1e6;
-
-    if (i === 0 || strain > maxStrain) {
-      maxStrain = strain;
-      maxStrainLocation = currentX;
-    }
-    if (i === 0 || strain < minStrain) {
-      minStrain = strain;
-    }
-
-    currentX += increment;
-  }
-
-  // ===== SECOND PASS: Recenter around peak and collect statistics =====
-  const xMin2 = xMinValue + maxStrainLocation;
-  const xMax2 = xMaxValue + maxStrainLocation;
-  let maxStrain2 = 0;
-  let minStrain2 = 0;
-  let strainSum = 0;
-  currentX = xMin2;
-
-  for (let i = 0; i <= iterations; i++) {
-    const rSqMinXSq = Math.sqrt(Math.pow(r, 2) - Math.pow(currentX, 2));
-    const secondTerm = K1 / (K2 - rSqMinXSq);
-    const denominator = K2 - rSqMinXSq;
-    const thirdTerm = (3 * (L_d / 2 + currentX)) / Math.pow(denominator, 2);
-    const strain = (firstTerm * (secondTerm + thirdTerm)) * 1e6;
-
-    strainSum += strain;
-
-    if (i === 0 || strain > maxStrain2) {
-      maxStrain2 = strain;
-    }
-    if (i === 0 || strain < minStrain2) {
-      minStrain2 = strain;
-    }
-
-    currentX += increment;
-  }
-
-  const avgStrain = Math.abs(strainSum / iterations);
-
-  // ===== CALCULATE GRADIENT AND SENSITIVITY =====
-  const gradient = Math.abs((maxStrain2 - minStrain2) / maxStrain2) * 100;
-  const fullSpanSensitivity = avgStrain * GF * 1e-3;
-
-  return {
-    minStrain: minStrain2,
-    maxStrain: maxStrain2,
-    avgStrain,
-    zOffset: maxStrainLocation,
-    gradient,
-    fullSpanSensitivity,
-  };
+  return solveFromNormalizedSI(normalized);
 }
 
 export { BinobeamInput, BinobeamOutput };

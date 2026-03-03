@@ -1,0 +1,96 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { calculateRoundShearSpan } from '../../domain/shearBeams'
+
+type UnitSystem = 'SI' | 'US'
+
+const N_PER_LBF = 4.4482216152605
+const MM_PER_IN = 25.4
+const GPA_PER_MPSI = 6.8947572932
+
+const round = (v: number, d = 4): number => Math.round(v * Math.pow(10, d)) / Math.pow(10, d)
+const show = (v: number, d: number): string => (Number.isFinite(v) ? v.toFixed(d) : '—')
+
+type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void }
+
+export default function RoundShearCalc({ unitSystem, onUnitChange }: Props) {
+  const [load, setLoad] = useState(1000)
+  const [width, setWidth] = useState(20)
+  const [height, setHeight] = useState(30)
+  const [diameter, setDiameter] = useState(20)
+  const [thickness, setThickness] = useState(3)
+  const [modulusGPa, setModulusGPa] = useState(200)
+  const [poisson, setPoisson] = useState(0.3)
+  const [gageFactor, setGageFactor] = useState(2.1)
+
+  const prevUnit = useRef<UnitSystem>(unitSystem)
+  useEffect(() => {
+    if (prevUnit.current === unitSystem) return
+    prevUnit.current = unitSystem
+    if (unitSystem === 'US') {
+      setLoad(v => round(v / N_PER_LBF))
+      setWidth(v => round(v / MM_PER_IN))
+      setHeight(v => round(v / MM_PER_IN))
+      setDiameter(v => round(v / MM_PER_IN))
+      setThickness(v => round(v / MM_PER_IN))
+      setModulusGPa(v => round(v / GPA_PER_MPSI))
+    } else {
+      setLoad(v => round(v * N_PER_LBF))
+      setWidth(v => round(v * MM_PER_IN))
+      setHeight(v => round(v * MM_PER_IN))
+      setDiameter(v => round(v * MM_PER_IN))
+      setThickness(v => round(v * MM_PER_IN))
+      setModulusGPa(v => round(v * GPA_PER_MPSI))
+    }
+  }, [unitSystem])
+
+  const result = useMemo(() => {
+    const loadN = unitSystem === 'SI' ? load : load * N_PER_LBF
+    const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+    const w = width * mm, h = height * mm, d = diameter * mm, t = thickness * mm
+    const modPa = (unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI) * 1e9
+    const checks: [number, string][] = [
+      [loadN, 'Applied load'], [w, 'Width'], [h, 'Height'], [d, 'Diameter'], [t, 'Thickness'], [modPa, 'Modulus'], [gageFactor, 'Gage factor'],
+    ]
+    const bad = checks.find(([v]) => !Number.isFinite(v) || v <= 0)
+    if (bad) return { error: `${bad[1]} must be a positive value.`, span: NaN }
+    try {
+      const span = calculateRoundShearSpan({ load: loadN, width: w, height: h, diameter: d, thickness: t, modulus: modPa, poisson, gageFactor })
+      return { error: '', span }
+    } catch (e) { return { error: e instanceof Error ? e.message : 'Calculation error', span: NaN } }
+  }, [unitSystem, load, width, height, diameter, thickness, modulusGPa, poisson, gageFactor])
+
+  const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
+  const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
+  const modUnit = unitSystem === 'SI' ? 'GPa' : 'Mpsi'
+
+  return (
+    <div className="bino-wrap">
+      <div className="workspace-controls">
+        <div className="analysis-toggle">
+          <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
+          <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
+        </div>
+      </div>
+      <div className="bino-illustration">
+        <img src="/legacy-help/ShrRnd.jpg" alt="Round shear beam" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      </div>
+      <div className="bino-grid">
+        <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Section width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Section height ({lenUnit})<input type="number" value={Number.isFinite(height) ? height : ''} onChange={e => setHeight(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Web opening diameter ({lenUnit})<input type="number" value={Number.isFinite(diameter) ? diameter : ''} onChange={e => setDiameter(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Web thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+      </div>
+      {result.error && <p className="workspace-note">{result.error}</p>}
+      <table className="bino-table">
+        <tbody>
+          <tr><th colSpan={3}>Calculated Values</th></tr>
+          <tr><td>Full Bridge Span:</td><td>{show(result.span, 4)}</td><td>mV/V</td></tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
