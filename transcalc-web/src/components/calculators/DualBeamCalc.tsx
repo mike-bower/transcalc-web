@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateDualbeamStrain } from '../../domain/dualbeam'
+import { solveDualBeamFea, sampleDualBeamGageStrains } from '../../domain/fea/dualBeamSolver'
+import StrainFieldViewer from '../StrainFieldViewer'
 
 type UnitSystem = 'SI' | 'US'
+type AnalysisMode = 'closed-form' | 'fea'
 
 const N_PER_LBF = 4.4482216152605
 const MM_PER_IN = 25.4
@@ -24,6 +27,7 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [modulusGPa, setModulusGPa] = useState(200)
   const [gageLength, setGageLength] = useState(5)
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -48,25 +52,27 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
     }
   }, [unitSystem])
 
-  const result = useMemo(() => {
-    const loadN = unitSystem === 'SI' ? load : load * N_PER_LBF
+  const siInputs = useMemo(() => {
     const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
-    const widthMm = width * mm
-    const thicknessMm = thickness * mm
-    const distMm = distBetweenGages * mm
-    const distLoadMm = distLoadToCL * mm
-    const gageLenMm = gageLength * mm
-    const modulusPa = (unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI) * 1e9
+    return {
+      loadN: unitSystem === 'SI' ? load : load * N_PER_LBF,
+      widthMm: width * mm,
+      thicknessMm: thickness * mm,
+      distMm: distBetweenGages * mm,
+      distLoadMm: distLoadToCL * mm,
+      gageLenMm: gageLength * mm,
+      modulusGPa: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+    }
+  }, [unitSystem, load, width, thickness, distBetweenGages, distLoadToCL, modulusGPa, gageLength])
 
+  const result = useMemo(() => {
+    const { loadN, widthMm, thicknessMm, distMm, distLoadMm, gageLenMm, modulusGPa: modGPa } = siInputs
+    const modulusPa = modGPa * 1e9
     if (!Number.isFinite(distLoadMm)) return { error: 'Distance load to CL must be a number.', data: null }
     const checks: [number, string][] = [
-      [loadN, 'Applied load'],
-      [widthMm, 'Beam width'],
-      [thicknessMm, 'Thickness'],
-      [distMm, 'Distance between gages'],
-      [modulusPa, 'Modulus'],
-      [gageLenMm, 'Gage length'],
-      [gageFactor, 'Gage factor'],
+      [loadN, 'Applied load'], [widthMm, 'Beam width'], [thicknessMm, 'Thickness'],
+      [distMm, 'Distance between gages'], [modulusPa, 'Modulus'],
+      [gageLenMm, 'Gage length'], [gageFactor, 'Gage factor'],
     ]
     const bad = checks.find(([v]) => !Number.isFinite(v) || v <= 0)
     if (bad) return { error: `${bad[1]} must be a positive value.`, data: null }
@@ -86,7 +92,25 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
     } catch (e) {
       return { error: e instanceof Error ? e.message : 'Calculation error', data: null }
     }
-  }, [unitSystem, load, width, thickness, distBetweenGages, distLoadToCL, modulusGPa, gageLength, gageFactor])
+  }, [siInputs, gageFactor])
+
+  const feaResult = useMemo(() => {
+    if (analysisMode !== 'fea') return null
+    const { loadN, widthMm, thicknessMm, distMm, modulusGPa: modGPa } = siInputs
+    if ([loadN, widthMm, thicknessMm, distMm, modGPa].some(v => !Number.isFinite(v) || v <= 0)) return null
+    try {
+      const solution = solveDualBeamFea({
+        appliedForceN: loadN,
+        beamWidthMm: widthMm,
+        thicknessMm,
+        spanMm: distMm,
+        distanceBetweenGagesMm: distMm * 0.4,  // gage pair separation = 40% of span
+        modulusGPa: modGPa,
+      })
+      const gages = sampleDualBeamGageStrains(solution, distMm, distMm * 0.4, thicknessMm)
+      return { solution, gages }
+    } catch { return null }
+  }, [analysisMode, siInputs])
 
   const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
   const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
@@ -98,6 +122,10 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
         <div className="analysis-toggle">
           <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
+        </div>
+        <div className="analysis-toggle">
+          <button className={analysisMode === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisMode('closed-form')}>Closed-form</button>
+          <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
         </div>
       </div>
 
@@ -128,6 +156,36 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
           <tr><td>Span at Applied Force:</td><td>{show(result.data?.fullSpanSensitivity ?? NaN, 4)}</td><td>mV/V</td></tr>
         </tbody>
       </table>
+
+      {analysisMode === 'fea' && (
+        <div className="fea-analysis-section">
+          {feaResult ? (
+            <>
+              <StrainFieldViewer
+                solution={feaResult.solution}
+                strainKey="exx"
+                gageMarkersMm={[
+                  siInputs.distMm / 2 - siInputs.distMm * 0.2,
+                  siInputs.distMm / 2 + siInputs.distMm * 0.2,
+                ]}
+                label="ε_xx field — simply-supported · load at centre · dashed lines show gage pair positions"
+              />
+              <table className="bino-table" style={{ marginTop: 8 }}>
+                <tbody>
+                  <tr><th colSpan={3}>FEA Sampled Gage Strains</th></tr>
+                  <tr><td>A (tension, left):</td><td>{show(feaResult.gages.strainA, 1)}</td><td>µε</td></tr>
+                  <tr><td>B (compression, left):</td><td>{show(feaResult.gages.strainB, 1)}</td><td>µε</td></tr>
+                  <tr><td>C (tension, right):</td><td>{show(feaResult.gages.strainC, 1)}</td><td>µε</td></tr>
+                  <tr><td>D (compression, right):</td><td>{show(feaResult.gages.strainD, 1)}</td><td>µε</td></tr>
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+          )}
+          <p className="fea-note">2D plane-stress CST · linear elastic · gage pair separation = 40% of span</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateReversebeamStrain } from '../../domain/reversebeam'
+import { solveReverseBeamFea } from '../../domain/fea/reverseBeamSolver'
+import StrainFieldViewer from '../StrainFieldViewer'
 
 type UnitSystem = 'SI' | 'US'
+type AnalysisMode = 'closed-form' | 'fea'
 
 const N_PER_LBF = 4.4482216152605
 const MM_PER_IN = 25.4
@@ -23,6 +26,7 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [modulusGPa, setModulusGPa] = useState(200)  // GPa or Mpsi
   const [gageLength, setGageLength] = useState(5)    // mm or in
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -46,23 +50,25 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
   }, [unitSystem])
 
   // Always call domain in SI: N, mm, Pa
-  const result = useMemo(() => {
-    const loadN = unitSystem === 'SI' ? load : load * N_PER_LBF
+  const siInputs = useMemo(() => {
     const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
-    const widthMm = width * mm
-    const thicknessMm = thickness * mm
-    const distMm = distBetweenGages * mm
-    const gageLenMm = gageLength * mm
-    const modulusPa = (unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI) * 1e9
+    return {
+      loadN: unitSystem === 'SI' ? load : load * N_PER_LBF,
+      widthMm: width * mm,
+      thicknessMm: thickness * mm,
+      distMm: distBetweenGages * mm,
+      gageLenMm: gageLength * mm,
+      modulusGPa: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+    }
+  }, [unitSystem, load, width, thickness, distBetweenGages, modulusGPa, gageLength])
 
+  const result = useMemo(() => {
+    const { loadN, widthMm, thicknessMm, distMm, gageLenMm, modulusGPa: modGPa } = siInputs
+    const modulusPa = modGPa * 1e9
     const checks: [number, string][] = [
-      [loadN, 'Applied load'],
-      [widthMm, 'Beam width'],
-      [thicknessMm, 'Thickness'],
-      [distMm, 'Distance between gages'],
-      [modulusPa, 'Modulus'],
-      [gageLenMm, 'Gage length'],
-      [gageFactor, 'Gage factor'],
+      [loadN, 'Applied load'], [widthMm, 'Beam width'], [thicknessMm, 'Thickness'],
+      [distMm, 'Distance between gages'], [modulusPa, 'Modulus'],
+      [gageLenMm, 'Gage length'], [gageFactor, 'Gage factor'],
     ]
     const bad = checks.find(([v]) => !Number.isFinite(v) || v <= 0)
     if (bad) return { error: `${bad[1]} must be a positive value.`, data: null }
@@ -81,11 +87,30 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
     } catch (e) {
       return { error: e instanceof Error ? e.message : 'Calculation error', data: null }
     }
-  }, [unitSystem, load, width, thickness, distBetweenGages, modulusGPa, gageLength, gageFactor])
+  }, [siInputs, gageFactor])
+
+  const feaSolution = useMemo(() => {
+    if (analysisMode !== 'fea') return null
+    const { loadN, widthMm, thicknessMm, distMm, modulusGPa: modGPa } = siInputs
+    if ([loadN, widthMm, thicknessMm, distMm, modGPa].some(v => !Number.isFinite(v) || v <= 0)) return null
+    try {
+      return solveReverseBeamFea({
+        appliedForceN: loadN,
+        beamWidthMm: widthMm,
+        thicknessMm,
+        spanMm: distMm,
+        modulusGPa: modGPa,
+      })
+    } catch { return null }
+  }, [analysisMode, siInputs])
 
   const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
   const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
   const modUnit = unitSystem === 'SI' ? 'GPa' : 'Mpsi'
+
+  // Gage marker: near left support (x = gageLength/2 from left)
+  const gageMm = siInputs.gageLenMm / 2
+  const span = siInputs.distMm
 
   return (
     <div className="bino-wrap">
@@ -93,6 +118,10 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
         <div className="analysis-toggle">
           <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
+        </div>
+        <div className="analysis-toggle">
+          <button className={analysisMode === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisMode('closed-form')}>Closed-form</button>
+          <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
         </div>
       </div>
 
@@ -122,6 +151,22 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
           <tr><td>Span at Applied Force:</td><td>{show(result.data?.fullSpanSensitivity ?? NaN, 4)}</td><td>mV/V</td></tr>
         </tbody>
       </table>
+
+      {analysisMode === 'fea' && (
+        <div className="fea-analysis-section">
+          {feaSolution ? (
+            <StrainFieldViewer
+              solution={feaSolution}
+              strainKey="exx"
+              gageMarkersMm={[gageMm, span - gageMm]}
+              label={`ε_xx field — simply-supported span ${span.toFixed(1)} mm · gage markers at ±${gageMm.toFixed(1)} mm from supports`}
+            />
+          ) : (
+            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+          )}
+          <p className="fea-note">2D plane-stress CST · linear elastic · dashed lines show gage centre positions</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,11 +11,8 @@
  * axial compression, and shear loading without code duplication.
  */
 
-import type {
-  CantileverFeaSolution,
-  CantileverStrainTensorMicrostrain,
-  StrainFieldRange,
-} from './cantilever'
+import type { CantileverStrainTensorMicrostrain, StrainFieldRange } from './cantilever'
+import type { CantileverFeaSolution } from './cantileverSolver'
 
 type Node2D = { xM: number; yM: number }
 type Element2D = [number, number, number]

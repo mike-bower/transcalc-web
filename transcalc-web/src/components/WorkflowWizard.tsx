@@ -1,0 +1,1531 @@
+/**
+ * WorkflowWizard — guided 3-step workflow: Design → Compensation → Trim
+ *
+ * Uses orchestrator.ts to chain the three domain functions:
+ *   Step 1: runDesign()       — pick transducer type + enter geometry
+ *   Step 2: runCompensation() — pick method, measuredSpan pre-filled
+ *   Step 3: realizeTrim()     — pick ladder family, targetResistance pre-filled
+ */
+
+import { useEffect, useMemo, useState } from 'react'
+import {
+  runDesign,
+  runCompensation,
+  realizeTrim,
+  type TransducerType,
+  type CompensationMethod,
+  type DesignResult,
+  type CompensationResult,
+  type DesignInput,
+  type CompensationInput,
+  type TrimParams,
+} from '../domain/orchestrator'
+import { commonWireTypes } from '../domain/zeroBalance'
+import { spanWireTypes } from '../domain/spanTemperature2Pt'
+import { LADDER_UNIT_KEYS } from '../domain/ladderResistors'
+import {
+  solveCantileverForTargetSpan,
+} from '../domain/inverse/cantileverInverse'
+import {
+  solveBinoBeamForTargetSpan,
+} from '../domain/inverse/binoBeamInverse'
+import {
+  solveReverseBeamForTargetSpan,
+  solveDualBeamForTargetSpan,
+  solveSBeamForTargetSpan,
+  solveSquareColumnForTargetSpan,
+  solveRoundSolidColumnForTargetSpan,
+  solveRoundHollowColumnForTargetSpan,
+  solveSquareShearForTargetSpan,
+  solveRoundShearForTargetSpan,
+  solveRoundSBeamShearForTargetSpan,
+  solveSquareTorqueForTargetSpan,
+  solveRoundSolidTorqueForTargetSpan,
+  solveRoundHollowTorqueForTargetSpan,
+  solvePressureForTargetSpan,
+} from '../domain/inverse/designInverse'
+import TransducerSvgViewer from './TransducerSvgViewer'
+import CantileverModelPreview from './CantileverModelPreview'
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const N_PER_LBF   = 4.4482216152605
+const MM_PER_IN   = 25.4
+const GPA_PER_MPSI = 6.8947572932
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type UnitSystem = 'SI' | 'US'
+type TrimFamily = 'C01' | 'C11' | 'C12' | 'D01' | 'E01_side'
+type Step = 1 | 2 | 3
+type DesignMode = 'forward' | 'targetDriven'
+
+type UnitKind = 'length' | 'force' | 'modulus' | 'pressure' | 'none'
+
+interface FieldDef {
+  key: string
+  label: string
+  unit: UnitKind
+  si: number
+  step?: number          // step for number inputs (default 0.01)
+  min?: number
+}
+
+// ── Unit helpers ─────────────────────────────────────────────────────────────
+
+function toDisplay(siVal: number, unit: UnitKind, us: boolean): number {
+  if (!us || unit === 'none') return siVal
+  switch (unit) {
+    case 'length':   return siVal / MM_PER_IN
+    case 'force':    return siVal / N_PER_LBF
+    case 'modulus':  return siVal / GPA_PER_MPSI
+    case 'pressure': return siVal / 0.006894757
+  }
+}
+
+function toSI(displayVal: number, unit: UnitKind, us: boolean): number {
+  if (!us || unit === 'none') return displayVal
+  switch (unit) {
+    case 'length':   return displayVal * MM_PER_IN
+    case 'force':    return displayVal * N_PER_LBF
+    case 'modulus':  return displayVal * GPA_PER_MPSI
+    case 'pressure': return displayVal * 0.006894757
+  }
+}
+
+function unitLabel(unit: UnitKind, us: boolean): string {
+  switch (unit) {
+    case 'length':   return us ? 'in' : 'mm'
+    case 'force':    return us ? 'lbf' : 'N'
+    case 'modulus':  return us ? 'Mpsi' : 'GPa'
+    case 'pressure': return us ? 'psi' : 'MPa'
+    case 'none':     return ''
+  }
+}
+
+const show = (v: number, d: number) => (Number.isFinite(v) ? v.toFixed(d) : '—')
+
+type InverseMeta = { key: string; label: string; fieldKey: string }
+type GenericInverseResult = {
+  isValid: boolean
+  solvedValue?: number
+  solvedKey?: string
+  solvedFieldKey?: string
+  designResult?: DesignResult
+  warnings: string[]
+  error?: string
+}
+
+const INVERSE_META: Partial<Record<TransducerType, InverseMeta[]>> = {
+  cantilever: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'momentArmMm', label: 'Moment Arm', fieldKey: 'momentArm' },
+    { key: 'beamWidthMm', label: 'Beam Width', fieldKey: 'width' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+    { key: 'gageFactor', label: 'Gage Factor', fieldKey: 'gageFactor' },
+    { key: 'youngsModulusGPa', label: 'Modulus', fieldKey: 'modulus' },
+  ],
+  binoBeam: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'minimumThicknessMm', label: 'Min. Thickness', fieldKey: 'minThick' },
+  ],
+  reverseBeam: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+  ],
+  dualBeam: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+  ],
+  sBeam: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+  ],
+  squareColumn: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'widthMm', label: 'Width', fieldKey: 'width' },
+  ],
+  roundSolidColumn: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'diameterMm', label: 'Diameter', fieldKey: 'diameter' },
+  ],
+  roundHollowColumn: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'outerDiameterMm', label: 'Outer Diameter', fieldKey: 'outerDiameter' },
+  ],
+  squareShear: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+  ],
+  roundShear: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+  ],
+  roundSBeamShear: [
+    { key: 'loadN', label: 'Applied Load', fieldKey: 'load' },
+    { key: 'thicknessMm', label: 'Thickness', fieldKey: 'thickness' },
+  ],
+  squareTorque: [
+    { key: 'appliedTorqueNmm', label: 'Applied Torque', fieldKey: 'appliedTorque' },
+    { key: 'widthMm', label: 'Width', fieldKey: 'width' },
+  ],
+  roundSolidTorque: [
+    { key: 'appliedTorqueNm', label: 'Applied Torque', fieldKey: 'appliedTorque' },
+    { key: 'diameterMm', label: 'Diameter', fieldKey: 'diameter' },
+  ],
+  roundHollowTorque: [
+    { key: 'appliedTorqueNm', label: 'Applied Torque', fieldKey: 'appliedTorque' },
+    { key: 'outerDiameterMm', label: 'Outer Diameter', fieldKey: 'outerDiameter' },
+  ],
+  pressure: [
+    { key: 'appliedPressureMPa', label: 'Applied Pressure', fieldKey: 'pressure' },
+    { key: 'thicknessMm', label: 'Diaphragm Thickness', fieldKey: 'thickness' },
+  ],
+}
+
+// ── Design field definitions ─────────────────────────────────────────────────
+
+const DESIGN_FIELDS: Record<string, FieldDef[]> = {
+  cantilever: [
+    { key: 'load',      label: 'Applied Load',  unit: 'force',   si: 100 },
+    { key: 'momentArm', label: 'Moment Arm',     unit: 'length',  si: 100 },
+    { key: 'gageOffset',label: 'Gage CL from Fixed End', unit: 'length', si: 6 },
+    { key: 'thickness', label: 'Thickness',      unit: 'length',  si: 2 },
+    { key: 'width',     label: 'Beam Width',     unit: 'length',  si: 25 },
+    { key: 'clampLength', label: 'Clamp Length', unit: 'length', si: 20 },
+    { key: 'mountHoleOffset', label: 'Mount Hole Offset', unit: 'length', si: 12 },
+    { key: 'mountHoleDia', label: 'Mount Hole Diameter', unit: 'length', si: 5 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'gageLen',   label: 'Gage Length',    unit: 'length',  si: 5 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.0 },
+  ],
+  reverseBeam: [
+    { key: 'load',      label: 'Applied Load',      unit: 'force',   si: 100 },
+    { key: 'width',     label: 'Beam Width',         unit: 'length',  si: 25 },
+    { key: 'thickness', label: 'Thickness',          unit: 'length',  si: 2 },
+    { key: 'distGages', label: 'Dist. Between Gages',unit: 'length',  si: 50 },
+    { key: 'modulus',   label: 'Modulus',            unit: 'modulus', si: 200 },
+    { key: 'gageLen',   label: 'Gage Length',        unit: 'length',  si: 5 },
+    { key: 'gageFactor',label: 'Gage Factor',        unit: 'none',    si: 2.0 },
+  ],
+  dualBeam: [
+    { key: 'load',       label: 'Applied Load',       unit: 'force',   si: 100 },
+    { key: 'width',      label: 'Beam Width',         unit: 'length',  si: 25 },
+    { key: 'thickness',  label: 'Thickness',          unit: 'length',  si: 2 },
+    { key: 'distGages',  label: 'Dist. Between Gages',unit: 'length',  si: 40 },
+    { key: 'distLoadCl', label: 'Load to CL Distance',unit: 'length',  si: 60 },
+    { key: 'modulus',    label: 'Modulus',            unit: 'modulus', si: 200 },
+    { key: 'gageLen',    label: 'Gage Length',        unit: 'length',  si: 5 },
+    { key: 'gageFactor', label: 'Gage Factor',        unit: 'none',    si: 2.0 },
+  ],
+  sBeam: [
+    { key: 'load',       label: 'Applied Load',       unit: 'force',   si: 1000 },
+    { key: 'holeRadius', label: 'Hole Radius',        unit: 'length',  si: 8 },
+    { key: 'width',      label: 'Beam Width',         unit: 'length',  si: 40 },
+    { key: 'thickness',  label: 'Thickness',          unit: 'length',  si: 10 },
+    { key: 'distGages',  label: 'Dist. Between Gages',unit: 'length',  si: 50 },
+    { key: 'modulus',    label: 'Modulus',            unit: 'modulus', si: 200 },
+    { key: 'gageLen',    label: 'Gage Length',        unit: 'length',  si: 10 },
+    { key: 'gageFactor', label: 'Gage Factor',        unit: 'none',    si: 2.1 },
+  ],
+  squareColumn: [
+    { key: 'load',      label: 'Applied Load',  unit: 'force',   si: 5000 },
+    { key: 'width',     label: 'Width',          unit: 'length',  si: 25 },
+    { key: 'depth',     label: 'Depth',          unit: 'length',  si: 25 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
+  ],
+  roundSolidColumn: [
+    { key: 'load',      label: 'Applied Load',   unit: 'force',   si: 5000 },
+    { key: 'diameter',  label: 'Diameter',       unit: 'length',  si: 25 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
+  ],
+  roundHollowColumn: [
+    { key: 'load',         label: 'Applied Load',    unit: 'force',   si: 5000 },
+    { key: 'outerDiameter',label: 'Outer Diameter',  unit: 'length',  si: 30 },
+    { key: 'innerDiameter',label: 'Inner Diameter',  unit: 'length',  si: 20 },
+    { key: 'modulus',      label: 'Modulus',         unit: 'modulus', si: 200 },
+    { key: 'poisson',      label: 'Poisson Ratio',   unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',   label: 'Gage Factor',     unit: 'none',    si: 2.1 },
+  ],
+  binoBeam: [
+    { key: 'load',        label: 'Applied Load',      unit: 'force',   si: 100 },
+    { key: 'distHoles',   label: 'Hole CL Distance',  unit: 'length',  si: 100 },
+    { key: 'radius',      label: 'Hole Radius',       unit: 'length',  si: 5 },
+    { key: 'beamWidth',   label: 'Beam Width',        unit: 'length',  si: 25 },
+    { key: 'beamHeight',  label: 'Beam Height',       unit: 'length',  si: 14 },
+    { key: 'minThick',    label: 'Min. Thickness',    unit: 'length',  si: 2 },
+    { key: 'modulus',     label: 'Modulus',           unit: 'modulus', si: 200 },
+    { key: 'gageLen',     label: 'Gage Length',       unit: 'length',  si: 5 },
+    { key: 'gageFactor',  label: 'Gage Factor',       unit: 'none',    si: 2.0 },
+  ],
+  squareShear: [
+    { key: 'load',      label: 'Applied Load',   unit: 'force',   si: 5000 },
+    { key: 'width',     label: 'Width',          unit: 'length',  si: 30 },
+    { key: 'height',    label: 'Height',         unit: 'length',  si: 50 },
+    { key: 'diameter',  label: 'Hole Diameter',  unit: 'length',  si: 30 },
+    { key: 'thickness', label: 'Web Thickness',  unit: 'length',  si: 5 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
+  ],
+  roundShear: [
+    { key: 'load',      label: 'Applied Load',   unit: 'force',   si: 5000 },
+    { key: 'width',     label: 'Width',          unit: 'length',  si: 30 },
+    { key: 'height',    label: 'Height',         unit: 'length',  si: 50 },
+    { key: 'diameter',  label: 'Hole Diameter',  unit: 'length',  si: 30 },
+    { key: 'thickness', label: 'Web Thickness',  unit: 'length',  si: 5 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
+  ],
+  roundSBeamShear: [
+    { key: 'load',      label: 'Applied Load',   unit: 'force',   si: 5000 },
+    { key: 'width',     label: 'Width',          unit: 'length',  si: 30 },
+    { key: 'height',    label: 'Height',         unit: 'length',  si: 50 },
+    { key: 'diameter',  label: 'Hole Diameter',  unit: 'length',  si: 30 },
+    { key: 'thickness', label: 'Web Thickness',  unit: 'length',  si: 5 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
+  ],
+  squareTorque: [
+    { key: 'appliedTorque', label: 'Applied Torque (N·mm)', unit: 'none',    si: 5000 },
+    { key: 'width',         label: 'Width',                 unit: 'length',  si: 25 },
+    { key: 'poisson',       label: 'Poisson Ratio',         unit: 'none',    si: 0.3 },
+    { key: 'modulus',       label: 'Modulus (GPa)',         unit: 'none',    si: 50000 },
+    { key: 'gageLen',       label: 'Gage Length',           unit: 'length',  si: 12 },
+    { key: 'gageFactor',    label: 'Gage Factor',           unit: 'none',    si: 2.1 },
+  ],
+  roundSolidTorque: [
+    { key: 'appliedTorque', label: 'Applied Torque (N·m)', unit: 'none',    si: 50 },
+    { key: 'diameter',      label: 'Diameter',             unit: 'length',  si: 25 },
+    { key: 'modulus',       label: 'Modulus',              unit: 'modulus', si: 200 },
+    { key: 'poisson',       label: 'Poisson Ratio',        unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',    label: 'Gage Factor',          unit: 'none',    si: 2.1 },
+  ],
+  roundHollowTorque: [
+    { key: 'appliedTorque', label: 'Applied Torque (N·m)', unit: 'none',    si: 50 },
+    { key: 'outerDiameter', label: 'Outer Diameter',       unit: 'length',  si: 30 },
+    { key: 'innerDiameter', label: 'Inner Diameter',       unit: 'length',  si: 20 },
+    { key: 'modulus',       label: 'Modulus',              unit: 'modulus', si: 200 },
+    { key: 'poisson',       label: 'Poisson Ratio',        unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',    label: 'Gage Factor',          unit: 'none',    si: 2.1 },
+  ],
+  pressure: [
+    { key: 'pressure',   label: 'Applied Pressure',      unit: 'pressure', si: 1 },
+    { key: 'thickness',  label: 'Diaphragm Thickness',   unit: 'length',   si: 2 },
+    { key: 'diameter',   label: 'Diaphragm Diameter',    unit: 'length',   si: 50 },
+    { key: 'poisson',    label: 'Poisson Ratio',         unit: 'none',     si: 0.28 },
+    { key: 'modulus',    label: 'Modulus',               unit: 'modulus',  si: 200 },
+    { key: 'gageFactor', label: 'Gage Factor',           unit: 'none',     si: 2.0 },
+  ],
+}
+
+// ── Compensation field definitions ───────────────────────────────────────────
+
+const COMP_FIELDS: Record<CompensationMethod, FieldDef[]> = {
+  zeroVsTemp: [
+    { key: 'lowTemp',          label: 'Low Temperature (°C)',    unit: 'none', si: -40 },
+    { key: 'lowOutput',        label: 'Low Output (mV/V)',       unit: 'none', si: -0.5 },
+    { key: 'highTemp',         label: 'High Temperature (°C)',   unit: 'none', si: 80 },
+    { key: 'highOutput',       label: 'High Output (mV/V)',      unit: 'none', si: 0.5 },
+    { key: 'resistorTcr',      label: 'Resistor TCR (%/°C)',     unit: 'none', si: 0.25 },
+    { key: 'bridgeResistance', label: 'Bridge Resistance (Ω)',   unit: 'none', si: 350 },
+  ],
+  zeroBalance: [
+    { key: 'unbalance',        label: 'Output Imbalance (mV/V)', unit: 'none', si: 5 },
+    { key: 'bridgeResistance', label: 'Bridge Resistance (Ω)',   unit: 'none', si: 350 },
+    { key: 'awgGauge',         label: 'AWG Gauge (30–50)',       unit: 'none', si: 36, min: 30, step: 1 },
+  ],
+  spanTemp2Pt: [
+    { key: 'lowTemp',          label: 'Low Temperature (°C)',    unit: 'none', si: -40 },
+    { key: 'lowOutput',        label: 'Low Output (mV/V)',       unit: 'none', si: 1.98 },
+    { key: 'highTemp',         label: 'High Temperature (°C)',   unit: 'none', si: 80 },
+    { key: 'highOutput',       label: 'High Output (mV/V)',      unit: 'none', si: 2.02 },
+    { key: 'resistorTCR',      label: 'Resistor TCR (%/°C)',     unit: 'none', si: 0.25 },
+    { key: 'bridgeResistance', label: 'Bridge Resistance (Ω)',   unit: 'none', si: 350 },
+  ],
+  spanTemp3Pt: [
+    { key: 'lowTemp',          label: 'Low Temperature (°C)',    unit: 'none', si: -40 },
+    { key: 'lowOutput',        label: 'Low Output (mV/V)',       unit: 'none', si: 1.98 },
+    { key: 'midTemp',          label: 'Mid Temperature (°C)',    unit: 'none', si: 20 },
+    { key: 'midOutput',        label: 'Mid Output (mV/V)',       unit: 'none', si: 2.00 },
+    { key: 'highTemp',         label: 'High Temperature (°C)',   unit: 'none', si: 80 },
+    { key: 'highOutput',       label: 'High Output (mV/V)',      unit: 'none', si: 2.02 },
+    { key: 'resistorTCR',      label: 'Resistor TCR (%/°C)',     unit: 'none', si: 0.25 },
+    { key: 'bridgeResistance', label: 'Bridge Resistance (Ω)',   unit: 'none', si: 350 },
+  ],
+  optShunt: [
+    { key: 'rmBridge',       label: 'Bridge Resistance (Ω)',     unit: 'none', si: 350 },
+    { key: 'rmTempCoeffPpm', label: 'Bridge TCR (ppm/°C)',       unit: 'none', si: 100 },
+    { key: 'tempLowC',       label: 'Low Temperature (°C)',      unit: 'none', si: -40 },
+    { key: 'tempAmbientC',   label: 'Ambient Temperature (°C)',  unit: 'none', si: 20 },
+    { key: 'tempHighC',      label: 'High Temperature (°C)',     unit: 'none', si: 80 },
+  ],
+  spanSet: [
+    { key: 'measuredSpan',    label: 'Measured Span (mV/V)',   unit: 'none', si: 2.0 },
+    { key: 'bridgeResistance',label: 'Bridge Resistance (Ω)',  unit: 'none', si: 350 },
+    { key: 'totalRm',         label: 'Total Series Rm (Ω)',    unit: 'none', si: 0 },
+    { key: 'desiredSpan',     label: 'Desired Span (mV/V)',    unit: 'none', si: 2.0 },
+  ],
+  simultaneous: [
+    { key: 'lowSpan',        label: 'Low Span (mV)',           unit: 'none', si: 1.98 },
+    { key: 'lowRBridge',     label: 'Low Bridge Ω',            unit: 'none', si: 350 },
+    { key: 'lowRMod',        label: 'Low Mod Ω',               unit: 'none', si: 1.0 },
+    { key: 'ambientSpan',    label: 'Ambient Span (mV)',       unit: 'none', si: 2.00 },
+    { key: 'ambientRBridge', label: 'Ambient Bridge Ω',        unit: 'none', si: 350 },
+    { key: 'ambientRMod',    label: 'Ambient Mod Ω',           unit: 'none', si: 1.0 },
+    { key: 'highSpan',       label: 'High Span (mV)',          unit: 'none', si: 2.02 },
+    { key: 'highRBridge',    label: 'High Bridge Ω',           unit: 'none', si: 350 },
+    { key: 'highRMod',       label: 'High Mod Ω',              unit: 'none', si: 1.0 },
+    { key: 'desiredSpan',    label: 'Desired Span (mV)',       unit: 'none', si: 2.0 },
+  ],
+}
+
+// ── Param initializers ───────────────────────────────────────────────────────
+
+function initParams(fields: FieldDef[]): Record<string, number> {
+  return Object.fromEntries(fields.map(f => [f.key, f.si]))
+}
+
+// ── Build orchestrator inputs ─────────────────────────────────────────────────
+
+function buildDesignInput(type: TransducerType, p: Record<string, number>): DesignInput {
+  switch (type) {
+    case 'cantilever':
+      return {
+        type: 'cantilever',
+        params: {
+          loadN: p.load,
+          momentArmMm: p.momentArm,
+          gageLengthMm: p.gageLen,
+          youngsModulusPa: p.modulus * 1e9,
+          beamWidthMm: p.width,
+          thicknessMm: p.thickness,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'reverseBeam':
+      return {
+        type: 'reverseBeam',
+        params: {
+          appliedLoad: p.load,
+          beamWidth: p.width * 0.001,
+          thickness: p.thickness * 0.001,
+          distanceBetweenGages: p.distGages * 0.001,
+          modulus: p.modulus * 1e9,
+          gageLength: p.gageLen * 0.001,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'dualBeam':
+      return {
+        type: 'dualBeam',
+        params: {
+          appliedLoad: p.load,
+          beamWidth: p.width * 0.001,
+          thickness: p.thickness * 0.001,
+          distanceBetweenGages: p.distGages * 0.001,
+          distanceLoadToCL: p.distLoadCl * 0.001,
+          modulus: p.modulus * 1e9,
+          gageLength: p.gageLen * 0.001,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'sBeam':
+      return {
+        type: 'sBeam',
+        params: {
+          appliedLoad: p.load,
+          holeRadius: p.holeRadius * 0.001,
+          beamWidth: p.width * 0.001,
+          thickness: p.thickness * 0.001,
+          distanceBetweenGages: p.distGages * 0.001,
+          modulus: p.modulus * 1e9,
+          gageLength: p.gageLen * 0.001,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'squareColumn':
+      return {
+        type: 'squareColumn',
+        params: {
+          appliedLoad: p.load,
+          width: p.width,
+          depth: p.depth,
+          modulus: p.modulus,
+          poissonRatio: p.poisson,
+          gageFactor: p.gageFactor,
+          usUnits: false,
+        },
+      }
+    case 'roundSolidColumn':
+      return {
+        type: 'roundSolidColumn',
+        params: {
+          appliedLoad: p.load,
+          diameter: p.diameter,
+          modulus: p.modulus,
+          poissonRatio: p.poisson,
+          gageFactor: p.gageFactor,
+          usUnits: false,
+        },
+      }
+    case 'roundHollowColumn':
+      return {
+        type: 'roundHollowColumn',
+        params: {
+          appliedLoad: p.load,
+          outerDiameter: p.outerDiameter,
+          innerDiameter: p.innerDiameter,
+          modulus: p.modulus,
+          poissonRatio: p.poisson,
+          gageFactor: p.gageFactor,
+          usUnits: false,
+        },
+      }
+    case 'binoBeam':
+      return {
+        type: 'binoBeam',
+        params: {
+          appliedLoad: p.load,
+          distanceBetweenHoles: p.distHoles * 0.001,
+          radius: p.radius * 0.001,
+          beamWidth: p.beamWidth * 0.001,
+          beamHeight: p.beamHeight * 0.001,
+          distanceLoadHole: 0,
+          minimumThickness: p.minThick * 0.001,
+          modulus: p.modulus * 1e9,
+          gageLength: p.gageLen * 0.001,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'squareShear':
+      return {
+        type: 'squareShear',
+        params: {
+          load: p.load,
+          width: p.width * 0.001,
+          height: p.height * 0.001,
+          diameter: p.diameter * 0.001,
+          thickness: p.thickness * 0.001,
+          modulus: p.modulus * 1e9,
+          poisson: p.poisson,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'roundShear':
+      return {
+        type: 'roundShear',
+        params: {
+          load: p.load,
+          width: p.width * 0.001,
+          height: p.height * 0.001,
+          diameter: p.diameter * 0.001,
+          thickness: p.thickness * 0.001,
+          modulus: p.modulus * 1e9,
+          poisson: p.poisson,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'roundSBeamShear':
+      return {
+        type: 'roundSBeamShear',
+        params: {
+          load: p.load,
+          width: p.width * 0.001,
+          height: p.height * 0.001,
+          diameter: p.diameter * 0.001,
+          thickness: p.thickness * 0.001,
+          modulus: p.modulus * 1e9,
+          poisson: p.poisson,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'squareTorque':
+      return {
+        type: 'squareTorque',
+        params: {
+          appliedTorque: p.appliedTorque,
+          width: p.width,
+          poisson: p.poisson,
+          modulus: p.modulus,
+          gageLength: p.gageLen,
+          gageFactor: p.gageFactor,
+          usUnits: false,
+        },
+      }
+    case 'roundSolidTorque':
+      return {
+        type: 'roundSolidTorque',
+        params: {
+          appliedTorque: p.appliedTorque,
+          diameter: p.diameter * 0.001,
+          modulus: p.modulus * 1e9,
+          poissonRatio: p.poisson,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'roundHollowTorque':
+      return {
+        type: 'roundHollowTorque',
+        params: {
+          appliedTorque: p.appliedTorque,
+          outerDiameter: p.outerDiameter * 0.001,
+          innerDiameter: p.innerDiameter * 0.001,
+          modulus: p.modulus * 1e9,
+          poissonRatio: p.poisson,
+          gageFactor: p.gageFactor,
+        },
+      }
+    case 'pressure':
+      return {
+        type: 'pressure',
+        params: {
+          appliedPressure: p.pressure,
+          thickness: p.thickness,
+          diameter: p.diameter,
+          poisson: p.poisson,
+          modulus: p.modulus * 1000,
+          gageFactor: p.gageFactor,
+        },
+      }
+    default:
+      throw new Error(`Unsupported design type in wizard: ${type}`)
+  }
+}
+
+function buildCompInput(
+  method: CompensationMethod,
+  p: Record<string, number>,
+  wireIdx: number,
+): CompensationInput {
+  switch (method) {
+    case 'zeroVsTemp':
+      return {
+        method: 'zeroVsTemp',
+        params: {
+          lowTemp: p.lowTemp,
+          lowOutput: p.lowOutput,
+          highTemp: p.highTemp,
+          highOutput: p.highOutput,
+          resistorTcr: p.resistorTcr,
+          bridgeResistance: p.bridgeResistance,
+          units: 'SI',
+        },
+      }
+    case 'zeroBalance':
+      return {
+        method: 'zeroBalance',
+        params: {
+          unbalance: p.unbalance,
+          bridgeResistance: p.bridgeResistance,
+          wireType: commonWireTypes[wireIdx] ?? commonWireTypes[0],
+          awgGauge: Math.round(p.awgGauge),
+        },
+      }
+    case 'spanTemp2Pt':
+      return {
+        method: 'spanTemp2Pt',
+        params: {
+          lowTemperature: p.lowTemp,
+          lowOutput: p.lowOutput,
+          highTemperature: p.highTemp,
+          highOutput: p.highOutput,
+          wireType: spanWireTypes[wireIdx] ?? spanWireTypes[0],
+          resistorTCR: p.resistorTCR,
+          bridgeResistance: p.bridgeResistance,
+          usUnits: false,
+        },
+      }
+    case 'spanTemp3Pt':
+      return {
+        method: 'spanTemp3Pt',
+        params: {
+          lowPoint:  { temperature: p.lowTemp,  output: p.lowOutput },
+          midPoint:  { temperature: p.midTemp,  output: p.midOutput },
+          highPoint: { temperature: p.highTemp, output: p.highOutput },
+          resistorTCR: p.resistorTCR,
+          bridgeResistance: p.bridgeResistance,
+          usUnits: false,
+        },
+      }
+    case 'optShunt':
+      return {
+        method: 'optShunt',
+        params: {
+          rmBridge: p.rmBridge,
+          rmTempCoeffPpm: p.rmTempCoeffPpm,
+          tempLowC: p.tempLowC,
+          tempAmbientC: p.tempAmbientC,
+          tempHighC: p.tempHighC,
+        },
+      }
+    case 'spanSet':
+      return {
+        method: 'spanSet',
+        params: {
+          measuredSpan: p.measuredSpan,
+          bridgeResistance: p.bridgeResistance,
+          totalRm: p.totalRm,
+          desiredSpan: p.desiredSpan,
+        },
+      }
+    case 'simultaneous':
+      return {
+        method: 'simultaneous',
+        params: {
+          lowSpan: p.lowSpan,
+          lowRBridge: p.lowRBridge,
+          lowRMod: p.lowRMod,
+          ambientSpan: p.ambientSpan,
+          ambientRBridge: p.ambientRBridge,
+          ambientRMod: p.ambientRMod,
+          highSpan: p.highSpan,
+          highRBridge: p.highRBridge,
+          highRMod: p.highRMod,
+          desiredSpan: p.desiredSpan,
+        },
+      }
+  }
+}
+
+// ── Design type metadata ─────────────────────────────────────────────────────
+
+const DESIGN_TYPES: Array<{ key: TransducerType; label: string }> = [
+  { key: 'cantilever',   label: 'Cantilever' },
+  { key: 'reverseBeam',  label: 'Reverse Beam' },
+  { key: 'dualBeam',     label: 'Dual Beam' },
+  { key: 'sBeam',        label: 'S-Beam' },
+  { key: 'squareColumn', label: 'Square Column' },
+  { key: 'roundSolidColumn',  label: 'Round Solid Column' },
+  { key: 'roundHollowColumn', label: 'Round Hollow Column' },
+  { key: 'binoBeam',     label: 'Binocular Beam' },
+  { key: 'squareShear',      label: 'Shear Square Web' },
+  { key: 'roundShear',       label: 'Shear Round Web' },
+  { key: 'roundSBeamShear',  label: 'Shear Round S-Beam' },
+  { key: 'squareTorque',     label: 'Square Torque' },
+  { key: 'roundSolidTorque', label: 'Round Solid Torque' },
+  { key: 'roundHollowTorque',label: 'Round Hollow Torque' },
+  { key: 'pressure',     label: 'Pressure Diaphragm' },
+]
+
+const COMP_METHODS: Array<{ key: CompensationMethod; label: string }> = [
+  { key: 'zeroVsTemp',  label: 'Zero vs Temp' },
+  { key: 'zeroBalance', label: 'Zero Balance' },
+  { key: 'spanTemp2Pt', label: 'Span Temp 2-Pt' },
+  { key: 'spanTemp3Pt', label: 'Span Temp 3-Pt' },
+  { key: 'optShunt',    label: 'Optimal Shunt' },
+  { key: 'spanSet',     label: 'Span Set' },
+  { key: 'simultaneous',label: 'Simultaneous' },
+]
+
+const TRIM_FAMILIES: Array<{ key: TrimFamily; label: string; unitListKey: keyof typeof LADDER_UNIT_KEYS }> = [
+  { key: 'C01',      label: 'C01',      unitListKey: 'c01' },
+  { key: 'C11',      label: 'C11',      unitListKey: 'c11' },
+  { key: 'C12',      label: 'C12',      unitListKey: 'c12' },
+  { key: 'D01',      label: 'D01',      unitListKey: 'd01' },
+  { key: 'E01_side', label: 'E01 Side', unitListKey: 'e01' },
+]
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+type Props = {
+  unitSystem: UnitSystem
+  onUnitChange: (u: UnitSystem) => void
+}
+
+export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
+  const us = unitSystem === 'US'
+
+  // ── Step ──────────────────────────────────────────────────────
+  const [step, setStep] = useState<Step>(1)
+
+  // ── Step 1: Design ────────────────────────────────────────────
+  const [designType, setDesignType] = useState<TransducerType>('cantilever')
+  const [dp, setDp] = useState<Record<string, number>>(initParams(DESIGN_FIELDS.cantilever))
+  const [designMode, setDesignMode] = useState<DesignMode>('forward')
+  const [targetSpanMvV, setTargetSpanMvV] = useState(2.0)
+  const [inverseUnknownByType, setInverseUnknownByType] = useState<Partial<Record<TransducerType, string>>>({
+    cantilever: INVERSE_META.cantilever?.[0]?.key,
+    reverseBeam: INVERSE_META.reverseBeam?.[0]?.key,
+    dualBeam: INVERSE_META.dualBeam?.[0]?.key,
+    sBeam: INVERSE_META.sBeam?.[0]?.key,
+    squareColumn: INVERSE_META.squareColumn?.[0]?.key,
+    roundSolidColumn: INVERSE_META.roundSolidColumn?.[0]?.key,
+    roundHollowColumn: INVERSE_META.roundHollowColumn?.[0]?.key,
+    binoBeam: INVERSE_META.binoBeam?.[0]?.key,
+    squareShear: INVERSE_META.squareShear?.[0]?.key,
+    roundShear: INVERSE_META.roundShear?.[0]?.key,
+    roundSBeamShear: INVERSE_META.roundSBeamShear?.[0]?.key,
+    squareTorque: INVERSE_META.squareTorque?.[0]?.key,
+    roundSolidTorque: INVERSE_META.roundSolidTorque?.[0]?.key,
+    roundHollowTorque: INVERSE_META.roundHollowTorque?.[0]?.key,
+    pressure: INVERSE_META.pressure?.[0]?.key,
+  })
+
+  // ── Step 2: Compensation ──────────────────────────────────────
+  const [compMethod, setCompMethod] = useState<CompensationMethod>('spanSet')
+  const [cp, setCp] = useState<Record<string, number>>(initParams(COMP_FIELDS.spanSet))
+  const [wireIdx, setWireIdx] = useState(0)
+
+  // ── Step 3: Trim ─────────────────────────────────────────────
+  const [trimFamily, setTrimFamily] = useState<TrimFamily>('C01')
+  const [trimUnit, setTrimUnit] = useState<string>(LADDER_UNIT_KEYS.c01[0])
+  const [trimStart, setTrimStart] = useState(350)
+  const [trimTarget, setTrimTarget] = useState(100)
+
+  // ── Reset design params when type changes ─────────────────────
+  useEffect(() => {
+    const fields = DESIGN_FIELDS[designType]
+    if (fields) setDp(initParams(fields))
+    const supported = Boolean(INVERSE_META[designType]?.length)
+    if (!supported) setDesignMode('forward')
+    setInverseUnknownByType(prev => {
+      if (prev[designType]) return prev
+      const fallback = INVERSE_META[designType]?.[0]?.key
+      if (!fallback) return prev
+      return { ...prev, [designType]: fallback }
+    })
+  }, [designType])
+
+  // ── Reset comp params when method changes ─────────────────────
+  useEffect(() => {
+    setCp(initParams(COMP_FIELDS[compMethod]))
+    setWireIdx(0)
+  }, [compMethod])
+
+  // ── Auto-fill trim unit when family changes ───────────────────
+  useEffect(() => {
+    const meta = TRIM_FAMILIES.find(f => f.key === trimFamily)
+    if (meta) setTrimUnit(LADDER_UNIT_KEYS[meta.unitListKey][0])
+  }, [trimFamily])
+
+  // ── Results ───────────────────────────────────────────────────
+  const selectedInverseMeta = INVERSE_META[designType] ?? []
+  const selectedUnknownKey = inverseUnknownByType[designType] ?? selectedInverseMeta[0]?.key
+
+  const inverseResult = useMemo((): GenericInverseResult | null => {
+    if (designMode !== 'targetDriven' || !selectedUnknownKey || selectedInverseMeta.length === 0) return null
+    const toGeneric = <T extends { isValid: boolean; solvedValue?: number; solvedKey?: string; designResult?: DesignResult; warnings: string[]; error?: string }>(
+      r: T
+    ): GenericInverseResult => ({
+      isValid: r.isValid,
+      solvedValue: r.solvedValue,
+      solvedKey: r.solvedKey,
+      solvedFieldKey: selectedInverseMeta.find(m => m.key === r.solvedKey)?.fieldKey,
+      designResult: r.designResult,
+      warnings: r.warnings,
+      error: r.error,
+    })
+
+    switch (designType) {
+      case 'cantilever':
+        return toGeneric(solveCantileverForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'momentArmMm' | 'beamWidthMm' | 'thicknessMm' | 'gageFactor' | 'youngsModulusGPa',
+          loadN: dp.load,
+          momentArmMm: dp.momentArm,
+          beamWidthMm: dp.width,
+          thicknessMm: dp.thickness,
+          youngsModulusGPa: dp.modulus,
+          gageLengthMm: dp.gageLen,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'binoBeam':
+        return toGeneric(solveBinoBeamForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'minimumThicknessMm',
+          loadN: dp.load,
+          distanceBetweenHolesMm: dp.distHoles,
+          radiusMm: dp.radius,
+          beamWidthMm: dp.beamWidth,
+          beamHeightMm: dp.beamHeight,
+          minimumThicknessMm: dp.minThick,
+          youngsModulusGPa: dp.modulus,
+          gageLengthMm: dp.gageLen,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'reverseBeam':
+        return toGeneric(solveReverseBeamForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'thicknessMm',
+          loadN: dp.load,
+          beamWidthMm: dp.width,
+          thicknessMm: dp.thickness,
+          distanceBetweenGagesMm: dp.distGages,
+          modulusGPa: dp.modulus,
+          gageLengthMm: dp.gageLen,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'dualBeam':
+        return toGeneric(solveDualBeamForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'thicknessMm',
+          loadN: dp.load,
+          beamWidthMm: dp.width,
+          thicknessMm: dp.thickness,
+          distanceBetweenGagesMm: dp.distGages,
+          distanceLoadToClMm: dp.distLoadCl,
+          modulusGPa: dp.modulus,
+          gageLengthMm: dp.gageLen,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'sBeam':
+        return toGeneric(solveSBeamForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'thicknessMm',
+          loadN: dp.load,
+          holeRadiusMm: dp.holeRadius,
+          beamWidthMm: dp.width,
+          thicknessMm: dp.thickness,
+          distanceBetweenGagesMm: dp.distGages,
+          modulusGPa: dp.modulus,
+          gageLengthMm: dp.gageLen,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'squareColumn':
+        return toGeneric(solveSquareColumnForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'widthMm',
+          loadN: dp.load,
+          widthMm: dp.width,
+          depthMm: dp.depth,
+          modulusGPa: dp.modulus,
+          poissonRatio: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'roundSolidColumn':
+        return toGeneric(solveRoundSolidColumnForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'diameterMm',
+          loadN: dp.load,
+          diameterMm: dp.diameter,
+          modulusGPa: dp.modulus,
+          poissonRatio: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'roundHollowColumn':
+        return toGeneric(solveRoundHollowColumnForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'outerDiameterMm',
+          loadN: dp.load,
+          outerDiameterMm: dp.outerDiameter,
+          innerDiameterMm: dp.innerDiameter,
+          modulusGPa: dp.modulus,
+          poissonRatio: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'squareShear':
+        return toGeneric(solveSquareShearForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'thicknessMm',
+          loadN: dp.load,
+          widthMm: dp.width,
+          heightMm: dp.height,
+          diameterMm: dp.diameter,
+          thicknessMm: dp.thickness,
+          modulusGPa: dp.modulus,
+          poisson: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'roundShear':
+        return toGeneric(solveRoundShearForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'thicknessMm',
+          loadN: dp.load,
+          widthMm: dp.width,
+          heightMm: dp.height,
+          diameterMm: dp.diameter,
+          thicknessMm: dp.thickness,
+          modulusGPa: dp.modulus,
+          poisson: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'roundSBeamShear':
+        return toGeneric(solveRoundSBeamShearForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'loadN' | 'thicknessMm',
+          loadN: dp.load,
+          widthMm: dp.width,
+          heightMm: dp.height,
+          diameterMm: dp.diameter,
+          thicknessMm: dp.thickness,
+          modulusGPa: dp.modulus,
+          poisson: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'squareTorque':
+        return toGeneric(solveSquareTorqueForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'appliedTorqueNmm' | 'widthMm',
+          appliedTorqueNmm: dp.appliedTorque,
+          widthMm: dp.width,
+          poisson: dp.poisson,
+          modulusGPa: dp.modulus,
+          gageLengthMm: dp.gageLen,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'roundSolidTorque':
+        return toGeneric(solveRoundSolidTorqueForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'appliedTorqueNm' | 'diameterMm',
+          appliedTorqueNm: dp.appliedTorque,
+          diameterMm: dp.diameter,
+          modulusGPa: dp.modulus,
+          poissonRatio: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'roundHollowTorque':
+        return toGeneric(solveRoundHollowTorqueForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'appliedTorqueNm' | 'outerDiameterMm',
+          appliedTorqueNm: dp.appliedTorque,
+          outerDiameterMm: dp.outerDiameter,
+          innerDiameterMm: dp.innerDiameter,
+          modulusGPa: dp.modulus,
+          poissonRatio: dp.poisson,
+          gageFactor: dp.gageFactor,
+        }))
+      case 'pressure':
+        return toGeneric(solvePressureForTargetSpan({
+          targetMvV: targetSpanMvV,
+          unknown: selectedUnknownKey as 'appliedPressureMPa' | 'thicknessMm',
+          appliedPressureMPa: dp.pressure,
+          thicknessMm: dp.thickness,
+          diameterMm: dp.diameter,
+          poisson: dp.poisson,
+          modulusGPa: dp.modulus,
+          gageFactor: dp.gageFactor,
+        }))
+      default:
+        return null
+    }
+  }, [designMode, designType, selectedUnknownKey, selectedInverseMeta, targetSpanMvV, dp])
+
+  const designResult = useMemo((): DesignResult | null => {
+    if (designMode === 'targetDriven' && selectedInverseMeta.length > 0) {
+      if (!inverseResult) return null
+      if (inverseResult.isValid) return inverseResult.designResult ?? null
+      return {
+        type: designType,
+        fullSpanSensitivity: 0,
+        avgStrain: 0,
+        isValid: false,
+        error: inverseResult.error ?? 'Unable to solve target-driven design.',
+      }
+    }
+    const fields = DESIGN_FIELDS[designType]
+    if (!fields) return null
+    const allValid = fields.every(f => Number.isFinite(dp[f.key]))
+    if (!allValid) return null
+    try {
+      return runDesign(buildDesignInput(designType, dp))
+    } catch {
+      return null
+    }
+  }, [designType, designMode, dp, inverseResult, selectedInverseMeta])
+
+  const compResult = useMemo((): CompensationResult | null => {
+    const fields = COMP_FIELDS[compMethod]
+    if (!fields) return null
+    const allValid = fields.every(f => Number.isFinite(cp[f.key]))
+    if (!allValid) return null
+    try {
+      return runCompensation(buildCompInput(compMethod, cp, wireIdx))
+    } catch {
+      return null
+    }
+  }, [compMethod, cp, wireIdx])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const trimResult = useMemo((): ReturnType<typeof realizeTrim> | null => {
+    if (!Number.isFinite(trimStart) || !Number.isFinite(trimTarget)) return null
+    try {
+      const params: TrimParams = { family: trimFamily, unit: trimUnit as never, startResistance: trimStart, targetResistance: trimTarget }
+      return realizeTrim(params)
+    } catch {
+      return null
+    }
+  }, [trimFamily, trimUnit, trimStart, trimTarget])
+
+  // ── Field setter helpers ──────────────────────────────────────
+  const setDesignField = (key: string, displayVal: number, unit: UnitKind) => {
+    setDp(prev => ({ ...prev, [key]: toSI(displayVal, unit, us) }))
+  }
+  const setCompField = (key: string, val: number) => {
+    setCp(prev => ({ ...prev, [key]: val }))
+  }
+
+  // ── Auto-fill measuredSpan on entering step 2 ─────────────────
+  const handleGoToStep2 = () => {
+    if (designResult?.isValid && Number.isFinite(designResult.fullSpanSensitivity)) {
+      if (compMethod === 'spanSet') {
+        setCp(prev => ({
+          ...prev,
+          measuredSpan: designResult.fullSpanSensitivity,
+          desiredSpan: selectedInverseMeta.length > 0 && designMode === 'targetDriven'
+            ? targetSpanMvV
+            : prev.desiredSpan,
+        }))
+      }
+    }
+    setStep(2)
+  }
+
+  // ── Auto-fill targetResistance on entering step 3 ────────────
+  const handleGoToStep3 = () => {
+    if (compResult?.isValid && Number.isFinite(compResult.primaryResistance)) {
+      setTrimTarget(Math.abs(compResult.primaryResistance))
+    }
+    setStep(3)
+  }
+
+  // ── Field renderer ────────────────────────────────────────────
+  const renderField = (
+    f: FieldDef,
+    value: number,
+    onChange: (key: string, val: number, unit: UnitKind) => void,
+  ) => {
+    const displayVal = toDisplay(value, f.unit, us)
+    const suffix = unitLabel(f.unit, us)
+    return (
+      <label key={f.key}>
+        {f.label}{suffix ? ` (${suffix})` : ''}
+        <input
+          type="number"
+          value={Number.isFinite(displayVal) ? displayVal : ''}
+          step={f.step ?? 0.01}
+          min={f.min}
+          onChange={e => onChange(f.key, Number(e.target.value), f.unit)}
+        />
+      </label>
+    )
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+
+  return (
+    <div className="wizard-wrap">
+      {/* Step indicator */}
+      <div className="wizard-steps">
+        {([1, 2, 3] as Step[]).map(s => (
+          <button
+            key={s}
+            className={`wizard-step${step === s ? ' active' : step > s ? ' done' : ''}`}
+            onClick={() => {
+              if (s === 1) setStep(1)
+              if (s === 2 && step >= 2) setStep(2)
+              if (s === 3 && step >= 3) setStep(3)
+            }}
+            disabled={s > step}
+          >
+            {s === 1 ? '① Frame 1: Design' : s === 2 ? '② Frame 2: Compensation' : '③ Frame 3: Trim'}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Step 1: Design ────────────────────────────────────── */}
+      {step === 1 && (
+        <div className="wizard-section">
+          <div className="wizard-section-header">
+            <h3>Step 1 — Transducer Design</h3>
+            <div className="analysis-toggle">
+              <button className={!us ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
+              <button className={us  ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
+            </div>
+          </div>
+
+          {/* Type picker */}
+          <div className="wizard-type-grid">
+            {DESIGN_TYPES.map(t => (
+              <button
+                key={t.key}
+                className={`tool-card${designType === t.key ? ' active' : ''}`}
+                onClick={() => setDesignType(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="design-frame-grid">
+            <div className="design-frame-main">
+          {selectedInverseMeta.length > 0 && (
+            <div className="wizard-wire-row">
+              <label>
+                Design Mode
+                <select
+                  value={designMode}
+                  onChange={e => setDesignMode(e.target.value as DesignMode)}
+                >
+                  <option value="forward">Forward (known geometry/load)</option>
+                  <option value="targetDriven">Target-driven (solve one unknown)</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && (
+            <div className="bino-grid">
+              <label>
+                Target Span (mV/V)
+                <input
+                  type="number"
+                  value={Number.isFinite(targetSpanMvV) ? targetSpanMvV : ''}
+                  step={0.01}
+                  min={0}
+                  onChange={e => setTargetSpanMvV(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Solve For
+                <select
+                  value={selectedUnknownKey ?? ''}
+                  onChange={e =>
+                    setInverseUnknownByType(prev => ({ ...prev, [designType]: e.target.value }))
+                  }
+                >
+                  {selectedInverseMeta.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {/* Input form */}
+          <div className="bino-grid">
+            {(DESIGN_FIELDS[designType] ?? []).map(f => {
+              const solvedFieldKey = inverseResult?.solvedFieldKey
+              const isSolvedField =
+                selectedInverseMeta.length > 0 &&
+                designMode === 'targetDriven' &&
+                solvedFieldKey === f.key
+
+              const sourceValue = isSolvedField && Number.isFinite(inverseResult?.solvedValue)
+                ? inverseResult?.solvedValue ?? (dp[f.key] ?? f.si)
+                : (dp[f.key] ?? f.si)
+              const displayVal = toDisplay(sourceValue, f.unit, us)
+              const suffix = unitLabel(f.unit, us)
+
+              return (
+                <label key={f.key}>
+                  {f.label}{suffix ? ` (${suffix})` : ''}{isSolvedField ? ' (Solved)' : ''}
+                  <input
+                    type="number"
+                    value={Number.isFinite(displayVal) ? displayVal : ''}
+                    step={f.step ?? 0.01}
+                    min={f.min}
+                    disabled={isSolvedField}
+                    onChange={e => setDesignField(f.key, Number(e.target.value), f.unit)}
+                  />
+                </label>
+              )
+            })}
+          </div>
+
+          {/* Results */}
+          {designResult && (
+            <table className="bino-table">
+              <tbody>
+                <tr><th colSpan={3}>Design Results</th></tr>
+                {designResult.isValid ? (
+                  <>
+                    <tr>
+                      <td>Nominal Gage Strain</td>
+                      <td>{show(designResult.avgStrain, 1)}</td>
+                      <td>µε</td>
+                    </tr>
+                    {designResult.minStrain !== undefined && (
+                      <tr>
+                        <td>Min / Max Strain</td>
+                        <td>{show(designResult.minStrain, 1)} / {show(designResult.maxStrain ?? 0, 1)}</td>
+                        <td>µε</td>
+                      </tr>
+                    )}
+                    {designResult.gradient !== undefined && (
+                      <tr>
+                        <td>Strain Variation</td>
+                        <td>{show(designResult.gradient, 2)}</td>
+                        <td>%</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td>Span at Applied Load</td>
+                      <td>{show(designResult.fullSpanSensitivity, 4)}</td>
+                      <td>mV/V</td>
+                    </tr>
+                    {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && inverseResult?.isValid && (
+                      <>
+                        <tr>
+                          <td>Target Span</td>
+                          <td>{show(targetSpanMvV, 4)}</td>
+                          <td>mV/V</td>
+                        </tr>
+                        <tr>
+                          <td>Solved Parameter</td>
+                          <td colSpan={2}>
+                            {(() => {
+                              const meta = selectedInverseMeta.find(m => m.key === inverseResult.solvedKey)
+                              const field = DESIGN_FIELDS[designType]?.find(f => f.key === meta?.fieldKey)
+                              const displayValue = field
+                                ? toDisplay(inverseResult.solvedValue ?? NaN, field.unit, us)
+                                : (inverseResult.solvedValue ?? NaN)
+                              const suffix = field ? unitLabel(field.unit, us) : ''
+                              return `${meta?.label ?? 'Unknown'}: ${show(displayValue, 4)}${suffix ? ` ${suffix}` : ''}`
+                            })()}
+                          </td>
+                        </tr>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <tr><td colSpan={3} className="comp-error">{designResult.error ?? 'Invalid inputs'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && inverseResult?.warnings.length ? (
+            <p className="workspace-note">{inverseResult.warnings.join(' ')}</p>
+          ) : null}
+            </div>
+
+            <aside className="design-frame-preview">
+              <h4>Interactive Drawing</h4>
+              {designType === 'cantilever'
+                ? <CantileverModelPreview params={dp} />
+                : <TransducerSvgViewer designType={designType} params={dp} />}
+            </aside>
+          </div>
+
+          <div className="wizard-nav">
+            <button
+              className="wizard-next"
+              disabled={!designResult?.isValid}
+              onClick={handleGoToStep2}
+            >
+              Next: Compensation →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: Compensation ──────────────────────────────── */}
+      {step === 2 && (
+        <div className="wizard-section">
+          <div className="wizard-section-header">
+            <h3>Step 2 — Compensation</h3>
+            {designResult?.isValid && (
+              <span className="wizard-carry">
+                Design span: {show(designResult.fullSpanSensitivity, 4)} mV/V
+              </span>
+            )}
+          </div>
+
+          {/* Method picker */}
+          <div className="wizard-type-grid">
+            {COMP_METHODS.map(m => (
+              <button
+                key={m.key}
+                className={`tool-card${compMethod === m.key ? ' active' : ''}`}
+                onClick={() => {
+                  setCompMethod(m.key)
+                  // Re-apply span auto-fill if switching to spanSet
+                  if (m.key === 'spanSet' && designResult?.isValid) {
+                    setCp({
+                      ...initParams(COMP_FIELDS.spanSet),
+                      measuredSpan: designResult.fullSpanSensitivity,
+                      desiredSpan: selectedInverseMeta.length > 0 && designMode === 'targetDriven'
+                        ? targetSpanMvV
+                        : COMP_FIELDS.spanSet.find(f => f.key === 'desiredSpan')?.si ?? 2,
+                    })
+                  }
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Wire type picker (for methods that need it) */}
+          {(compMethod === 'zeroBalance' || compMethod === 'spanTemp2Pt') && (
+            <div className="wizard-wire-row">
+              <label>
+                Wire Type
+                <select value={wireIdx} onChange={e => setWireIdx(Number(e.target.value))}>
+                  {(compMethod === 'zeroBalance' ? commonWireTypes : spanWireTypes).map((w, i) => (
+                    <option key={i} value={i}>{w.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {/* Input form */}
+          <div className="bino-grid">
+            {(COMP_FIELDS[compMethod] ?? []).map(f =>
+              renderField(f, cp[f.key] ?? f.si, (key, val) => setCompField(key, val))
+            )}
+          </div>
+
+          {/* Results */}
+          {compResult && (
+            <table className="bino-table">
+              <tbody>
+                <tr><th colSpan={3}>Compensation Result</th></tr>
+                {compResult.isValid ? (
+                  <>
+                    <tr>
+                      <td>Required Resistance</td>
+                      <td>{show(compResult.primaryResistance, 3)}</td>
+                      <td>Ω</td>
+                    </tr>
+                    {compResult.secondaryResistance !== undefined && (
+                      <tr>
+                        <td>Secondary Resistance</td>
+                        <td>{show(compResult.secondaryResistance, 3)}</td>
+                        <td>Ω</td>
+                      </tr>
+                    )}
+                    {compResult.bridgeArm !== undefined && (
+                      <tr>
+                        <td>Bridge Arm</td>
+                        <td colSpan={2}>{compResult.bridgeArm}</td>
+                      </tr>
+                    )}
+                  </>
+                ) : (
+                  <tr><td colSpan={3} className="comp-error">{compResult.error ?? 'Invalid inputs'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
+
+          <div className="wizard-nav">
+            <button className="wizard-back" onClick={() => setStep(1)}>← Back</button>
+            <button
+              className="wizard-next"
+              disabled={!compResult?.isValid}
+              onClick={handleGoToStep3}
+            >
+              Next: Trim Realization →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Trim Realization ──────────────────────────── */}
+      {step === 3 && (
+        <div className="wizard-section">
+          <div className="wizard-section-header">
+            <h3>Step 3 — Trim Realization</h3>
+            {compResult?.isValid && (
+              <span className="wizard-carry">
+                Target from comp: {show(compResult.primaryResistance, 3)} Ω
+              </span>
+            )}
+          </div>
+
+          {/* Family picker */}
+          <div className="wizard-type-grid">
+            {TRIM_FAMILIES.map(f => (
+              <button
+                key={f.key}
+                className={`tool-card${trimFamily === f.key ? ' active' : ''}`}
+                onClick={() => setTrimFamily(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Unit picker */}
+          <div className="wizard-wire-row">
+            <label>
+              Network Unit
+              <select
+                value={trimUnit}
+                onChange={e => setTrimUnit(e.target.value)}
+              >
+                {(() => {
+                  const meta = TRIM_FAMILIES.find(f => f.key === trimFamily)
+                  if (!meta) return null
+                  return LADDER_UNIT_KEYS[meta.unitListKey].map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))
+                })()}
+              </select>
+            </label>
+          </div>
+
+          {/* Inputs */}
+          <div className="bino-grid">
+            <label>
+              Start Resistance (Ω)
+              <input
+                type="number"
+                value={Number.isFinite(trimStart) ? trimStart : ''}
+                min={0}
+                step={1}
+                onChange={e => setTrimStart(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Target Resistance (Ω)
+              <input
+                type="number"
+                value={Number.isFinite(trimTarget) ? trimTarget : ''}
+                min={0}
+                step={0.1}
+                onChange={e => setTrimTarget(Number(e.target.value))}
+              />
+            </label>
+          </div>
+
+          {/* Results */}
+          {trimResult && (
+            <table className="bino-table">
+              <tbody>
+                <tr><th colSpan={3}>Trim Result</th></tr>
+                {trimResult.achievedResistance !== undefined ? (
+                  <>
+                    <tr>
+                      <td>Achieved Resistance</td>
+                      <td>{show(trimResult.achievedResistance, 4)}</td>
+                      <td>Ω</td>
+                    </tr>
+                    <tr>
+                      <td>Absolute Error</td>
+                      <td>{show(trimResult.absoluteError, 4)}</td>
+                      <td>Ω</td>
+                    </tr>
+                    <tr>
+                      <td>Relative Error</td>
+                      <td>{show(
+                        trimTarget > 0 ? (trimResult.absoluteError / trimTarget) * 100 : 0,
+                        3
+                      )}</td>
+                      <td>%</td>
+                    </tr>
+                  </>
+                ) : (
+                  <tr><td colSpan={3} className="comp-error">Unable to solve trim for these inputs.</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
+
+          <div className="wizard-nav">
+            <button className="wizard-back" onClick={() => setStep(2)}>← Back</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

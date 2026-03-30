@@ -8,6 +8,7 @@ import {
 } from '../../domain/beams'
 import { runCantileverFeaScaffold } from '../../domain/fea/cantilever'
 import { generateCantileverMeshStep } from '../../domain/fea/stepExport'
+import StrainFieldViewer from '../StrainFieldViewer'
 
 const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
 
@@ -38,7 +39,7 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
   const [momentArm, setMomentArm] = useState(100)// mm or in
   const [modulusGPa, setModulusGPa] = useState(200) // GPa or Mpsi
   const [gageLength, setGageLength] = useState(5)   // mm or in
-  const [gageFactor, setGageFactor] = useState(2.1)
+  const [gageFactor, setGageFactor] = useState(2.0)
   const [analysisPath, setAnalysisPath] = useState<'closed-form' | 'fea'>('closed-form')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
@@ -187,9 +188,17 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         <div className="viewer-block">
           <h3>FEA Mesh Viewer</h3>
           {!inputError && feaSolution ? (
-            <Suspense fallback={<div className="step-viewer loading">Loading 3D viewer…</div>}>
-              <StepMeshViewer input={feaInput} solution={feaSolution.solution} meshOptions={MESH_OPTIONS} />
-            </Suspense>
+            <>
+              <StrainFieldViewer
+                solution={feaSolution.solution}
+                strainKey="exx"
+                gageMarkersMm={[0, norm.gageLengthMm]}
+                label="ε_xx field — fixed end at left · dashed lines bound gage region"
+              />
+              <Suspense fallback={<div className="step-viewer loading">Loading 3D viewer…</div>}>
+                <StepMeshViewer input={feaInput} solution={feaSolution.solution} meshOptions={MESH_OPTIONS} />
+              </Suspense>
+            </>
           ) : (
             <div className="step-viewer loading">{inputError || 'Unable to solve FEA for current inputs.'}</div>
           )}

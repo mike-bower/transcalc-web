@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSquareColumnStrain } from '../../domain/sqrcol'
+import { solveSquareColumnFea } from '../../domain/fea/squareColumnSolver'
+import StrainFieldViewer from '../StrainFieldViewer'
 
 type UnitSystem = 'SI' | 'US'
+type AnalysisMode = 'closed-form' | 'fea'
 
 const N_PER_LBF = 4.4482216152605
 const MM_PER_IN = 25.4
@@ -19,6 +22,7 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
   const [modulusGPa, setModulusGPa] = useState(200) // GPa or Mpsi
   const [poisson, setPoisson] = useState(0.3)
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -37,18 +41,21 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
     }
   }, [unitSystem])
 
-  const result = useMemo(() => {
-    // sqrcol handles unit conversion internally when usUnits is set
-    // SI: modulus in GPa, dims in mm, load in N
-    // US: modulus in PSI (Mpsi * 1e6), dims in in, load in lbf
-    const modulusForDomain = unitSystem === 'US' ? modulusGPa * 1e6 : modulusGPa
+  const siInputs = useMemo(() => {
+    const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+    return {
+      loadN: unitSystem === 'SI' ? load : load * N_PER_LBF,
+      widthMm: width * mm,
+      depthMm: depth * mm,
+      modulusGPa: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+    }
+  }, [unitSystem, load, width, depth, modulusGPa])
 
+  const result = useMemo(() => {
+    const modulusForDomain = unitSystem === 'US' ? modulusGPa * 1e6 : modulusGPa
     const checks: [number, string][] = [
-      [load, 'Applied load'],
-      [width, 'Width'],
-      [depth, 'Depth'],
-      [modulusForDomain, 'Modulus'],
-      [gageFactor, 'Gage factor'],
+      [load, 'Applied load'], [width, 'Width'], [depth, 'Depth'],
+      [modulusForDomain, 'Modulus'], [gageFactor, 'Gage factor'],
     ]
     const bad = checks.find(([v]) => !Number.isFinite(v) || v <= 0)
     if (bad) return { error: `${bad[1]} must be a positive value.`, data: null }
@@ -70,6 +77,22 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
     }
   }, [unitSystem, load, width, depth, modulusGPa, poisson, gageFactor])
 
+  const feaSolution = useMemo(() => {
+    if (analysisMode !== 'fea') return null
+    const { loadN, widthMm, depthMm, modulusGPa: modGPa } = siInputs
+    if ([loadN, widthMm, depthMm, modGPa].some(v => !Number.isFinite(v) || v <= 0)) return null
+    if (!Number.isFinite(poisson) || poisson <= 0 || poisson >= 0.5) return null
+    try {
+      return solveSquareColumnFea({
+        appliedForceN: loadN,
+        widthMm,
+        depthMm,
+        modulusGPa: modGPa,
+        poissonRatio: poisson,
+      })
+    } catch { return null }
+  }, [analysisMode, siInputs, poisson])
+
   const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
   const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
   const modUnit = unitSystem === 'SI' ? 'GPa' : 'Mpsi'
@@ -80,6 +103,10 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
         <div className="analysis-toggle">
           <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
+        </div>
+        <div className="analysis-toggle">
+          <button className={analysisMode === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisMode('closed-form')}>Closed-form</button>
+          <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
         </div>
       </div>
       <div className="bino-illustration">
@@ -102,6 +129,21 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
           <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpanOutput ?? NaN, 4)}</td><td>mV/V</td></tr>
         </tbody>
       </table>
+
+      {analysisMode === 'fea' && (
+        <div className="fea-analysis-section">
+          {feaSolution ? (
+            <StrainFieldViewer
+              solution={feaSolution}
+              strainKey="exx"
+              label={`ε_xx field — column cross-section ${siInputs.widthMm.toFixed(1)} × ${siInputs.depthMm.toFixed(1)} mm`}
+            />
+          ) : (
+            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+          )}
+          <p className="fea-note">2D plane-stress CST · axial strain (ε_xx) should be uniform throughout column cross-section</p>
+        </div>
+      )}
     </div>
   )
 }

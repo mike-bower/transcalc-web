@@ -11,7 +11,7 @@
  */
 
 import { solveRectangularCst2D, type RectMeshOptions, type RectBcSpec } from './rectangularCstSolver'
-import type { CantileverFeaSolution } from './cantilever'
+import type { CantileverFeaSolution } from './cantileverSolver'
 
 export type ReverseBeamFeaInput = {
   appliedForceN: number
