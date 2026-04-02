@@ -1,0 +1,60 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Span Shift w/Temperature, 2 Points</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="span_shift_w_temperature__2_points"></A>Span Shift with Temperature, 2 Points</P>
+
+<P>Circuit Refinements command</P>
+
+<P><B>General Considerations</B></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature_change_.htm">Span Shift with Temperature Change</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature__techniques_.htm">Span Shift Compensation Techniques</A></P>
+
+<P><B>Inputs</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Span at High &amp; Low Temperature </B>(-100 to +500F, 0.000 to 10 mV/V)</P>
+
+<P>No specific temperature value are required to be entered, but the low temperature must be lower than the high temperature entry.  We suggest a minimum 50 deg F difference between the two temperatures to obtain better resolution. If the difference in temperatures entered is less than 50�F, the following warning message appears:</P>
+
+<P>�It is recommended that the difference in the high temperature and low temperature be a minimum of 50�F.  If less than this, accuracy of compensation is degraded.�</P>
+
+<P>Span is measured at these same two temperatures, and entered in mV/V.</P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0>Resistor Material </B></P>
+
+<P>Choose Balco, nickel or copper compensation resistor material from <SMALL>LIST</SMALL> <SMALL>BOX</SMALL>.  Resistor TCR (measured as a chord slope between +50 and +150F) is automatically filled in.</P>
+
+<P>In addition, custom TCR values can be manually input by selecting User Defined from the Resistor Material LIST BOX.</P>
+
+<P><IMG SRC="../images/bm122.gif" ALT="" BORDER=0></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Bridge Resistance</B> (50 to 10,000 ohms)</P>
+
+<P>This is the resistance value as measured between P+ and P- illustrated in the drawing.  For bridges using four gages of equal resistance value, the bridge resistance and gage resistance will be essentially equal.</P>
+
+<P><B>Solutions</B></P>
+
+<P><B><IMG SRC="../images/bm154.gif" ALT="" BORDER=0>Rmod</B></P>
+
+<P>This is the required span vs. temperature resistor value based on the entered data and resistor material chosen.  It is inserted in the bridge power supply line between Vin and P+.  An alternate, less restrictive method is to use Rmod/2 and insert this value in each of the two power legs.  This is particularly important in transducers that may be connected in parallel circuits with other load cells.  </P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Span</B></P>
+
+<P>After adding Rmod, this is the new, desensitized span of the transducer.</P>
+
+<P><B>Resistor Type</B></P>
+
+<P>Once the Rmod value is calculated, the user can select the resistor type to be used.  Choose between <A HREF="resistor_patterns.htm">A, C or D pattern bondable resistors</A> or select the <A HREF="wire_table.htm">wire table</A>.</P>
+
+</BODY>
+</HTML>
+

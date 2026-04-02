@@ -1,0 +1,72 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Span Shift w/Temperature, 3 Points</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="span_shift_w_temperature__3_points"></A>Span Shift with Temperature, 3 Points</P>
+
+<P>Circuit Refinements command</P>
+
+<P><B>General Considerations</B></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature_change_.htm">Span Shift with Temperature Change</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature__techniques_.htm">Span Shift Compensation techniques</A></P>
+
+<P><A HREF="span_shift_w_temperature__2_points.htm">Span shift with temperature change, two points</A> is a first order correction.  Span shift with temperature change three point is the next refinement and is designed to remove any nonlinearities in the span vs. temperature compensation process by shunting the Rmod resistor with a fixed value (low TCR) resistor.</P>
+
+<P><B>Inputs</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Span at High, Ambient &amp; Low Temperature</B></P>
+
+<P>Three measured values from the transducer under test are entered at three test temperatures.  The actual temperatures used are not critical providing that the temperatures are separated by a reasonable amount.  For example, a transducer that is designed to operate over a 0�F to 120�F temperature range would typically be tested at 0�F, 75�F and 120�F to obtain the best accuracy of compensation.</P>
+
+<P>The bridge output entered at each temperature is the measured output at the test load minus the bridge zero output at the same temperature.  Span measurement should not be done with Rmod and Rspan resistors in the circuit.  If these resistors are already wired into the bridge circuit, they can be temporarily disabled by shorting across their terminals.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Rbridge</B></P>
+
+<P>The bridge resistance value measured at P+ and P-.  The measurement should not  include span set or span shift with temperature change resistors.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Rtl, Rta, Rth</B></P>
+
+<P>These are resistor values (or resistance ratios relative to the ambient temperature value) of an Rmod resistor (bondable or wire type) installed on the transducer or sample of the transducer material.  They are measured or computed from measurements taken at the same three temperatures as used for Span and Rbridge inputs.</P>
+
+<P>For best accuracy, Rtl, Rta and Rth values are obtained by testing a sample of the intended Rmod resistor material on an actual spring element, since TCR is sensitive to both lot and installation (i.e., bondable resistors mounted on steel alloys will exhibit different TCR values than the same resistors mounted on aluminum alloys).  Since the TransCalc computation compares the relative change in ambient temperature resistor value to low and high temperature values, the actual ambient temperature value of the test resistor is not critical.</P>
+
+<P>Rtl, Rta and Rth have already been computed for Measurements Group <A HREF="resistor_patterns.htm">bondable resistors</A> of copper, nickel and Balco alloys mounted on steel and aluminum alloy transducer materials.  To access this calculator, select the auxiliary program Resistance Ratios.</P>
+
+<P><B>Solutions</B></P>
+
+<P><B><IMG SRC="../images/bm154.gif" ALT="" BORDER=0>Rshunt</B></P>
+
+<P>The value of fixed resistance to be placed in parallel with Rmod to achieve the desired linearity correction of span vs. temperature.  This resistor does not need to have an extremely low TCR.  A wire or metal film resistor of perhaps 0-50 ppm/�C will be sufficient.</P>
+
+<P><IMG SRC="../images/bm123.gif" ALT="" BORDER=0></P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Rmod</B></P>
+
+<P>This is the ambient temperature value of the suggested modulus resistor, produced  from the same material as was used to measure Rtl, Rta and Rth.</P>
+
+<P>Some transducers, due to the nature of their use, require that the span vs. temperature resistors be equally divided between the P+ and P- power supply leads.  In these cases the Rspan and Rmod should be divided by 2 and these values placed in each of the two power leads.</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Span</B></P>
+
+<P>The calculated transducer output after the addition of Rmod and Rshunt.</P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I>Compensation Impracticable</B></P>
+
+<P>This error message, should it arise, means that there is no combination of Rmod and Rshunt which will result in linear span vs. temperature compensation.  It typically results from excessive nonlinearity in either resistor TCR or transducer span shift with temperature change.</P>
+
+<P>When this error message is displayed a solution can be attempted by using a different resistor alloy (each alloy has slightly different resistance vs. temperature characteristics).  If this doesn�t help we suggest looking for external influences on span vs. temperature results.  A good example is a protective coating on the spring element.  Many coatings stiffen significantly at cold temperatures but soften at high temperatures.  Such changes often influence the transducer span to a degree that outputs are impossible to linearize.</P>
+
+<P>If it is not possible to obtain a solution using span shift with temperature change, 3 points, we suggest trying the <A HREF="span_shift_w_temperature__optimum.htm">Optimum Shunt calculation</A> because it has a larger tolerance for nonlinear behavior.</P>
+
+</BODY>
+</HTML>
+

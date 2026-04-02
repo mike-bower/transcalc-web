@@ -1,0 +1,76 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Axial - Round Solid Element</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="axial___round_solid_element"></A>Axial - Round Solid Element</P>
+
+<P>Design Verification command</P>
+
+<P><B>Design Considerations</B></P>
+
+<P><B><IMG SRC="../images/bm160.gif" ALT="" BORDER=0></B><A HREF="design_considerations.htm">Design Considerations</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="axial__basic_considerations_.htm">The Axial Column</A></P>
+
+<P><IMG SRC="../images/bm16.gif" ALT="" BORDER=0></P>
+
+<P><B>Inputs (Allowed Range)</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Applied Force</B>, <B>F</B> (0.000 to 500,000 lbf [0 to 2.224E+6 N])</P>
+
+<P>Force applied in the axial direction, either as a point load along the centerline or as an evenly distributed load over the ends.</P>
+
+<P><B>Diameter</B>, <B>d</B> (0.020 to 10 in [0.51 to 254 mm])</P>
+
+<P>Cylinderical column of uniform thickness in the gaged area.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Poisson's Ratio</B> (0.1 to 0.4)</P>
+
+<P>For the <A HREF="poisson_s_ratio__table_.htm">material</A> from which the element is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Modulus of Elasticity</B> (5E+6 to +50E+6 psi [34.5 to 345 GPa]) </P>
+
+<P>For the <A HREF="modulus_of_elasticity__table_.htm">material</A> from which the element is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Gage Factor</B> (1.0 to 5.0) The default value is 2.00.</P>
+
+<P>From Engineering Data Form supplied with gages. </P>
+
+<P><B>Calculated Values (Units)</B></P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0></B>Pressing the <SMALL>COMPUTE</SMALL> <SMALL>BUTTON</SMALL> after entering the variables (within their acceptable ranges) calculates the following three output values:</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Axial Strain</B> (microstrain)</P>
+
+<P>Strain in the long direction of the column.  It has a negative value for compressive loads.  Ideally in the strain range of <A HREF="design_considerations.htm#iu3mm">1000 to 1700 microstrain</A> at rated load.</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Circumferential Strain</B> (microstrain)</P>
+
+<P>Strain in the transverse direction of then column.  It has a positive value for compressive loads.</P>
+
+<P><I><IMG SRC="../images/bm154.gif" ALT="" BORDER=0></I><B>Span at Applied Force</B> (mV/V) </P>
+
+<P><IMG SRC="../images/bm12.gif" ALT="" BORDER=0></P>
+
+<P>Calculated output of a full-bridge circuit with gages connected in the Wheatstone bridge circuit as shown above, when the force is equal to the value entered.  The mV/V units are millivolts of  bridge output per volt of bridge excitation.</P>
+
+<P><B><I>Error Messages</I></B></P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I></B>�<I>The calculated nominal gage strain exceeds 1700 microstrain, which is considered to be the maximum strain level recommended for normal full scale transducer operation.</I>�</P>
+
+<P>A value of 1700 microstrain is considered to be the <A HREF="design_considerations.htm#iu3mm">maximum strain level</A> recommended for normal transducers. However, TransCalc will calculate the nominal gage strain until the value reaches 5000 microstrain.</P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I></B>�<I>Design Impracticable.  Gage strain exceeds 5000 microstrain</I>�</P>
+
+<P>No common transducer material will survive 5000 microstrain without an unacceptable amount of permanent zero offset.  Accordingly, no calculations are made for bridge output.  Adjust inputs so that nominal gage strain is less than 5000 microstrain.</P>
+
+</BODY>
+</HTML>
+

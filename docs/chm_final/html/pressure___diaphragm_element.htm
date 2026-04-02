@@ -1,0 +1,76 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Pressure - Diaphragm Element</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="pressure___diaphragm_element"></A>Pressure - Diaphragm Element</P>
+
+<P>Design Verification command</P>
+
+<P><B>Design Considerations</B></P>
+
+<P>Calculations are based on the following assumptions:</P>
+
+<P><IMG SRC="../images/bm436.gif" ALT="" BORDER=0>Uniform diaphragm thickness.</P>
+
+<P><IMG SRC="../images/bm436.gif" ALT="" BORDER=0>Small deflections.</P>
+
+<P><IMG SRC="../images/bm436.gif" ALT="" BORDER=0>Infinitely rigid clamping around the diaphragm periphery.</P>
+
+<P><IMG SRC="../images/bm436.gif" ALT="" BORDER=0>Perfectly elastic behavior.</P>
+
+<P><IMG SRC="../images/bm436.gif" ALT="" BORDER=0>Negligible stiffening and mass effects due to the presence of the strain gage on the diaphragm.</P>
+
+<P>To the degree that the actual transducer fails to satisfy all the above assumptions, the calculations will be inaccurate.  Because of this, the calculations should be used only in the initial stages of transducer development to detrermine the approximate proportions of the transducer.</P>
+
+<P>For more details, see Measurements Group <A HREF="technical_assistance.htm">Tech Note TN-510</A>.</P>
+
+<P><IMG SRC="../images/bm104.gif" ALT="" BORDER=0></P>
+
+<P><B>Inputs (Allowed Range)</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Applied Pressure</B>, <B>P</B> (0.000 to 100,000 psi [0 to 689 GPa])</P>
+
+<P>Fluid or gas pressure uniformly distrubuted over the diaphragm surface.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Thickness, t</B> (0.010 to 1.000 in [0.254 to 25.4 mm])</P>
+
+<P>Measured.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Diameter</B>, <B>d</B> (0.182 to 10 in [4.623 to 254 mm])</P>
+
+<P>Measured.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Poisson's ratio</B> (0.1 to 0.4)</P>
+
+<P>For the <A HREF="poisson_s_ratio__table_.htm">material</A> from which the shaft is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Modulus of Elasticity</B> (5E+6 to +50E+6 psi[34.5 to 345 GPa]) </P>
+
+<P>For the <A HREF="modulus_of_elasticity__table_.htm">material</A> from which the diaphragm is constructed.</P>
+
+<P><B>Calculated Values (Units)</B></P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0></B>Pressing the <SMALL>COMPUTE</SMALL> <SMALL>BUTTON</SMALL> after entering the variables (within their acceptable ranges) calculates the following three output values:</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Maximum Radial Strain</B> (microstrain)</P>
+
+<P>Calculated at the diaphragm edge.</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Maximum Tangential Strain</B> (microstrain)</P>
+
+<P>Calculated at the diaphragm center.</P>
+
+<P><I><IMG SRC="../images/bm154.gif" ALT="" BORDER=0></I><B>Span at Applied Pressure</B> (mV/V) </P>
+
+<P>Bridge output at applied pressure is not calculated because of the large variety of choices for gage grid length and placement locations on the diaphragm.  To obtain an approximate estimate of full-bridge output, it is possible to use the strain diagram illustration provided.  By superimposing the gage length and placement locations on this diagram, one can calculate the approximate average strain values and bridge output.</P>
+
+</BODY>
+</HTML>
+

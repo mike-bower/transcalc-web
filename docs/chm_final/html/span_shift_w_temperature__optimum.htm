@@ -1,0 +1,52 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Span Shift w/Temperature, Optimum</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="span_shift_w_temperature__optimum"></A>Span Set w/Temperature, Optimum</P>
+
+<P>Circuit Refinements command</P>
+
+<P><B>General Considerations</B></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature_change_.htm">Span Shift with Temperature Change</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature__techniques_.htm">Span Shift Compensation techniques</A></P>
+
+<P>In span shift with temperature change, optimum shunt, data is taken in the same manner as 3 points except the values for Rtl, Rta, Rth are now labeled Rmod because the Rmod must be the actual value to be used in the finished transducer.  Choosing the ambient temperature Rmod value is sometimes by trial and error or a matter of convenience due to the availability of certain standard resistance values.  Since the Rmod will be shunted, it will typically be 20-50% higher in ambient temperature value than the Rmod calculated in span shift with temperature change, 2 points.</P>
+
+<P><B>Inputs</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Span at High, Ambient &amp; Low Temperature </B>Three measured values from the transducer under test are entered at three test temperatures.  The actual temperatures used are not critical providing that the temperatures are separated by a reasonable amount.  For example, a transducer which is designed to operate over a 0�F to 120�F temperature range would typically be tested at 0�F, 75�F and 120�F to obtain the best accuracy of compensation.</P>
+
+<P>The bridge output entered is the output at test load minus the bridge zero output at the same temperature.  Span measurement should not be done with Rmod and Rspan resistors in the circuit.  If  these resistors are already wired into the bridge circuit, they can be temporarily disabled by shorting across their terminals.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Rbridge</B>  The bridge resistance value measured at P+ and P- for each of the three temperatures.  The measurement should not include span set or span shift with temperature change resistors.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Rmod</B>  The resistance value of Rmod measured at each of the three temperatures. Rmod must be installed on the spring material for these measurements.</P>
+
+<P><B>Solutions</B></P>
+
+<P><B><IMG SRC="../images/bm154.gif" ALT="" BORDER=0>Rshunt</B></P>
+
+<P>The value of shunt resistor to be placed in parallel with Rmod.</P>
+
+<P><IMG SRC="../images/bm123.gif" ALT="" BORDER=0></P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Span</B></P>
+
+<P>The calculated span at the same three temperatures as used for data entry.  Any nonlinearities remaining are clearly evident.</P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0>Select</B></P>
+
+<P>Select Rmod resistor type from the available choices.</P>
+
+</BODY>
+</HTML>
+

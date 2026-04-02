@@ -1,0 +1,48 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Initial Zero Balance (Techniques)</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="initial_zero_balance__techniques_"></A>How to Adjust for Initial Imbalance</P>
+
+<P><I>Strain Gage Based Transducer</I> reference</P>
+
+<P>The procedure for adjusting the no-load bridge output to zero is essentially the same as for <A HREF="zero_shift_with_temperature__techniques_.htm">zero-shift compensation</A> except that a low-TC resistor (e.g., manganin) is needed.</P>
+
+<P>Assume, for an example, that after completing the zero-shift compensation, the bridge exhibits an initial unbalance equivalent to 800 <I>microstrain </I>in a single arm (400 �V/V  in a full bridge).  </P>
+
+<P>The resistance change required for bridge balance can be expressed as:</P>
+
+<P><IMG SRC="../images/bm143.gif" ALT="" BORDER=0></P>
+
+<P>where:</P>
+
+<P><IMG SRC="../images/bm144.gif" ALT="" BORDER=0> = resistance change, ohms </P>
+
+<P><IMG SRC="../images/bm145.gif" ALT="" BORDER=0><I> = </I>gage factor of gages</P>
+
+<P><IMG SRC="../images/bm146.gif" ALT="" BORDER=0><I> </I>= equivalent output strain</P>
+
+<P><IMG SRC="../images/bm100.gif" ALT="" BORDER=0><I> </I>= bridge resistance</P>
+
+<P>Substituting the above quantities,</P>
+
+<P><IMG SRC="../images/bm101.gif" ALT="" BORDER=0></P>
+
+<P>Thus, the resistance of one bridge arm needs to be increased by 0.56 ohm to null the output.  If manganin wire in AWG-37 <I>(0.08-mm) </I>size were used, this resistance would correspond to a length of about 0.45 in <I>(11.5 mm).  </I>Depending on the direction of the initial unbalance, the small wire can be inserted in series with the gage in one arm of the bridge for approximate zero balance.</P>
+
+<P>An alternate method is to install a double ladder resistor such as the <A HREF="e01_resistors.htm">E-Pattern</A> in the bridge corner opposite the copper ladder resistor.</P>
+
+<P><IMG SRC="../images/bm102.gif" ALT="" BORDER=0></P>
+
+<P>This arrangement permits easy, precise adjustment of the initial zero balance.  If the strain gages in the bridge circuit are made from constantan, then the usual choice for the <A HREF="e01_resistors.htm">E-Pattern resistor</A> is also constantan to minimize the introduction of added zero shift with temperature.  Similarly, a K-alloy resistor is normally chosen for use with K-alloy strain gages.</P>
+
+</BODY>
+</HTML>
+

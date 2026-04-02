@@ -995,6 +995,29 @@ select:focus {
   font-family: 'IBM Plex Mono', monospace;
 }
 
+.wizard-type-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.category-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.category-header {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px;
+}
+
 .wizard-type-grid {
   display: flex;
   flex-wrap: wrap;

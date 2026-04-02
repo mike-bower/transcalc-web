@@ -1,0 +1,66 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Span Set</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="span_set"></A>Span Set</P>
+
+<P>Circuit Refinements command</P>
+
+<P><B>General Considerations</B></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="#span_set">Span Set</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_set___techniques.htm">Span Set Techniques</A></P>
+
+<P>This program calculates a fixed value resistor (low TCR) to be inserted in a bridge power lead for the purpose of adjusting (decreasing) transducer span to a desired level.</P>
+
+<P><IMG SRC="../images/bm120.gif" ALT="" BORDER=0></P>
+
+<P><B>Inputs</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Measured Span</B></P>
+
+<P>Bridge output at test load minus unloaded (zero) value.  Span should be measured with Rmod/Rshunt resistors in place.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Bridge Resistance</B></P>
+
+<P>Measured at P+/P- and does not include Rmod/Rshunt.  If strain gages of essentially equal resistance are used in the bridge, bridge resistance equals gage resistance.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Total Rm Resistance</B></P>
+
+<P>The total amount of Rmod resistors in use if no shunt resistors are employed.  If Rshunt resistors are used, Total Rm Resistance equals the value of the Rmod/Rshunt parallel resistance value.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Desired Span</B></P>
+
+<P>The span desired after insertion of the calculated span resistor.</P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I>Error Messages</B></P>
+
+<P>�<I>The measured span must be greater than the desired span</I>.�</P>
+
+<P>Prevents entering a desired span which is larger than the measured span<I>.</I></P>
+
+<P><B><I><IMG SRC="../images/bm153.gif" ALT="" BORDER=0></I>Resistor Alloy</B></P>
+
+<P>Selecting from the drop-down menu provides a choice between constantan (A alloy), manganin, or modified Karma (K alloy) resistor alloys.  With constantan alloy,  <A HREF="b_pattern_resistors.htm">B-pattern</A>, <A HREF="d_pattern_resistors.htm">D-pattern</A>, and the <A HREF="wire_table.htm">wire table</A> are available for use.  For manganin alloy, only the <A HREF="wire_table.htm">wire table</A> is available.  For modified Karma, the <A HREF="d_pattern_resistors.htm">D-pattern</A> and wire table are available.  </P>
+
+<P><B>Solution</B></P>
+
+<P><B><IMG SRC="../images/bm154.gif" ALT="" BORDER=0>Rspan</B></P>
+
+<P>The resistance value to be added to the bridge power lead(s) to reduce the measured  span to the desired span level.  As with span vs. temperature, the value for span set  is often split equally between the positive and negative excitation leads.</P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0>Select</B></P>
+
+<P>Select Rspan resistor type from the available choices.</P>
+
+</BODY>
+</HTML>
+

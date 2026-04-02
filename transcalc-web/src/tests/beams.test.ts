@@ -7,7 +7,8 @@ import {
   calculateCantileverMinStrain,
   calculateCantileverMaxStrain,
   calculateCantileverAvgStrain,
-  calculateCantileverGradient
+  calculateCantileverGradient,
+  validateCantilever
 } from '../domain/beams'
 
 describe('beam solvers', () => {
@@ -111,5 +112,47 @@ describe('beam solvers', () => {
 
   it('calculateCantileverGradient throws on zero max strain', () => {
     expect(() => calculateCantileverGradient(0, 100)).toThrow()
+  })
+
+  describe('validateCantilever', () => {
+    const validParams = {
+      loadN: 100,
+      momentArmMm: 100,
+      youngsModulusPa: 200e9,
+      beamWidthMm: 25,
+      thicknessMm: 2
+    }
+
+    it('returns valid for normal parameters', () => {
+      const result = validateCantilever(validParams, 5, 1000)
+      expect(result.isValid).toBe(true)
+      expect(result.warnings).toHaveLength(0)
+    })
+
+    it('warns if strain exceeds 5000 microstrain', () => {
+      // 6000 microstrain
+      const result = validateCantilever(validParams, 5, 6000)
+      expect(result.isValid).toBe(true)
+      expect(result.warnings).toContain('Design exceeds 5000 microstrain; might be impractical.')
+    })
+
+    it('returns error for zero thickness', () => {
+      const result = validateCantilever({ ...validParams, thicknessMm: 0 }, 5, 1000)
+      expect(result.isValid).toBe(false)
+      expect(result.errorMessage).toBe('Thickness must be greater than zero.')
+    })
+
+    it('returns error for zero width', () => {
+      const result = validateCantilever({ ...validParams, beamWidthMm: 0 }, 5, 1000)
+      expect(result.isValid).toBe(false)
+      expect(result.errorMessage).toBe('Beam width must be greater than zero.')
+    })
+
+    it('warns if gage length is overly large compared to moment arm', () => {
+      // Gage length = 150mm, Moment Arm = 100mm -> 150%
+      const result = validateCantilever(validParams, 150, 1000)
+      expect(result.isValid).toBe(true)
+      expect(result.warnings).toContain('Gage length is large relative to moment arm; accuracy may suffer.')
+    })
   })
 })

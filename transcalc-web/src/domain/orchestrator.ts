@@ -13,6 +13,8 @@ import {
   calculateCantileverMaxStrain,
   calculateCantileverAvgStrain,
   calculateCantileverGradient,
+  calculateCantileverNaturalFrequency,
+  validateCantilever,
 } from './beams'
 import { calculateBinobeamStrain, type BinobeamInput } from './binobeam'
 import { calculateDualbeamStrain, type DualbeamInput } from './dualbeam'
@@ -77,6 +79,14 @@ export type TransducerType =
   | 'roundHollowTorque'
   | 'pressure'
 
+export type BridgeConfig = 
+  | 'quarter'
+  | 'halfBending'
+  | 'fullBending'
+  | 'poissonHalf'
+  | 'poissonFullTop'
+  | 'poissonFullDifferential'
+
 /** Cantilever-specific params (beams.ts takes positional args; this groups them). */
 export interface CantileverDesignParams {
   /** Applied load (N, SI) */
@@ -87,12 +97,16 @@ export interface CantileverDesignParams {
   gageLengthMm: number
   /** Young's modulus (Pa; values < 1e6 are treated as GPa and auto-converted) */
   youngsModulusPa: number
+  /** Poisson's Ratio (dimensionless) */
+  poissonRatio: number
   /** Beam width (mm) */
   beamWidthMm: number
   /** Beam thickness (mm) */
   thicknessMm: number
   /** Gage factor (dimensionless) */
   gageFactor: number
+  /** Bridge configuration */
+  bridgeConfig: BridgeConfig
 }
 
 /**
@@ -136,6 +150,8 @@ export interface DesignResult {
   maxStrain?: number
   /** Strain gradient across the gage (%) */
   gradient?: number
+  /** Natural frequency (Hz, cantilever-specific) */
+  naturalFrequency?: number
   isValid: boolean
   error?: string
 }
@@ -153,7 +169,44 @@ export function runDesign(input: DesignInput): DesignResult {
         const maxStrain = calculateCantileverMaxStrain(p.loadN, p.momentArmMm, p.gageLengthMm, p.youngsModulusPa, p.beamWidthMm, p.thicknessMm)
         const avgStrain = calculateCantileverAvgStrain(p.loadN, p.momentArmMm, p.youngsModulusPa, p.beamWidthMm, p.thicknessMm)
         const gradient  = calculateCantileverGradient(maxStrain, minStrain)
-        return { type: 'cantilever', fullSpanSensitivity: sensitivityFromStrain(avgStrain, p.gageFactor), avgStrain, minStrain, maxStrain, gradient, isValid: true }
+        const naturalFrequency = calculateCantileverNaturalFrequency(p.youngsModulusPa, p.beamWidthMm, p.thicknessMm, p.momentArmMm, p.loadN)
+
+        // Calculate gain multiplier based on bridge configuration
+        // Quarter: 1 gage
+        // Half (Bending): 1 Top (+), 1 Bottom (-) = 2 units
+        // Full (Bending): 2 Top (+), 2 Bottom (-) = 4 units
+        // Poisson Half: 1 Active (+), 1 Poisson (-) = (1 + nu) units
+        // Poisson Full (Top): 2 Active (+), 2 Poisson (-) = 2 * (1 + nu) units
+        // Poisson Full (Differential): 1 Top(+), 1 TopPoisson(-), 1 Bottom(-), 1 BottomPoisson(+) = 2 * (1 + nu) units
+        let bridgeGain = 1.0;
+        const nu = p.poissonRatio;
+
+        switch (p.bridgeConfig) {
+          case 'quarter': bridgeGain = 1.0; break;
+          case 'halfBending': bridgeGain = 2.0; break;
+          case 'fullBending': bridgeGain = 4.0; break;
+          case 'poissonHalf': bridgeGain = 1.0 + nu; break;
+          case 'poissonFullTop': bridgeGain = 2.0 * (1.0 + nu); break;
+          case 'poissonFullDifferential': bridgeGain = 2.0 * (1.0 + nu); break;
+        }
+
+        const validation = validateCantilever(
+          { loadN: p.loadN, momentArmMm: p.momentArmMm, youngsModulusPa: p.youngsModulusPa, beamWidthMm: p.beamWidthMm, thicknessMm: p.thicknessMm },
+          p.gageLengthMm,
+          avgStrain
+        )
+
+        return {
+          type: 'cantilever',
+          fullSpanSensitivity: sensitivityFromStrain(avgStrain, p.gageFactor) * bridgeGain,
+          avgStrain,
+          minStrain,
+          maxStrain,
+          gradient,
+          naturalFrequency,
+          isValid: validation.isValid,
+          error: validation.errorMessage || validation.warnings[0], // fallback to first warning if no error but we need a string
+        }
       }
 
       case 'reverseBeam': {

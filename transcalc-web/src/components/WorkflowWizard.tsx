@@ -44,8 +44,10 @@ import {
   solveRoundHollowTorqueForTargetSpan,
   solvePressureForTargetSpan,
 } from '../domain/inverse/designInverse'
-import TransducerSvgViewer from './TransducerSvgViewer'
 import CantileverModelPreview from './CantileverModelPreview'
+import { BinocularSketch2D } from './BinocularSketch2D'
+import { BinocularModelPreview } from './BinocularModelPreview'
+import { TRANSDUCER_DEFINITIONS, TRANSDUCER_CATEGORIES } from '../domain/transducerDefinitions'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -75,22 +77,31 @@ interface FieldDef {
 
 function toDisplay(siVal: number, unit: UnitKind, us: boolean): number {
   if (!us || unit === 'none') return siVal
+  let val = 0
   switch (unit) {
-    case 'length':   return siVal / MM_PER_IN
-    case 'force':    return siVal / N_PER_LBF
-    case 'modulus':  return siVal / GPA_PER_MPSI
-    case 'pressure': return siVal / 0.006894757
+    case 'length':   val = siVal / MM_PER_IN; break
+    case 'force':    val = siVal / N_PER_LBF; break
+    case 'modulus':  val = siVal / GPA_PER_MPSI; break
+    case 'pressure': val = siVal / 0.006894757; break
+    default: return siVal
   }
+  // Round to 4 decimal places to avoid floating point artifacts like 0.999999999
+  return Math.round(val * 10000) / 10000
 }
 
 function toSI(displayVal: number, unit: UnitKind, us: boolean): number {
   if (!us || unit === 'none') return displayVal
+  let val = 0
   switch (unit) {
-    case 'length':   return displayVal * MM_PER_IN
-    case 'force':    return displayVal * N_PER_LBF
-    case 'modulus':  return displayVal * GPA_PER_MPSI
-    case 'pressure': return displayVal * 0.006894757
+    case 'length':   val = displayVal * MM_PER_IN; break
+    case 'force':    val = displayVal * N_PER_LBF; break
+    case 'modulus':  val = displayVal * GPA_PER_MPSI; break
+    case 'pressure': val = displayVal * 0.006894757; break
+    default: return displayVal
   }
+  // Round to 6 decimal places for SI storage to minimize precision loss 
+  // while still cleaning up artifacts (e.g. 25.400000000000002)
+  return Math.round(val * 1000000) / 1000000
 }
 
 function unitLabel(unit: UnitKind, us: boolean): string {
@@ -193,11 +204,11 @@ const DESIGN_FIELDS: Record<string, FieldDef[]> = {
     { key: 'thickness', label: 'Thickness',      unit: 'length',  si: 2 },
     { key: 'width',     label: 'Beam Width',     unit: 'length',  si: 25 },
     { key: 'clampLength', label: 'Clamp Length', unit: 'length', si: 20 },
-    { key: 'mountHoleOffset', label: 'Mount Hole Offset', unit: 'length', si: 12 },
-    { key: 'mountHoleDia', label: 'Mount Hole Diameter', unit: 'length', si: 5 },
     { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
     { key: 'gageLen',   label: 'Gage Length',    unit: 'length',  si: 5 },
     { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.0 },
+    { key: 'bridgeConfig', label: 'Bridge Config', unit: 'none', si: 0 }, // Placeholder for mapping
   ],
   reverseBeam: [
     { key: 'load',      label: 'Applied Load',      unit: 'force',   si: 100 },
@@ -388,13 +399,22 @@ const COMP_FIELDS: Record<CompensationMethod, FieldDef[]> = {
 
 // ── Param initializers ───────────────────────────────────────────────────────
 
-function initParams(fields: FieldDef[]): Record<string, number> {
-  return Object.fromEntries(fields.map(f => [f.key, f.si]))
+const BRIDGE_CONFIG_LABELS: Record<string, string> = {
+  quarter: 'Quarter Bridge (1 gage)',
+  halfBending: 'Half Bridge Bending (1 top / 1 bottom)',
+  fullBending: 'Full Bridge Bending (2 top / 2 bottom)',
+  poissonHalf: 'Poisson Half Bridge (1 active / 1 poisson)',
+  poissonFullTop: 'Poisson Full Bridge (2 active / 2 poisson on top)',
+  poissonFullDifferential: 'Poisson Full Bridge (1 active / 1 poisson top + bottom)',
+}
+
+function initParams(fields: FieldDef[]): Record<string, number | string> {
+  return Object.fromEntries(fields.map(f => [f.key, f.key === 'bridgeConfig' ? 'quarter' : f.si]))
 }
 
 // ── Build orchestrator inputs ─────────────────────────────────────────────────
 
-function buildDesignInput(type: TransducerType, p: Record<string, number>): DesignInput {
+function buildDesignInput(type: TransducerType, p: Record<string, any>): DesignInput {
   switch (type) {
     case 'cantilever':
       return {
@@ -404,9 +424,11 @@ function buildDesignInput(type: TransducerType, p: Record<string, number>): Desi
           momentArmMm: p.momentArm,
           gageLengthMm: p.gageLen,
           youngsModulusPa: p.modulus * 1e9,
+          poissonRatio: p.poisson ?? 0.3,
           beamWidthMm: p.width,
           thicknessMm: p.thickness,
           gageFactor: p.gageFactor,
+          bridgeConfig: p.bridgeConfig || 'quarter',
         },
       }
     case 'reverseBeam':
@@ -695,24 +717,6 @@ function buildCompInput(
 }
 
 // ── Design type metadata ─────────────────────────────────────────────────────
-
-const DESIGN_TYPES: Array<{ key: TransducerType; label: string }> = [
-  { key: 'cantilever',   label: 'Cantilever' },
-  { key: 'reverseBeam',  label: 'Reverse Beam' },
-  { key: 'dualBeam',     label: 'Dual Beam' },
-  { key: 'sBeam',        label: 'S-Beam' },
-  { key: 'squareColumn', label: 'Square Column' },
-  { key: 'roundSolidColumn',  label: 'Round Solid Column' },
-  { key: 'roundHollowColumn', label: 'Round Hollow Column' },
-  { key: 'binoBeam',     label: 'Binocular Beam' },
-  { key: 'squareShear',      label: 'Shear Square Web' },
-  { key: 'roundShear',       label: 'Shear Round Web' },
-  { key: 'roundSBeamShear',  label: 'Shear Round S-Beam' },
-  { key: 'squareTorque',     label: 'Square Torque' },
-  { key: 'roundSolidTorque', label: 'Round Solid Torque' },
-  { key: 'roundHollowTorque',label: 'Round Hollow Torque' },
-  { key: 'pressure',     label: 'Pressure Diaphragm' },
-]
 
 const COMP_METHODS: Array<{ key: CompensationMethod; label: string }> = [
   { key: 'zeroVsTemp',  label: 'Zero vs Temp' },
@@ -1021,7 +1025,10 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
     }
     const fields = DESIGN_FIELDS[designType]
     if (!fields) return null
-    const allValid = fields.every(f => Number.isFinite(dp[f.key]))
+    const allValid = fields.every(f => {
+      if (f.key === 'bridgeConfig') return true
+      return Number.isFinite(dp[f.key])
+    })
     if (!allValid) return null
     try {
       return runDesign(buildDesignInput(designType, dp))
@@ -1033,7 +1040,11 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
   const compResult = useMemo((): CompensationResult | null => {
     const fields = COMP_FIELDS[compMethod]
     if (!fields) return null
-    const allValid = fields.every(f => Number.isFinite(cp[f.key]))
+    const allValid = fields.every(f => {
+      // Allow string for bridgeConfig if it accidentally leaks here, 
+      // though COMP_FIELDS shouldn't have it.
+      return typeof cp[f.key] === 'string' || Number.isFinite(cp[f.key])
+    })
     if (!allValid) return null
     try {
       return runCompensation(buildCompInput(compMethod, cp, wireIdx))
@@ -1107,6 +1118,20 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
     )
   }
 
+  // ── Derived State for Model ───────────────────────────────────
+
+  const dpWithSolved = useMemo(() => {
+    if (designMode !== 'targetDriven' || !inverseResult?.isValid) return dp;
+    const solvedFieldKey = inverseResult.solvedFieldKey;
+    if (!solvedFieldKey) return dp;
+    return {
+      ...dp,
+      [solvedFieldKey]: inverseResult.solvedValue,
+      isTargetDriven: 1,
+      targetOutput: targetSpanMvV
+    };
+  }, [dp, designMode, inverseResult, targetSpanMvV]);
+
   // ── Render ────────────────────────────────────────────────────
 
   return (
@@ -1140,17 +1165,29 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
             </div>
           </div>
 
-          {/* Type picker */}
-          <div className="wizard-type-grid">
-            {DESIGN_TYPES.map(t => (
-              <button
-                key={t.key}
-                className={`tool-card${designType === t.key ? ' active' : ''}`}
-                onClick={() => setDesignType(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* Type picker grouped by category */}
+          <div className="wizard-type-selection">
+            {TRANSDUCER_CATEGORIES.map(category => {
+              const typesInCat = TRANSDUCER_DEFINITIONS.filter(d => d.category === category);
+              if (typesInCat.length === 0) return null;
+              
+              return (
+                <div key={category} className="category-group">
+                  <h4 className="category-header">{category}</h4>
+                  <div className="wizard-type-grid">
+                    {typesInCat.map(t => (
+                      <button
+                        key={t.type}
+                        className={`tool-card${designType === t.type ? ' active' : ''}`}
+                        onClick={() => setDesignType(t.type)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="design-frame-grid">
@@ -1213,9 +1250,25 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
               const displayVal = toDisplay(sourceValue, f.unit, us)
               const suffix = unitLabel(f.unit, us)
 
+              if (f.key === 'bridgeConfig') {
+                return (
+                  <label key={f.key}>
+                    {f.label}
+                    <select
+                      value={dp[f.key] ?? 'quarter'}
+                      onChange={e => setDp(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    >
+                      {Object.entries(BRIDGE_CONFIG_LABELS).map(([k, label]) => (
+                        <option key={k} value={k}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              }
+
               return (
                 <label key={f.key}>
-                  {f.label}{suffix ? ` (${suffix})` : ''}{isSolvedField ? ' (Solved)' : ''}
+                  {f.label} {suffix ? ` (${suffix})` : ''} {isSolvedField ? ' (Solved)' : ''}
                   <input
                     type="number"
                     value={Number.isFinite(displayVal) ? displayVal : ''}
@@ -1260,6 +1313,13 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
                       <td>{show(designResult.fullSpanSensitivity, 4)}</td>
                       <td>mV/V</td>
                     </tr>
+                    {designResult.naturalFrequency !== undefined && (
+                      <tr>
+                        <td>Natural Frequency</td>
+                        <td>{show(designResult.naturalFrequency, 0)}</td>
+                        <td>Hz</td>
+                      </tr>
+                    )}
                     {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && inverseResult?.isValid && (
                       <>
                         <tr>
@@ -1297,10 +1357,19 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
             </div>
 
             <aside className="design-frame-preview">
-              <h4>Interactive Drawing</h4>
-              {designType === 'cantilever'
-                ? <CantileverModelPreview params={dp} />
-                : <TransducerSvgViewer designType={designType} params={dp} />}
+              <h4>Interactive Model</h4>
+              {designType === 'cantilever' ? (
+                <CantileverModelPreview params={dpWithSolved} us={us} />
+              ) : designType === 'binoBeam' ? (
+                <>
+                  <BinocularModelPreview params={dpWithSolved} us={us} />
+                  <div style={{ marginTop: '1rem' }}>
+                    <BinocularSketch2D params={dpWithSolved} us={us} />
+                  </div>
+                </>
+              ) : (
+                <div className="preview-placeholder">Model preview coming soon</div>
+              )}
             </aside>
           </div>
 

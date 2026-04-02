@@ -1,0 +1,80 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Torque - Square Shaft Element</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="torque___square_shaft_element"></A>Torque - Square Shaft Element</P>
+
+<P>Design Verification command</P>
+
+<P><B>Design Considerations</B></P>
+
+<P>Solid square shafts are frequently used for torque measurements due to the simplicity of mounting strain gages to flat surfaces and to their increased resistance to bending when compared to solid circular shafts.  Gage placement is at a 45 degree angle to, and on, the centerline of all four faces.  Gage length must be kept short in relation to shaft width w, because shear strain at the center of the shaft changes with bending strain, as the measuring grid approaches the outer edges of the shaft width.  There is also a corresponding shift in maximum strain direction from 45 degrees at the shaft centerline, to 0 degrees at the shaft edge.</P>
+
+<P><IMG SRC="../images/bm140.gif" ALT="" BORDER=0></P>
+
+<P><B>Inputs (Allowed Range)</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Applied Torque</B>, <B>T</B> (0.000 to 500,000 lb in [0 to 56,490 Nm])</P>
+
+<P>Pure torsion, free from axial or bending loads.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Shaft Width</B>, <B>w</B> (0.200 to 20 in [5.08 to 508 mm])</P>
+
+<P>Square shaft of uniform width in the gaged area.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Poisson's Ratio</B> (0.1 to 0.4)</P>
+
+<P>For the <A HREF="poisson_s_ratio__table_.htm">material</A> from which the shaft is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Modulus of Elasticity</B> (5E+6 to +50E+6 psi [34.5 to 345 GPa]) </P>
+
+<P>For the <A HREF="modulus_of_elasticity__table_.htm">material</A> from which the shaft is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Gage Length</B> (0.008 to 1.000 in [0.203 to 25.4 mm]) </P>
+
+<P>Obtained from strain gage catalog.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Gage Factor</B> (1.0 to 5.0) The default value is 2.00.</P>
+
+<P>From Engineering Data Form supplied with gages. </P>
+
+<P><B>Calculated Values (Units)</B></P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0></B>Pressing the <SMALL>COMPUTE</SMALL> <SMALL>BUTTON</SMALL> after entering the variables (within their acceptable ranges) calculates the following three output values:</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Nominal Gage Strain</B> (microstrain)</P>
+
+<P>The average of the absolute strains in the surface of the shaft under the gages.   Ideally in the strain range of <A HREF="design_considerations.htm#iu3mm">1000 to 1700 microstrain</A> at rated load.</P>
+
+<P><I><IMG SRC="../images/bm154.gif" ALT="" BORDER=0></I><B>Strain Variation</B> (%)</P>
+
+<P>Calculation of how much the strain varies under the active gage length. It is computed as a percentage from the difference in the maximum and minimum strains, divided by the maximum strain and multiplied times 100. Ideally under <A HREF="design_considerations.htm#rlb7dp">15% variation</A>.</P>
+
+<P><I><IMG SRC="../images/bm154.gif" ALT="" BORDER=0></I><B>Span at Applied Torque</B> (mV/V) </P>
+
+<P>Calculated output of a full-bridge circuit when the torque is equal to the value entered.  The mV/V units are millivolts of bridge output per volt of bridge excitation.</P>
+
+<P><B><I>Error Messages</I></B></P>
+
+<P><I><B><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></B>�Design impracticable. Gage length exceeds available measuring length� </I></P>
+
+<P>Displayed when the gage length exceeds shaft width divided by 0.707 which is the distance from edge to edge at a 45 degree angle.</P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I></B>�<I>The calculated nominal gage strain exceeds 1700 microstrain, which is considered to be the maximum strain level recommended for normal full scale transducer operation.</I>�</P>
+
+<P>A value of 1700 microstrain is considered to be the <A HREF="design_considerations.htm#iu3mm">maximum strain level</A> recommended for normal transducers. However, TransCalc will calculate the nominal gage strain until the value reaches 5000 microstrain.</P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I></B>�<I>Design Impracticable.  Gage strain exceeds 5000 microstrain</I>�</P>
+
+<P>No common transducer material will survive 5000 microstrain without an unacceptable amount of permanent zero offset.  Accordingly, no calculations are made for bridge output.  Adjust inputs so that nominal gage strain is less than 5000 microstrain.</P>
+
+</BODY>
+</HTML>
+

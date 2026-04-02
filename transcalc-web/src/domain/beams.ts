@@ -5,8 +5,64 @@ export interface CantileverParams {
   load: number // load in N or lbf
   beamWidth: number // mm or inches
   thickness: number // mm or inches
-  momentArm: number // distance from load to strain sensor, mm or inches
+  momentArm: number // distance from load to center of strain sensor, mm or inches
   modulus?: number // Young's modulus (if needed for deflection)
+}
+
+export interface CantileverValidation {
+  isValid: boolean
+  warnings: string[]
+  errorMessage?: string
+}
+
+/**
+ * Validates a cantilever beam design based on practical engineering limits ported from bbcant.pas.
+ */
+export function validateCantilever(
+  params: {
+    loadN: number
+    momentArmMm: number
+    youngsModulusPa: number
+    beamWidthMm: number
+    thicknessMm: number
+  },
+  gageLength: number,
+  avgStrain: number
+): CantileverValidation {
+  const warnings: string[] = []
+  let errorMessage: string | undefined
+
+  if (params.thicknessMm <= 0) {
+    errorMessage = 'Thickness must be greater than zero.'
+  } else if (params.beamWidthMm <= 0) {
+    errorMessage = 'Beam width must be greater than zero.'
+  } else if (params.momentArmMm <= 0) {
+    errorMessage = 'Moment arm must be greater than zero.'
+  }
+
+  if (errorMessage) {
+    return { isValid: false, warnings: [], errorMessage }
+  }
+
+  // Practical strain limit (ported from bbcant.pas / ID_SZ_Impratical)
+  if (Math.abs(avgStrain) > 5000) {
+    warnings.push('Design exceeds 5000 microstrain; might be impractical.')
+  }
+
+  // Geometry checks
+  if (params.thicknessMm > params.beamWidthMm) {
+    warnings.push('Beam thickness is greater than width; lateral instability possible.')
+  }
+
+  if (gageLength > params.momentArmMm) {
+    warnings.push('Gage length is large relative to moment arm; accuracy may suffer.')
+  }
+
+  return {
+    isValid: true,
+    warnings,
+    errorMessage
+  }
 }
 
 // Cantilever bending stress
@@ -222,4 +278,44 @@ export function calculateCantileverGradient(
     throw new Error('Maximum strain must be non-zero (cannot divide by zero)')
   }
   return ((maxStrain - minStrain) / maxStrain) * 100
+}
+
+/**
+ * Calculate natural frequency of a cantilever beam with tip load (approximation).
+ * Formula: f_n = (1 / 2π) * sqrt(k / m_eff)
+ * where k (stiffness) = (3 * E * I) / L^3
+ * and m_eff (effective mass) ≈ mass_load + 0.23 * mass_beam
+ * 
+ * @param youngsModulusPa Young's Modulus in Pa
+ * @param widthMm Beam width in mm
+ * @param thicknessMm Beam thickness in mm
+ * @param lengthMm Beam length (moment arm) in mm
+ * @param loadN Applied load in N (used to estimate mass, mass = load / 9.80665)
+ * @param densityKgM3 Material density in kg/m^3 (default 7850 for steel)
+ * @returns Natural frequency in Hz
+ */
+export function calculateCantileverNaturalFrequency(
+  youngsModulusPa: number,
+  widthMm: number,
+  thicknessMm: number,
+  lengthMm: number,
+  loadN: number,
+  densityKgM3: number = 7850
+): number {
+  const E = youngsModulusPa < 1e6 ? youngsModulusPa * 1e9 : youngsModulusPa
+  const w = widthMm / 1000
+  const t = thicknessMm / 1000
+  const L = lengthMm / 1000
+  
+  const I = (w * Math.pow(t, 3)) / 12
+  const k = (3 * E * I) / Math.pow(L, 3)
+  
+  const massLoad = loadN / 9.80665
+  const volumeBeam = w * t * L
+  const massBeam = volumeBeam * densityKgM3
+  const effectiveMass = massLoad + (0.24 * massBeam) // 0.23-0.24 is standard for cantilever tip mass
+  
+  if (effectiveMass <= 0) return 0
+  
+  return (1 / (2 * Math.PI)) * Math.sqrt(k / effectiveMass)
 }

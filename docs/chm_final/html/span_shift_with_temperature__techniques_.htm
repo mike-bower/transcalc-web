@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Span Shift with Temperature (Techniques)</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="span_shift_with_temperature__techniques_"></A>How to Compensate Span Shift with Temperature</P>
+
+<P><I>Strain Gage Based Transducer</I> reference</P>
+
+<P>Compensation for span shift with temperature can be accomplished by inserting a temperature-sensitive (high-TC) resistor in the bridge excitation supply line. When the resistor is of the proper size and temperature sensitivity, it serves to vary the bridge voltage so as to counteract the temperature dependent changes in bridge output.  With a temperature rise, for example, the bridge output for a particular load tends to rise also.  This can be compensated for, however, if the resistance in the supply line increases simultaneously to produce an offsetting reduction in bridge voltage.  The procedure for compensating span shift is usually the most difficult adjustment to make because it requires accurately loading the transducer and making measurements at two or more different temperatures.</P>
+
+<P><IMG SRC="../images/bm125.gif" ALT="" BORDER=0></P>
+
+<P>Nickel resistors have been widely used for span shift compensation, but there has recently been considerable use of Balco, a very stable nickel-iron alloy with a relatively high temperature coefficient of resistance.  Balco offers several advantages over pure nickel.  It is less expensive, is easier to fabricate, and has about 2-1/2 times the resistivity of nickel.  One of its few disadvantages is that it has a slightly lower temperature coefficient of resistance than nickel at typical transducer working temperatures (above -100 deg F, or -75 deg C).  Given the TCR of the resistor material, and the rate of change of transducer output with temperature (both expressed in the same units, such as percent per degree), the nominal value of the span-shift compensation resistor can be calculated with the following relationship:</P>
+
+<P><IMG SRC="../images/bm126.gif" ALT="" BORDER=0></P>
+
+<P>where:</P>
+
+<P><IMG SRC="../images/bm127.gif" ALT="" BORDER=0> = Resistance of span-shift compensation resistor</P>
+
+<P><IMG SRC="../images/bm128.gif" ALT="" BORDER=0> = Percent change in span per unit temperature change</P>
+
+<P><IMG SRC="../images/bm100.gif" ALT="" BORDER=0> = Bridge resistance</P>
+
+<P><IMG SRC="../images/bm130.gif" ALT="" BORDER=0> = Temperature coefficient of resistance of compensating resistor (in percent)</P>
+
+<P>For preliminary estimation of the required resistance, prior to running span tests, the change in span with temperature can be estimated from:</P>
+
+<P><IMG SRC="../images/bm131.gif" ALT="" BORDER=0></P>
+
+<P>where:</P>
+
+<P><IMG SRC="../images/bm132.gif" ALT="" BORDER=0> = percent change in elastic modulus of the spring material per unit</P>
+
+<P>temperature change (normally negative)</P>
+
+<P><IMG SRC="../images/bm133.gif" ALT="" BORDER=0> = percent change in gage factor per unit temperature change</P>
+
+<P>The following Table gives nominal values of <I><IMG SRC="../images/bm132.gif" ALT="" BORDER=0>, <IMG SRC="../images/bm133.gif" ALT="" BORDER=0>, </I>and <IMG SRC="../images/bm130.gif" ALT="" BORDER=0>  which can be used the preceding equations for preliminary calculation of the compensating resistor.</P>
+
+<P><B>Table</B></P>
+
+<P>Material Properties Variations with Temperature</P>
+
+<P><B>Modulus of Elasticity</B></P>
+
+<TABLE cols=2 width=473>
+
+<TR VALIGN="top">
+<TD width=39%><I>Spring Element</I>
+<P><I>Material</I></P>
+</TD>
+<TD width=61%><I>Temperature Coefficient of </I>
+<P><I>Modulus</I></P>
+</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>17-4 PH stainless steel</TD>
+<TD width=61%>-0.015%/deg F (-0.027%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>tool steel</TD>
+<TD width=61%>-0.013%/deg F (-0.023%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>beryllium-copper</TD>
+<TD width=61%>-0.025%/deg F (-0.045%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>aluminum</TD>
+<TD width=61%>-0.030%/deg F (-0.054%/deg C)</TD>
+</TR>
+</TABLE><BR>
+
+<P><B>Gage Factor</B></P>
+
+<TABLE cols=2 width=473>
+
+<TR VALIGN="top">
+<TD width=39%><I>Gage Grid</I>
+<P><I>Alloy</I></P>
+</TD>
+<TD width=61%>Temperature Coefficient of 
+<P>Gage Factor</P>
+</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>constantan</TD>
+<TD width=61%>+0.0050%/deg F (+0.0090%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>K-alloy (06 STC)</TD>
+<TD width=61%>-0.0057%/deg F (-0.0103%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>K-alloy (13 STC)</TD>
+<TD width=61%>-0.0083%/deg F (-0.0149%/deg C)</TD>
+</TR>
+</TABLE><BR>
+
+<P><B>Resistance</B></P>
+
+<TABLE cols=2 width=473>
+
+<TR VALIGN="top">
+<TD width=39%><I>Resistor </I>
+<P><I>Material</I></P>
+</TD>
+<TD width=61%><I>Temperature Coefficient of Resistance</I></TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>nickel</TD>
+<TD width=61%>+0.33%/deg F (+0.59%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>Balco</TD>
+<TD width=61%>+0.24%/deg F (-0.43%/deg C)</TD>
+</TR>
+
+<TR VALIGN="top">
+<TD width=39%>copper</TD>
+<TD width=61%>+0.22%/deg F (-0.40%/deg C)</TD>
+</TR>
+</TABLE><BR>
+
+<P>The preceding method will not generally result in precise compensation for span shift because of the approximate properties of the spring element, gages, and resistor alloys used in the calculations. Furthermore, readjustment of the compensation resistor will usually be required when the span-set or calibration resistor is inserted as described in the following section.  The most practical approach is to determine the nominal resistance, and then select a C pattern resistor which has an initial, uncut resistance below the required value, and a fully cut resistance above it.  By successive span-versus-temperature tests, the resistor can be adjusted to minimize the observed span changes.  It is usually possible, with this procedure, to adjust span-shift-versus-temperature to less than 0.001% of signal per deg F <I>(0.0018 % per deg C).</I></P>
+
+</BODY>
+</HTML>
+

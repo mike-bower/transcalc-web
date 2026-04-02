@@ -9,6 +9,28 @@ export interface BridgeParams {
   gageFactor: number // unitless (typical: 2.0-2.1 for strain gages)
   poisson?: number // Poisson's ratio (typical: 0.3 for steel)
   strainL?: number // alternative strain input for differential bridges (microstrain)
+  strain12?: number // strain for arms 1 & 2 in full 4-arm bridge
+  strain34?: number // strain for arms 3 & 4 in full 4-arm bridge
+}
+
+/**
+ * Calculate non-linear Poisson bridge output (2 + 2v arms, Axial/Bending)
+ * Based on the Delphi implementation in nonline.pas:
+ * Output = (strain - (-strain * poisson) + strain - (-strain * poisson)) / 4 * gageFactor * 1e-3
+ * which simplifies to: strain * (1 + poisson) * gageFactor * 1e-3
+ */
+export function calculateNonLinearPoissonBridge(
+  strain: number,
+  gageFactor: number,
+  poisson: number
+): number {
+  // Original formula from nonline.pas:
+  // Numerator := TheStrain - (-TheStrain * ThePoisson) + TheStrain -(-TheStrain * ThePoisson);
+  // Denominator := 4;
+  // OutValue := (Numerator / Denominator) * TheGageFactor * 1e-3;
+  const numerator = strain * (1 + poisson) + strain * (1 + poisson)
+  const denominator = 4
+  return (numerator / denominator) * gageFactor * 1e-3
 }
 
 /**
@@ -59,17 +81,19 @@ export function calculateFullTwoBridge(
  * All four arms are active strain gages: two in tension, two in compression
  * Provides maximum sensitivity and internal temperature compensation
  * 
- * Output (mV/V) = ε × Fg × 1e-3
+ * Output (mV/V) = ((ε12 - ε34) / 2) × Fg × 1e-3
  * 
- * @param strain Strain in microstrain (με)
+ * @param strain12 Strain for arms 1 & 2 in microstrain (με)
+ * @param strain34 Strain for arms 3 & 4 in microstrain (με)
  * @param gageFactor Gauge factor of strain gages (unitless)
  * @returns Bridge output in mV/V (millivolts per volt excitation)
  */
 export function calculateFullFourBridge(
-  strain: number,
+  strain12: number,
+  strain34: number,
   gageFactor: number
 ): number {
-  return strain * gageFactor * 1e-3
+  return ((strain12 - strain34) / 2) * gageFactor * 1e-3
 }
 
 /**
@@ -92,16 +116,18 @@ export function calculateHalfBridge(
 
 // Generic bridge calculator dispatcher
 export function calculateBridgeOutput(
-  bridgeType: 'linear' | 'fullTwo' | 'fullFour' | 'halfBridge',
+  bridgeType: 'linear' | 'nonLinearPoisson' | 'fullTwo' | 'fullFour' | 'halfBridge',
   params: BridgeParams
 ): number {
   switch (bridgeType) {
     case 'linear':
       return calculateLinearBridge(params.strain, params.gageFactor, params.poisson ?? 0.3)
+    case 'nonLinearPoisson':
+      return calculateNonLinearPoissonBridge(params.strain, params.gageFactor, params.poisson ?? 0.3)
     case 'fullTwo':
       return calculateFullTwoBridge(params.strain, params.strainL ?? 0, params.gageFactor)
     case 'fullFour':
-      return calculateFullFourBridge(params.strain, params.gageFactor)
+      return calculateFullFourBridge(params.strain12 ?? params.strain, params.strain34 ?? 0, params.gageFactor)
     case 'halfBridge':
       return calculateHalfBridge(params.strain, params.gageFactor)
     default:

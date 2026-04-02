@@ -1,0 +1,68 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Torque - Round Solid Shaft Element</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="torque___round_solid_shaft_element"></A>Torque - Round Solid Shaft</P>
+
+<P>Design Verification command</P>
+
+<P><B>Design Considerations</B></P>
+
+<P>A solid round shaft is the most simple torque transducer design and consequently the most popular.  There are no strain gradients for gages placed on a 45 degree angle from shaft centerline so any convenient gage length can be used.  Locating, aligning and bonding the four strain gages (or two half-bridge gage designs) is more difficult than the solid square shaft design.</P>
+
+<P><IMG SRC="../images/bm139.gif" ALT="" BORDER=0></P>
+
+<P><B>Inputs (Allowed Range)</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Applied Torque</B>, <B>T</B> (0.000 to 500,000 lb in [0 to 56,490 Nm])</P>
+
+<P>Pure torsion, free from axial or bending loads.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Shaft Diameter</B>, <B>d</B> (0.200 to 20 in [5.08 to 508 mm])</P>
+
+<P>Round shaft of uniform diameter in the gaged area.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Poisson's Ratio</B> (0.1 to 0.4)</P>
+
+<P>For the <A HREF="poisson_s_ratio__table_.htm">material</A> from which the shaft is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Modulus of Elasticity</B> (5E+6 to +50E+6 psi [34.5 to 345 GPa]) </P>
+
+<P>For the <A HREF="modulus_of_elasticity__table_.htm">material</A> from which the shaft is constructed.</P>
+
+<P><IMG SRC="../images/bm10.gif" ALT="" BORDER=0><B>Gage Factor</B> (1.0 to 5.0) The default value is 2.00.</P>
+
+<P>From Engineering Data Form supplied with gages. </P>
+
+<P><B>Calculated Values (Units)</B></P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0></B>Pressing the <SMALL>COMPUTE</SMALL> <SMALL>BUTTON</SMALL> after entering the variables (within their acceptable ranges) calculates the following two output values:</P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Nominal Gage Strain</B> (microstrain)</P>
+
+<P>The average of the absolute strains in the surface of the shaft under the gages.  Ideally in the strain range of <A HREF="design_considerations.htm#iu3mm">1000 to 1700 microstrain</A> at rated load.</P>
+
+<P><I><IMG SRC="../images/bm154.gif" ALT="" BORDER=0></I><B>Span at Applied Torque</B> (mV/V) </P>
+
+<P>Calculated output of a full-bridge circuit when the torque is equal to the value entered.  The mV/V units are millivolts of bridge output per volt of bridge excitation.</P>
+
+<P><B>Error Messages</B></P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I></B>�<I>The calculated nominal gage strain exceeds 1700 microstrain, which is considered to be the maximum strain level recommended for normal full scale transducer operation.</I>�</P>
+
+<P>A value of 1700 microstrain is considered to be the <A HREF="design_considerations.htm#iu3mm">maximum strain level</A> recommended for normal transducers. However, TransCalc will calculate the nominal gage strain until the value reaches 5000 microstrain.</P>
+
+<P><B><I><IMG SRC="../images/bm157.gif" ALT="" BORDER=0></I></B>�<I>Design Impracticable.  Gage strain exceeds 5000 microstrain</I>�</P>
+
+<P>No common transducer material will survive 5000 microstrain without an unacceptable amount of permanent zero offset.  Accordingly, no calculations are made for bridge output.  Adjust inputs so that nominal gage strain is less than 5000 microstrain.</P>
+
+</BODY>
+</HTML>
+

@@ -1,0 +1,440 @@
+<HTML>
+<!-- Sitemap 1.0 -->
+<OBJECT type="text/site properties">
+</OBJECT>
+<UL>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Auxiliary Resistors">
+		<param name="Name" value="Resistor Patterns">
+		<param name="Local" value="html/resistor_patterns.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Axial Designs">
+		<param name="Name" value="Axial (Basic Considerations)">
+		<param name="Local" value="html/axial__basic_considerations_.htm">
+		<param name="Name" value="Axial - Rectangular Element">
+		<param name="Local" value="html/axial___rectangular_element.htm">
+		<param name="Name" value="Axial - Round Hollow Element">
+		<param name="Local" value="html/axial___round_hollow_element.htm">
+		<param name="Name" value="Axial - Round Solid Element">
+		<param name="Local" value="html/axial___round_solid_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Beam Designs">
+		<param name="Name" value="Bending Beam (Basic Considerations)">
+		<param name="Local" value="html/bending_beam__basic_considerations_.htm">
+		<param name="Name" value="Bending Beam (Multiple Bending)">
+		<param name="Local" value="html/bending_beam__multiple_bending_.htm">
+		<param name="Name" value="Bending Beam - Binocular Element">
+		<param name="Local" value="html/bending_beam___binocular_element.htm">
+		<param name="Name" value="Bending Beam (Performance Improvements)">
+		<param name="Local" value="html/bending_beam__performance_improvements_.htm">
+		<param name="Name" value="Bending Beam - Cantilever Element">
+		<param name="Local" value="html/bending_beam___cantilever_element.htm">
+		<param name="Name" value="Bending Beam - Dual Beam Element">
+		<param name="Local" value="html/bending_beam___dual_beam_element.htm">
+		<param name="Name" value="Bending Beam - Reverse Bending Element">
+		<param name="Local" value="html/bending_beam___reverse_bending_element.htm">
+		<param name="Name" value="Bending Beam - S-Beam Element">
+		<param name="Local" value="html/bending_beam___s_beam_element.htm">
+		<param name="Name" value="Bending Elements">
+		<param name="Local" value="html/bending_elements.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Bending Beams - Multiple Bending">
+		<param name="Name" value="Bending Beam (Multiple Bending)">
+		<param name="Local" value="html/bending_beam__multiple_bending_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Bending Elements">
+		<param name="Name" value="Bending Elements">
+		<param name="Local" value="html/bending_elements.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Bridge Output Program">
+		<param name="Name" value="Bridge (1+v) Output">
+		<param name="Local" value="html/bridge__1_v_.htm">
+		<param name="Name" value="Bridge (2) Output">
+		<param name="Local" value="html/bridge__2__output.htm">
+		<param name="Name" value="Bridge (2+2v) Bridge">
+		<param name="Local" value="html/bridge__2_2v__bridge.htm">
+		<param name="Name" value="Bridge (4D) Output">
+		<param name="Local" value="html/bridge__4d__output.htm">
+		<param name="Name" value="Bridge (4) Output">
+		<param name="Local" value="html/bridge__4__output.htm">
+		<param name="Name" value="Bridge 2(1+v) )Output">
+		<param name="Local" value="html/bridge_2_1_v___output.htm">
+		<param name="Name" value="Bridge Output Program">
+		<param name="Local" value="html/bridge_output_program.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Cantilever Beams">
+		<param name="Name" value="Bending Beam (Basic Considerations)">
+		<param name="Local" value="html/bending_beam__basic_considerations_.htm">
+		<param name="Name" value="Bending Beam (Performance Improvements)">
+		<param name="Local" value="html/bending_beam__performance_improvements_.htm">
+		<param name="Name" value="Bending Beam - Cantilever Element">
+		<param name="Local" value="html/bending_beam___cantilever_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Circuit Refinements">
+		<param name="Name" value="Circuit Refinements (Basic)">
+		<param name="Local" value="html/circuit_refinements__basic_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Circuit Refinements (command)">
+		<param name="Name" value="Circuit Refinements (command)">
+		<param name="Local" value="html/circuit_refinements__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Column Designs">
+		<param name="Name" value="Axial (Basic Considerations)">
+		<param name="Local" value="html/axial__basic_considerations_.htm">
+		<param name="Name" value="Axial - Rectangular Element">
+		<param name="Local" value="html/axial___rectangular_element.htm">
+		<param name="Name" value="Axial - Round Hollow Element">
+		<param name="Local" value="html/axial___round_hollow_element.htm">
+		<param name="Name" value="Axial - Round Solid Element">
+		<param name="Local" value="html/axial___round_solid_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Configuration Program">
+		<param name="Name" value="Configuration Program">
+		<param name="Local" value="html/configuration_program.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Contents">
+		<param name="Name" value="Contents">
+		<param name="Local" value="html/contents.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Design Considerations">
+		<param name="Name" value="Axial (Basic Considerations)">
+		<param name="Local" value="html/axial__basic_considerations_.htm">
+		<param name="Name" value="Bending Beam (Basic Considerations)">
+		<param name="Local" value="html/bending_beam__basic_considerations_.htm">
+		<param name="Name" value="Bending Beam (Multiple Bending)">
+		<param name="Local" value="html/bending_beam__multiple_bending_.htm">
+		<param name="Name" value="Bending Beam (Performance Improvements)">
+		<param name="Local" value="html/bending_beam__performance_improvements_.htm">
+		<param name="Name" value="Bending Elements">
+		<param name="Local" value="html/bending_elements.htm">
+		<param name="Name" value="Design Considerations">
+		<param name="Local" value="html/design_considerations.htm">
+		<param name="Name" value="Shear Web - General Considerations">
+		<param name="Local" value="html/shear_web___general_considerations.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Design Verification (command)">
+		<param name="Name" value="Design Verification (command)">
+		<param name="Local" value="html/design_verification__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Diaphragm Designs">
+		<param name="Name" value="Pressure - Diaphragm Element">
+		<param name="Local" value="html/pressure___diaphragm_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Differential Beam">
+		<param name="Name" value="Bridge (4D) Output">
+		<param name="Local" value="html/bridge__4d__output.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Exit (command)">
+		<param name="Name" value="Exit (command)">
+		<param name="Local" value="html/exit__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Getting Started">
+		<param name="Name" value="Getting Started">
+		<param name="Local" value="html/getting_started.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="High Capacity Load Cells">
+		<param name="Name" value="High Capacity Load Cells">
+		<param name="Local" value="html/high_capacity_load_cells.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="High vs. Low Modulus Materials">
+		<param name="Name" value="High vs. Low Modulus Materials">
+		<param name="Local" value="html/high_vs._low_modulus_materials.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Initial Bridge Balance">
+		<param name="Name" value="Initial Bridge Balance">
+		<param name="Local" value="html/initial_bridge_balance.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Intitial Bridge Balance">
+		<param name="Name" value="Initial Bridge Balance (Basics)">
+		<param name="Local" value="html/initial_bridge_balance__basics_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Introduction">
+		<param name="Name" value="Getting Started">
+		<param name="Local" value="html/getting_started.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Manufacturing Considerations">
+		<param name="Name" value="High vs. Low Modulus Materials">
+		<param name="Local" value="html/high_vs._low_modulus_materials.htm">
+		<param name="Name" value="Manufacturing Considerations">
+		<param name="Local" value="html/manufacturing_considerations.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Materials">
+		<param name="Name" value="High vs. Low Modulus Materials">
+		<param name="Local" value="html/high_vs._low_modulus_materials.htm">
+		<param name="Name" value="Manufacturing Considerations">
+		<param name="Local" value="html/manufacturing_considerations.htm">
+		<param name="Name" value="Materials Properties">
+		<param name="Local" value="html/materials_properties.htm">
+		<param name="Name" value="Mechanical Properties">
+		<param name="Local" value="html/mechanical_properties.htm">
+		<param name="Name" value="Modulus of Elasticity (Table)">
+		<param name="Local" value="html/modulus_of_elasticity__table_.htm">
+		<param name="Name" value="Poisson's Ratio (Table)">
+		<param name="Local" value="html/poisson_s_ratio__table_.htm">
+		<param name="Name" value="Thermal Properties">
+		<param name="Local" value="html/thermal_properties.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Mechanical Properties">
+		<param name="Name" value="Mechanical Properties">
+		<param name="Local" value="html/mechanical_properties.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Modulus of Elasticity (table)">
+		<param name="Name" value="Modulus of Elasticity (Table)">
+		<param name="Local" value="html/modulus_of_elasticity__table_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Monograph">
+		<param name="Name" value="Monograph Index">
+		<param name="Local" value="html/monograph_index.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="New Project (command)">
+		<param name="Name" value="New Project (command)">
+		<param name="Local" value="html/new_project__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Open Project (command)">
+		<param name="Name" value="Open Project (command)">
+		<param name="Local" value="html/open_project__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Poisson Bridge">
+		<param name="Name" value="Bridge (1+v) Output">
+		<param name="Local" value="html/bridge__1_v_.htm">
+		<param name="Name" value="Bridge (2+2v) Bridge">
+		<param name="Local" value="html/bridge__2_2v__bridge.htm">
+		<param name="Name" value="Bridge 2(1+v) )Output">
+		<param name="Local" value="html/bridge_2_1_v___output.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Poisson's Ratio (table)">
+		<param name="Name" value="Poisson's Ratio (Table)">
+		<param name="Local" value="html/poisson_s_ratio__table_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Pressure Designs">
+		<param name="Name" value="Pressure - Diaphragm Element">
+		<param name="Local" value="html/pressure___diaphragm_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Print Project (command)">
+		<param name="Name" value="Print (command)">
+		<param name="Local" value="html/print__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Ratio Program">
+		<param name="Name" value="Ratio Program">
+		<param name="Local" value="html/ratio_program.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Resistor Patterns">
+		<param name="Name" value="A-Pattern Resistors">
+		<param name="Local" value="html/a_pattern_resistors.htm">
+		<param name="Name" value="B-Pattern Resistors">
+		<param name="Local" value="html/b_pattern_resistors.htm">
+		<param name="Name" value="C-Pattern Resistors">
+		<param name="Local" value="html/c_pattern_resistors.htm">
+		<param name="Name" value="C11 Resistors">
+		<param name="Local" value="html/c11_resistors.htm">
+		<param name="Name" value="C12-10 Resistors">
+		<param name="Local" value="html/c12_10_resistors.htm">
+		<param name="Name" value="C13 Resistors">
+		<param name="Local" value="html/c13_resistors.htm">
+		<param name="Name" value="C12-20 Resistors">
+		<param name="Local" value="html/c12_20_resistors.htm">
+		<param name="Name" value="D-Pattern Resistors">
+		<param name="Local" value="html/d_pattern_resistors.htm">
+		<param name="Name" value="E01 Resistors">
+		<param name="Local" value="html/e01_resistors.htm">
+		<param name="Name" value="Resistor Patterns">
+		<param name="Local" value="html/resistor_patterns.htm">
+		<param name="Name" value="Wire Table (dialog)">
+		<param name="Local" value="html/wire_table.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Reverse Bending Beam">
+		<param name="Name" value="Bending Beam - Reverse Bending Element">
+		<param name="Local" value="html/bending_beam___reverse_bending_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="S Beams">
+		<param name="Name" value="Bending Beam - S-Beam Element">
+		<param name="Local" value="html/bending_beam___s_beam_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Save Project (command)">
+		<param name="Name" value="Save Project (command)">
+		<param name="Local" value="html/save_project__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Save Project As (command)">
+		<param name="Name" value="Save Project As (command)">
+		<param name="Local" value="html/save_project_as__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Shear Web Designs">
+		<param name="Name" value="Shear - Round S-Beam Element">
+		<param name="Local" value="html/shear___round_s_beam_element.htm">
+		<param name="Name" value="Shear - Round Web Element">
+		<param name="Local" value="html/shear___round_web_element.htm">
+		<param name="Name" value="Shear - Square Web Element">
+		<param name="Local" value="html/shear___square_web_element.htm">
+		<param name="Name" value="Shear Web - General Considerations">
+		<param name="Local" value="html/shear_web___general_considerations.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Span Set">
+		<param name="Name" value="Initial Span Adjust  (Basics)">
+		<param name="Local" value="html/initial_span_adjust___basics_.htm">
+		<param name="Name" value="Span &amp; Span Shift w/Temperature, Simultaneous">
+		<param name="Local" value="html/span___span_shift_w_temperature__simultaneous.htm">
+		<param name="Name" value="Span Set">
+		<param name="Local" value="html/span_set.htm">
+		<param name="Name" value="Span Set - Techniques">
+		<param name="Local" value="html/span_set___techniques.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Span Shift">
+		<param name="Name" value="Span Shift with Temperature (Techniques)">
+		<param name="Local" value="html/span_shift_with_temperature__techniques_.htm">
+		<param name="Name" value="Span Shift with Temperature Change">
+		<param name="Local" value="html/span_shift_with_temperature_change_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Span Shift Compensation">
+		<param name="Name" value="Span &amp; Span Shift w/Temperature, Simultaneous">
+		<param name="Local" value="html/span___span_shift_w_temperature__simultaneous.htm">
+		<param name="Name" value="Span Shift w/Temperature, 2 Points">
+		<param name="Local" value="html/span_shift_w_temperature__2_points.htm">
+		<param name="Name" value="Span Shift w/Temperature, 3 Points">
+		<param name="Local" value="html/span_shift_w_temperature__3_points.htm">
+		<param name="Name" value="Span Shift w/Temperature, Optimum">
+		<param name="Local" value="html/span_shift_w_temperature__optimum.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Spring Element Designs">
+		<param name="Name" value="Axial - Rectangular Element">
+		<param name="Local" value="html/axial___rectangular_element.htm">
+		<param name="Name" value="Axial - Round Hollow Element">
+		<param name="Local" value="html/axial___round_hollow_element.htm">
+		<param name="Name" value="Axial - Round Solid Element">
+		<param name="Local" value="html/axial___round_solid_element.htm">
+		<param name="Name" value="Bending Beam - Binocular Element">
+		<param name="Local" value="html/bending_beam___binocular_element.htm">
+		<param name="Name" value="Bending Beam - Cantilever Element">
+		<param name="Local" value="html/bending_beam___cantilever_element.htm">
+		<param name="Name" value="Bending Beam - Dual Beam Element">
+		<param name="Local" value="html/bending_beam___dual_beam_element.htm">
+		<param name="Name" value="Bending Beam - Reverse Bending Element">
+		<param name="Local" value="html/bending_beam___reverse_bending_element.htm">
+		<param name="Name" value="Bending Beam - S-Beam Element">
+		<param name="Local" value="html/bending_beam___s_beam_element.htm">
+		<param name="Name" value="Pressure - Diaphragm Element">
+		<param name="Local" value="html/pressure___diaphragm_element.htm">
+		<param name="Name" value="Shear - Round S-Beam Element">
+		<param name="Local" value="html/shear___round_s_beam_element.htm">
+		<param name="Name" value="Shear - Round Web Element">
+		<param name="Local" value="html/shear___round_web_element.htm">
+		<param name="Name" value="Shear - Square Web Element">
+		<param name="Local" value="html/shear___square_web_element.htm">
+		<param name="Name" value="Torque - Round Hollow Shaft Element">
+		<param name="Local" value="html/torque___round_hollow_shaft_element.htm">
+		<param name="Name" value="Torque - Round Solid Shaft Element">
+		<param name="Local" value="html/torque___round_solid_shaft_element.htm">
+		<param name="Name" value="Torque - Square Shaft Element">
+		<param name="Local" value="html/torque___square_shaft_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Spring Elements">
+		<param name="Name" value="Spring Elements (Basics)">
+		<param name="Local" value="html/spring_elements__basics_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Technical Assistance">
+		<param name="Name" value="Technical Assistance">
+		<param name="Local" value="html/technical_assistance.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Thermal Properties">
+		<param name="Name" value="High vs. Low Modulus Materials">
+		<param name="Local" value="html/high_vs._low_modulus_materials.htm">
+		<param name="Name" value="Manufacturing Considerations">
+		<param name="Local" value="html/manufacturing_considerations.htm">
+		<param name="Name" value="Thermal Properties">
+		<param name="Local" value="html/thermal_properties.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Torque Designs">
+		<param name="Name" value="Torque - Round Hollow Shaft Element">
+		<param name="Local" value="html/torque___round_hollow_shaft_element.htm">
+		<param name="Name" value="Torque - Round Solid Shaft Element">
+		<param name="Local" value="html/torque___round_solid_shaft_element.htm">
+		<param name="Name" value="Torque - Square Shaft Element">
+		<param name="Local" value="html/torque___square_shaft_element.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Version">
+		<param name="Name" value="Version">
+		<param name="Local" value="html/version.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Wire (table)">
+		<param name="Name" value="Wire Table (dialog)">
+		<param name="Local" value="html/wire_table.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Wire Table Program">
+		<param name="Name" value="Wire Table Program">
+		<param name="Local" value="html/wire_table_program.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Zero Balance">
+		<param name="Name" value="Initial Bridge Balance">
+		<param name="Local" value="html/initial_bridge_balance.htm">
+		<param name="Name" value="Initial Zero Balance (Techniques)">
+		<param name="Local" value="html/initial_zero_balance__techniques_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Zero Shift">
+		<param name="Name" value="Zero Shift with Temperature Change (Basics)">
+		<param name="Local" value="html/zero_shift_with_temperature_change__basics_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Zero Shift Compensation">
+		<param name="Name" value="Zero Shift with Temperature (Techniques)">
+		<param name="Local" value="html/zero_shift_with_temperature__techniques_.htm">
+		<param name="Name" value="Zero Shift with Temperature Change (command)">
+		<param name="Local" value="html/zero_shift_with_temperature_change__command_.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Keyword" value="Zero Shift with Temperature - Techniques">
+		<param name="Name" value="Zero Shift with Temperature (Techniques)">
+		<param name="Local" value="html/zero_shift_with_temperature__techniques_.htm">
+		</OBJECT>
+</UL></HTML>

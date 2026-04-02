@@ -1,0 +1,74 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" Content="text/html; charset=Windows-1252">
+<TITLE>Span &amp; Span Shift w/Temperature, Simultaneous</TITLE>
+</HEAD>
+
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+
+
+<P><A NAME="span___span_shift_w_temperature__simultaneous"></A>Span &amp; Span Shift with Temperature, Simultaneous</P>
+
+<P>Circuits Refinements command</P>
+
+<P><B>General Considerations</B></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_set.htm">Span Set</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_set___techniques.htm">Span Set Techniques</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature_change_.htm">Span Shift with Temperature Change</A></P>
+
+<P><IMG SRC="../images/bm160.gif" ALT="" BORDER=0><A HREF="span_shift_with_temperature__techniques_.htm">Span Shift Compensation Techniques</A></P>
+
+<P>This is a simultaneous calculation of span shift with temperature change, 3 points and span set.  The entry of variables is the same as span shift with temperature change, 3 points with the addition of a value for desired span.  Desired span must be lower than the measured span, bearing in mind that the measured span will also be reduced by the inclusion of the calculated Rmod/Rshunt.  If the error message, �The desired span must be lower than the measured span� is encountered, it is typically due to an unusually high calculated value for Rmod/Rshunt. Reducing the value for desired span gradually will eventually remove the error message and permit a calculation.</P>
+
+<P>When utilizing both span set and span shift with temperature change, 3 point dialogs, it is advantageous to run the simultaneous span set and span shift with temperature change, 3 point dialog rather than the two separate dialogs independently.  This is because the addition of a span set resistor will influence the compensation obtained with a specific Rmod/Rshunt resistor combination.  In the simultaneous span set and span shift with temperature change, 3 point dialog, such influences are anticipated and corrected.</P>
+
+<P><B>Inputs</B></P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Span at High, Ambient &amp; Low Temperature </B>Three measured values from the transducer under test are entered at three test temperatures.  The actual temperatures used are not critical, providing that the temperatures are separated by a reasonable amount.  For example, a transducer which is designed to operate over a 0�F to 120�F temperature range would typically be tested at 0�F, 75�F and 120�F to obtain the best accuracy of compensation.</P>
+
+<P>The bridge output at the test load minus the bridge zero output at the same temperature.  Span measurement should not be done with Rmod and Rspan resistors in the circuit.  If  these resistors are already wired into the bridge circuit, they can be temporarily disabled by shorting across their terminals.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Rbridge</B>  The bridge resistance value measured at P+ and P-.  The measurement should not include span set or span shift with temperature change resistors.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Rtl, Rta, Rth</B></P>
+
+<P>These are resistor values (or resistance ratios relative to the ambient temperature value) of an Rmod resistor (bondable or wire type) installed on the transducer or sample of the transducer material.  They are measured or computed from measurements taken at the same three temperatures as used for Span and Rbridge inputs.</P>
+
+<P>For best accuracy, Rtl, Rta and Rth values are obtained by testing a sample of the intended Rmod resistor material since TCR is sensitive to both lot and installation (i.e., bondable resistors mounted on steel alloys will exhibit different TCR values than the same resistors mounted on aluminum alloys).  Since the TransCalc computation compares the relative change in ambient temperature resistor value to low and high temperature values, the actual ambient temperature value of the test resistor is not critical.</P>
+
+<P>Rtl, Rta and Rth have already been computed for Measurements Group <A HREF="resistor_patterns.htm">bondable resistors</A> of copper, nickel and Balco alloys mounted on steel and aluminum alloy transducer materials.  To access this calculator, select the auxiliary program Resistance Ratios.</P>
+
+<P><B><IMG SRC="../images/bm10.gif" ALT="" BORDER=0>Desired Span</B></P>
+
+<P>The span desired after insertion of the calculated span resistor.</P>
+
+<P><B>Solutions</B></P>
+
+<P><B><IMG SRC="../images/bm154.gif" ALT="" BORDER=0>Rshunt</B></P>
+
+<P>The value of fixed resistance to be placed in parallel with Rmod to achieve the desired linearity correction of span vs. temperature.  This resistor does not need to have an extremely low TCR.  A wire or metal film resistor of perhaps 0-50 ppm/�C will be sufficient.</P>
+
+<P><IMG SRC="../images/bm119.gif" ALT="" BORDER=0></P>
+
+<P><IMG SRC="../images/bm154.gif" ALT="" BORDER=0><B>Rmod</B></P>
+
+<P>This is the ambient temperature value of the suggested modulus resistor, produced  from the same material as was used to measure Rtl, Rta and Rth.</P>
+
+<P>Some transducers, due to the nature of their use, require that the span vs. temperature resistors be equally divided between the P+ and P- power supply leads.  In these cases the Rspan and Rmod should be divided by 2 and these values placed in each of the two power leads.</P>
+
+<P><B><IMG SRC="../images/bm154.gif" ALT="" BORDER=0>Rspan</B></P>
+
+<P>The resistance value to be added to the bridge power lead(s) to reduce the measured  span to the desired span level.  As with span vs. temperature, the value for span set   is often split equally between the positive and negative excitation leads.</P>
+
+<P><B><IMG SRC="../images/bm153.gif" ALT="" BORDER=0>Select</B></P>
+
+<P>Select Rspan resistor type from the available choices.</P>
+
+</BODY>
+</HTML>
+
