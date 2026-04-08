@@ -42,7 +42,7 @@ const calculateSpanFromStrain = (maxStrain: number, gageFactor: number): number 
 export const calculateRoundSBeamSpan = (params: ShearSpanParams): number => {
   const d = params.diameter / 2
   const flange = (params.height - params.diameter) / 2
-  const factor1 = flange * params.width * (d - flange)
+  const factor1 = flange * params.width * (d - 2 * flange / 2)
   const maxStrain = calculateMaxStrain(
     params.load,
     params.width,
@@ -59,7 +59,7 @@ export const calculateRoundSBeamSpan = (params: ShearSpanParams): number => {
 export const calculateSquareShearSpan = (params: ShearSpanParams): number => {
   const d = params.diameter / 2
   const flange = (params.height - params.diameter) / 2
-  const factor1 = flange * params.width * (d - flange / 2)
+  const factor1 = flange * params.width * (d - 2 * flange / 2)
   const maxStrain = calculateMaxStrain(
     params.load,
     params.width,
@@ -76,7 +76,7 @@ export const calculateSquareShearSpan = (params: ShearSpanParams): number => {
 export const calculateRoundShearSpan = (params: ShearSpanParams): number => {
   const d = params.diameter / 2
   const flange = (params.height - params.diameter) / 2
-  const factor1 = flange * params.width * (d - flange)
+  const factor1 = flange * params.width * (d - 2 * flange / 2)
   const maxStrain = calculateMaxStrain(
     params.load,
     params.width,

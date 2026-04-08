@@ -1,29 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #eef3f8;
-  --ink: #152634;
-  --ink-soft: #41576b;
+  --bg: #f8fafc;
+  --ink: #0f172a;
+  --ink-soft: #64748b;
   --panel: #ffffff;
-  --accent: #0f4f87;
-  --accent-strong: #0a3b66;
-  --accent-warm: #ef8b1e;
-  --line: #c9d5e2;
-  --shadow: 0 12px 28px rgba(22, 48, 73, 0.12);
-}
-
-* {
-  box-sizing: border-box;
+  --accent: #2563eb;
+  --accent-strong: #1e40af;
+  --accent-warm: #d97706;
+  --line: #e2e8f0;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 body {
   margin: 0;
   font-family: 'Barlow', sans-serif;
   color: var(--ink);
-  background:
-    radial-gradient(1200px 480px at 0% -10%, #d8e6f6 0%, transparent 70%),
-    radial-gradient(900px 600px at 100% 0%, #ffe5c9 0%, transparent 66%),
-    var(--bg);
+  background: var(--bg);
   min-height: 100vh;
 }
 

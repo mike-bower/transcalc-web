@@ -442,8 +442,8 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     if (!hostRef.current) return
     const host = hostRef.current
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0xf4f8fc)
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100)
+    scene.background = new THREE.Color(0xffffff) // Set to white
+    const camera = new THREE.PerspectiveCamera(45, host.clientWidth / Math.max(1, host.clientHeight), 0.1, 100)
     camera.position.set(2.5, 1.8, 2.2)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -458,11 +458,11 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     controls.target.set(0.6, 0, 0)
     controls.update()
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65))
-    const d = new THREE.DirectionalLight(0xffffff, 0.95)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+    const d = new THREE.DirectionalLight(0xffffff, 1.0)
     d.position.set(4, 5, 3)
     scene.add(d)
-    scene.add(new THREE.GridHelper(6, 14, 0xbfd3e5, 0xdbe7f2))
+    scene.add(new THREE.GridHelper(6, 14, 0xcccccc, 0xeeeeee)) // Lighter grid for white background
 
     const root = new THREE.Group()
     rootRef.current = root
@@ -480,8 +480,9 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     const ro = new ResizeObserver(() => {
       const w = host.clientWidth
       const h = host.clientHeight
-      renderer.setSize(w, h)
-      camera.aspect = w / Math.max(1, h)
+      if (w === 0 || h === 0) return
+      renderer.setSize(w, h, false) // false prevents style changes
+      camera.aspect = w / h
       camera.updateProjectionMatrix()
     })
     ro.observe(host)
@@ -491,26 +492,29 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
       ro.disconnect()
       controls.dispose()
       renderer.dispose()
-      host.removeChild(renderer.domElement)
+      if (host.contains(renderer.domElement)) {
+        host.removeChild(renderer.domElement)
+      }
     }
   }, [model])
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div ref={hostRef} className="transducer-3d-canvas" />
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '0', overflow: 'hidden' }}>
+      <div ref={hostRef} className="transducer-3d-canvas" style={{ height: '100%', border: 'none', background: 'transparent' }} />
       <div style={{
         position: 'absolute',
         top: '10px',
         right: '10px',
         zIndex: 10,
-        backgroundColor: 'rgba(255,255,255,0.4)',
+        backgroundColor: 'rgba(30, 41, 59, 0.7)',
         padding: '4px 8px',
         borderRadius: '4px',
         fontSize: '11px',
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
-        border: '1px solid #ccc',
+        border: '1px solid rgba(71, 85, 105, 0.5)',
+        color: '#f8fafc',
         pointerEvents: 'auto'
       }}>
         <input
@@ -528,7 +532,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
 
 export default function CantileverModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap">
+    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
       <Cantilever3D params={params} us={us} />
     </div>
   )

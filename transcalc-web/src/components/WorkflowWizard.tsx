@@ -46,6 +46,8 @@ import {
 } from '../domain/inverse/designInverse'
 import CantileverModelPreview from './CantileverModelPreview'
 import { BinocularSketch2D } from './BinocularSketch2D'
+import { TorqueHollowSketch2D } from './diagrams/TorqueHollowSketch2D'
+import { TorqueHollow3D } from './diagrams/TorqueHollow3D'
 import { BinocularModelPreview } from './BinocularModelPreview'
 import { TRANSDUCER_DEFINITIONS, TRANSDUCER_CATEGORIES } from '../domain/transducerDefinitions'
 
@@ -104,13 +106,16 @@ function toSI(displayVal: number, unit: UnitKind, us: boolean): number {
   return Math.round(val * 1000000) / 1000000
 }
 
-function unitLabel(unit: UnitKind, us: boolean): string {
+function unitLabel(unit: UnitKind, us: boolean, fieldKey?: string): string {
   switch (unit) {
     case 'length':   return us ? 'in' : 'mm'
     case 'force':    return us ? 'lbf' : 'N'
     case 'modulus':  return us ? 'Mpsi' : 'GPa'
     case 'pressure': return us ? 'psi' : 'MPa'
-    case 'none':     return ''
+    case 'none':     
+      if (fieldKey === 'appliedTorque') return us ? 'in·lb' : 'N·m'
+      return ''
+    default: return ''
   }
 }
 
@@ -266,6 +271,7 @@ const DESIGN_FIELDS: Record<string, FieldDef[]> = {
     { key: 'load',        label: 'Applied Load',      unit: 'force',   si: 100 },
     { key: 'distHoles',   label: 'Hole CL Distance',  unit: 'length',  si: 100 },
     { key: 'radius',      label: 'Hole Radius',       unit: 'length',  si: 5 },
+    { key: 'cutThick',    label: 'Cut Thickness',     unit: 'length',  si: 2 },
     { key: 'beamWidth',   label: 'Beam Width',        unit: 'length',  si: 25 },
     { key: 'beamHeight',  label: 'Beam Height',       unit: 'length',  si: 14 },
     { key: 'minThick',    label: 'Min. Thickness',    unit: 'length',  si: 2 },
@@ -284,6 +290,16 @@ const DESIGN_FIELDS: Record<string, FieldDef[]> = {
     { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
   ],
   roundShear: [
+    { key: 'load',      label: 'Applied Load',   unit: 'force',   si: 5000 },
+    { key: 'width',     label: 'Width',          unit: 'length',  si: 30 },
+    { key: 'height',    label: 'Height',         unit: 'length',  si: 50 },
+    { key: 'diameter',  label: 'Hole Diameter',  unit: 'length',  si: 30 },
+    { key: 'thickness', label: 'Web Thickness',  unit: 'length',  si: 5 },
+    { key: 'modulus',   label: 'Modulus',        unit: 'modulus', si: 200 },
+    { key: 'poisson',   label: 'Poisson Ratio',  unit: 'none',    si: 0.3 },
+    { key: 'gageFactor',label: 'Gage Factor',    unit: 'none',    si: 2.1 },
+  ],
+  roundHollowShear: [
     { key: 'load',      label: 'Applied Load',   unit: 'force',   si: 5000 },
     { key: 'width',     label: 'Width',          unit: 'length',  si: 30 },
     { key: 'height',    label: 'Height',         unit: 'length',  si: 50 },
@@ -319,7 +335,7 @@ const DESIGN_FIELDS: Record<string, FieldDef[]> = {
     { key: 'gageFactor',    label: 'Gage Factor',          unit: 'none',    si: 2.1 },
   ],
   roundHollowTorque: [
-    { key: 'appliedTorque', label: 'Applied Torque (N·m)', unit: 'none',    si: 50 },
+    { key: 'appliedTorque', label: 'Applied Torque',       unit: 'none',    si: 50 },
     { key: 'outerDiameter', label: 'Outer Diameter',       unit: 'length',  si: 30 },
     { key: 'innerDiameter', label: 'Inner Diameter',       unit: 'length',  si: 20 },
     { key: 'modulus',       label: 'Modulus',              unit: 'modulus', si: 200 },
@@ -409,7 +425,11 @@ const BRIDGE_CONFIG_LABELS: Record<string, string> = {
 }
 
 function initParams(fields: FieldDef[]): Record<string, number | string> {
-  return Object.fromEntries(fields.map(f => [f.key, f.key === 'bridgeConfig' ? 'quarter' : f.si]))
+  const params: Record<string, number | string> = {};
+  fields.forEach(f => {
+    params[f.key] = f.key === 'bridgeConfig' ? 'quarter' : f.si;
+  });
+  return params;
 }
 
 // ── Build orchestrator inputs ─────────────────────────────────────────────────
@@ -741,17 +761,24 @@ const TRIM_FAMILIES: Array<{ key: TrimFamily; label: string; unitListKey: keyof 
 type Props = {
   unitSystem: UnitSystem
   onUnitChange: (u: UnitSystem) => void
+  initialStep?: Step
 }
 
-export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
+export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }: Props) {
   const us = unitSystem === 'US'
 
   // ── Step ──────────────────────────────────────────────────────
-  const [step, setStep] = useState<Step>(1)
+  const [step, setStep] = useState<Step>(initialStep ?? 1)
+
+  useEffect(() => {
+    if (initialStep !== undefined) {
+      setStep(initialStep)
+    }
+  }, [initialStep])
 
   // ── Step 1: Design ────────────────────────────────────────────
-  const [designType, setDesignType] = useState<TransducerType>('cantilever')
-  const [dp, setDp] = useState<Record<string, number>>(initParams(DESIGN_FIELDS.cantilever))
+  const [designType, setDesignType] = useState<TransducerType>('binocularBeam')
+  const [dp, setDp] = useState<Record<string, number>>(initParams(DESIGN_FIELDS.binoBeam))
   const [designMode, setDesignMode] = useState<DesignMode>('forward')
   const [targetSpanMvV, setTargetSpanMvV] = useState(2.0)
   const [inverseUnknownByType, setInverseUnknownByType] = useState<Partial<Record<TransducerType, string>>>({
@@ -765,6 +792,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
     binoBeam: INVERSE_META.binoBeam?.[0]?.key,
     squareShear: INVERSE_META.squareShear?.[0]?.key,
     roundShear: INVERSE_META.roundShear?.[0]?.key,
+    roundHollowShear: INVERSE_META.roundShear?.[0]?.key,
     roundSBeamShear: INVERSE_META.roundSBeamShear?.[0]?.key,
     squareTorque: INVERSE_META.squareTorque?.[0]?.key,
     roundSolidTorque: INVERSE_META.roundSolidTorque?.[0]?.key,
@@ -785,8 +813,11 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
 
   // ── Reset design params when type changes ─────────────────────
   useEffect(() => {
-    const fields = DESIGN_FIELDS[designType]
-    if (fields) setDp(initParams(fields))
+    if (DESIGN_FIELDS[designType]) {
+      const newParams = initParams(DESIGN_FIELDS[designType]);
+      console.log('Resetting params for:', designType, newParams);
+      setDp(newParams as Record<string, number>);
+    }
     const supported = Boolean(INVERSE_META[designType]?.length)
     if (!supported) setDesignMode('forward')
     setInverseUnknownByType(prev => {
@@ -1192,183 +1223,208 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
 
           <div className="design-frame-grid">
             <div className="design-frame-main">
-          {selectedInverseMeta.length > 0 && (
-            <div className="wizard-wire-row">
-              <label>
-                Design Mode
-                <select
-                  value={designMode}
-                  onChange={e => setDesignMode(e.target.value as DesignMode)}
-                >
-                  <option value="forward">Forward (known geometry/load)</option>
-                  <option value="targetDriven">Target-driven (solve one unknown)</option>
-                </select>
-              </label>
-            </div>
-          )}
+              {/* Target Driven Configuration */}
+              {selectedInverseMeta.length > 0 && (
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Design Mode</label>
+                      <select
+                        className="w-full bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                        value={designMode}
+                        onChange={e => setDesignMode(e.target.value as DesignMode)}
+                      >
+                        <option value="forward">Forward (known geometry/load)</option>
+                        <option value="targetDriven">Target-driven (solve one unknown)</option>
+                      </select>
+                    </div>
 
-          {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && (
-            <div className="bino-grid">
-              <label>
-                Target Span (mV/V)
-                <input
-                  type="number"
-                  value={Number.isFinite(targetSpanMvV) ? targetSpanMvV : ''}
-                  step={0.01}
-                  min={0}
-                  onChange={e => setTargetSpanMvV(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Solve For
-                <select
-                  value={selectedUnknownKey ?? ''}
-                  onChange={e =>
-                    setInverseUnknownByType(prev => ({ ...prev, [designType]: e.target.value }))
-                  }
-                >
-                  {selectedInverseMeta.map(m => (
-                    <option key={m.key} value={m.key}>{m.label}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          )}
-
-          {/* Input form */}
-          <div className="bino-grid">
-            {(DESIGN_FIELDS[designType] ?? []).map(f => {
-              const solvedFieldKey = inverseResult?.solvedFieldKey
-              const isSolvedField =
-                selectedInverseMeta.length > 0 &&
-                designMode === 'targetDriven' &&
-                solvedFieldKey === f.key
-
-              const sourceValue = isSolvedField && Number.isFinite(inverseResult?.solvedValue)
-                ? inverseResult?.solvedValue ?? (dp[f.key] ?? f.si)
-                : (dp[f.key] ?? f.si)
-              const displayVal = toDisplay(sourceValue, f.unit, us)
-              const suffix = unitLabel(f.unit, us)
-
-              if (f.key === 'bridgeConfig') {
-                return (
-                  <label key={f.key}>
-                    {f.label}
-                    <select
-                      value={dp[f.key] ?? 'quarter'}
-                      onChange={e => setDp(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    >
-                      {Object.entries(BRIDGE_CONFIG_LABELS).map(([k, label]) => (
-                        <option key={k} value={k}>{label}</option>
-                      ))}
-                    </select>
-                  </label>
-                )
-              }
-
-              return (
-                <label key={f.key}>
-                  {f.label} {suffix ? ` (${suffix})` : ''} {isSolvedField ? ' (Solved)' : ''}
-                  <input
-                    type="number"
-                    value={Number.isFinite(displayVal) ? displayVal : ''}
-                    step={f.step ?? 0.01}
-                    min={f.min}
-                    disabled={isSolvedField}
-                    onChange={e => setDesignField(f.key, Number(e.target.value), f.unit)}
-                  />
-                </label>
-              )
-            })}
-          </div>
-
-          {/* Results */}
-          {designResult && (
-            <table className="bino-table">
-              <tbody>
-                <tr><th colSpan={3}>Design Results</th></tr>
-                {designResult.isValid ? (
-                  <>
-                    <tr>
-                      <td>Nominal Gage Strain</td>
-                      <td>{show(designResult.avgStrain, 1)}</td>
-                      <td>µε</td>
-                    </tr>
-                    {designResult.minStrain !== undefined && (
-                      <tr>
-                        <td>Min / Max Strain</td>
-                        <td>{show(designResult.minStrain, 1)} / {show(designResult.maxStrain ?? 0, 1)}</td>
-                        <td>µε</td>
-                      </tr>
+                    {designMode === 'targetDriven' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Target (mV/V)</label>
+                          <input
+                            type="number"
+                            className="w-full bg-white border border-slate-300 text-blue-700 font-mono font-bold text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                            value={Number.isFinite(targetSpanMvV) ? targetSpanMvV : ''}
+                            step={0.01}
+                            min={0}
+                            onChange={e => setTargetSpanMvV(Number(e.target.value))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Solve For</label>
+                          <select
+                            className="w-full bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                            value={selectedUnknownKey ?? ''}
+                            onChange={e =>
+                              setInverseUnknownByType(prev => ({ ...prev, [designType]: e.target.value }))
+                            }
+                          >
+                            {selectedInverseMeta.map(m => (
+                              <option key={m.key} value={m.key}>{m.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     )}
-                    {designResult.gradient !== undefined && (
-                      <tr>
-                        <td>Strain Variation</td>
-                        <td>{show(designResult.gradient, 2)}</td>
-                        <td>%</td>
-                      </tr>
-                    )}
-                    <tr>
-                      <td>Span at Applied Load</td>
-                      <td>{show(designResult.fullSpanSensitivity, 4)}</td>
-                      <td>mV/V</td>
-                    </tr>
-                    {designResult.naturalFrequency !== undefined && (
-                      <tr>
-                        <td>Natural Frequency</td>
-                        <td>{show(designResult.naturalFrequency, 0)}</td>
-                        <td>Hz</td>
-                      </tr>
-                    )}
-                    {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && inverseResult?.isValid && (
-                      <>
-                        <tr>
-                          <td>Target Span</td>
-                          <td>{show(targetSpanMvV, 4)}</td>
-                          <td>mV/V</td>
-                        </tr>
-                        <tr>
-                          <td>Solved Parameter</td>
-                          <td colSpan={2}>
+                  </div>
+                </div>
+              )}
+
+              {/* Input Form Grid */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                  {(DESIGN_FIELDS[designType] ?? []).map(f => {
+                    const solvedFieldKey = inverseResult?.solvedFieldKey
+                    const isSolvedField =
+                      selectedInverseMeta.length > 0 &&
+                      designMode === 'targetDriven' &&
+                      solvedFieldKey === f.key
+
+                    const sourceValue = isSolvedField && Number.isFinite(inverseResult?.solvedValue)
+                      ? inverseResult?.solvedValue ?? (dp[f.key] ?? f.si)
+                      : (dp[f.key] ?? f.si)
+                    const displayVal = toDisplay(sourceValue, f.unit, us)
+                    const suffix = unitLabel(f.unit, us, f.key)
+
+                    if (f.key === 'bridgeConfig') {
+                      return (
+                        <div key={f.key} className="flex flex-col space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">{f.label}</label>
+                          <select
+                            className="bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                            value={dp[f.key] ?? 'quarter'}
+                            onChange={e => setDp(prev => ({ ...prev, [f.key]: e.target.value }))}
+                          >
+                            {Object.entries(BRIDGE_CONFIG_LABELS).map(([k, label]) => (
+                              <option key={k} value={k}>{label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div key={f.key} className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-tight flex-1">
+                          {f.label}
+                          {suffix && <span className="ml-1 text-[9px] text-slate-400 lowercase font-normal">({suffix})</span>}
+                          {isSolvedField && <span className="ml-2 text-[9px] text-emerald-600 font-black tracking-widest">SOLVED</span>}
+                        </label>
+                        <input
+                          type="number"
+                          className={`w-28 px-3 py-1.5 text-right text-xs font-mono font-bold rounded-lg transition-all outline-none border shadow-inner ${
+                            isSolvedField 
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-not-allowed' 
+                              : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:ring-1 focus:ring-blue-500'
+                          }`}
+                          value={Number.isFinite(displayVal) ? displayVal : ''}
+                          step={f.step ?? 0.01}
+                          min={f.min}
+                          disabled={isSolvedField}
+                          onChange={e => setDesignField(f.key, Number(e.target.value), f.unit)}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Design Analysis Results */}
+              {designResult && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mt-4">
+                  <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Design Analysis Results</h3>
+                    <div className="flex gap-2">
+                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${designResult.isValid ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                         {designResult.isValid ? 'Valid Design' : 'Limit Violation'}
+                       </span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-12">
+                    {[
+                      { label: 'Calculated Shear Strain', value: show(designResult.avgStrain, 1), unit: 'µε', color: 'text-blue-600', visible: true },
+                      { label: 'Normal Strain (45°)', value: show(designResult.minStrain ?? 0, 1), unit: 'µε', color: 'text-slate-700', visible: designType === 'roundHollowTorque' },
+                      { label: 'Min / Max Strain', value: `${show(designResult.minStrain ?? 0, 1)} / ${show(designResult.maxStrain ?? 0, 1)}`, unit: 'µε', color: 'text-slate-700', visible: designResult.minStrain !== undefined && designType !== 'roundHollowTorque' },
+                      { label: 'Strain Variation', value: show(designResult.gradient ?? 0, 2), unit: '%', color: 'text-amber-600', visible: designResult.gradient !== undefined },
+                      { label: 'Span at Applied Torque', value: show(designResult.fullSpanSensitivity, 4), unit: 'mV/V', color: 'text-emerald-600', visible: true },
+                      { label: 'Natural Frequency', value: show(designResult.naturalFrequency || 0, 0), unit: 'Hz', color: 'text-purple-600', visible: designResult.naturalFrequency !== undefined },
+                    ].filter(r => r.visible).map((res, i) => (
+                      <div key={i} className="flex justify-between items-center group">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{res.label}</span>
+                        <div className="flex items-baseline gap-2">
+                          <span className={`text-sm font-black font-mono tracking-tight ${res.color}`}>{res.value}</span>
+                          <span className="text-[9px] font-bold text-slate-400 italic uppercase w-8">{res.unit}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Solved Parameter Highlight */}
+                  {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && inverseResult?.isValid && (
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2">
+                       <div className="flex justify-between items-center bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Solved Parameter</span>
+                          <span className="text-xs font-mono font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded">
                             {(() => {
-                              const meta = selectedInverseMeta.find(m => m.key === inverseResult.solvedKey)
-                              const field = DESIGN_FIELDS[designType]?.find(f => f.key === meta?.fieldKey)
-                              const displayValue = field
-                                ? toDisplay(inverseResult.solvedValue ?? NaN, field.unit, us)
-                                : (inverseResult.solvedValue ?? NaN)
-                              const suffix = field ? unitLabel(field.unit, us) : ''
-                              return `${meta?.label ?? 'Unknown'}: ${show(displayValue, 4)}${suffix ? ` ${suffix}` : ''}`
+                                const meta = selectedInverseMeta.find(m => m.key === inverseResult.solvedKey)
+                                const field = DESIGN_FIELDS[designType]?.find(f => f.key === meta?.fieldKey)
+                                const displayValue = field ? toDisplay(inverseResult.solvedValue ?? NaN, field.unit, us) : (inverseResult.solvedValue ?? NaN)
+                                const suffix = field ? unitLabel(field.unit, us, field.key) : ''
+                                return `${meta?.label ?? 'Unknown'}: ${show(displayValue, 4)}${suffix ? ` ${suffix}` : ''}`
                             })()}
-                          </td>
-                        </tr>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <tr><td colSpan={3} className="comp-error">{designResult.error ?? 'Invalid inputs'}</td></tr>
-                )}
-              </tbody>
-            </table>
-          )}
+                          </span>
+                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
           {selectedInverseMeta.length > 0 && designMode === 'targetDriven' && inverseResult?.warnings.length ? (
             <p className="workspace-note">{inverseResult.warnings.join(' ')}</p>
           ) : null}
             </div>
 
-            <aside className="design-frame-preview">
-              <h4>Interactive Model</h4>
-              {designType === 'cantilever' ? (
-                <CantileverModelPreview params={dpWithSolved} us={us} />
-              ) : designType === 'binoBeam' ? (
-                <>
-                  <BinocularModelPreview params={dpWithSolved} us={us} />
-                  <div style={{ marginTop: '1rem' }}>
-                    <BinocularSketch2D params={dpWithSolved} us={us} />
-                  </div>
-                </>
-              ) : (
-                <div className="preview-placeholder">Model preview coming soon</div>
+            <aside className="design-frame-preview bg-slate-50 border-none p-0 flex flex-col gap-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-1 overflow-hidden shadow-sm">
+                <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest m-0">Interactive Model</h4>
+                </div>
+                <div className="h-[380px] w-full relative">
+                  {designType === 'cantilever' ? (
+                    <CantileverModelPreview params={dpWithSolved} us={us} />
+                  ) : designType === 'binoBeam' ? (
+                    <BinocularModelPreview params={dpWithSolved} us={us} />
+                  ) : designType === 'roundHollowTorque' ? (
+                    <TorqueHollow3D 
+                      outerDiameter={toDisplay(dpWithSolved.outerDiameter, 'length', us)} 
+                      innerDiameter={toDisplay(dpWithSolved.innerDiameter, 'length', us)} 
+                      appliedTorque={toDisplay(dpWithSolved.appliedTorque, 'none', us)} 
+                      us={us}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs uppercase tracking-tighter">Model preview coming soon</div>
+                  )}
+                </div>
+              </div>
+
+              {designType === 'binoBeam' && (
+                <div className="grid gap-4">
+                   <BinocularSketch2D params={dpWithSolved} us={us} />
+                </div>
+              )}
+
+              {designType === 'roundHollowTorque' && (
+                <div className="grid gap-4">
+                   <TorqueHollowSketch2D 
+                      outerDiameter={toDisplay(dpWithSolved.outerDiameter, 'length', us)} 
+                      innerDiameter={toDisplay(dpWithSolved.innerDiameter, 'length', us)} 
+                      appliedTorque={toDisplay(dpWithSolved.appliedTorque, 'none', us)} 
+                      us={us}
+                   />
+                </div>
               )}
             </aside>
           </div>
@@ -1398,11 +1454,11 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
           </div>
 
           {/* Method picker */}
-          <div className="wizard-type-grid">
+          <div className="wizard-type-grid border-b border-slate-200 pb-6 mb-6">
             {COMP_METHODS.map(m => (
               <button
                 key={m.key}
-                className={`tool-card${compMethod === m.key ? ' active' : ''}`}
+                className={`tool-card transition-all duration-200 ${compMethod === m.key ? 'active bg-blue-600 border-blue-400 text-white shadow-md' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                 onClick={() => {
                   setCompMethod(m.key)
                   // Re-apply span auto-fill if switching to spanSet
@@ -1422,59 +1478,104 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
             ))}
           </div>
 
-          {/* Wire type picker (for methods that need it) */}
-          {(compMethod === 'zeroBalance' || compMethod === 'spanTemp2Pt') && (
-            <div className="wizard-wire-row">
-              <label>
-                Wire Type
-                <select value={wireIdx} onChange={e => setWireIdx(Number(e.target.value))}>
-                  {(compMethod === 'zeroBalance' ? commonWireTypes : spanWireTypes).map((w, i) => (
-                    <option key={i} value={i}>{w.name}</option>
-                  ))}
-                </select>
-              </label>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              {/* Wire type picker (for methods that need it) */}
+              {(compMethod === 'zeroBalance' || compMethod === 'spanTemp2Pt') && (
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-left">Wire Architecture</label>
+                    <select 
+                       className="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                       value={wireIdx} 
+                       onChange={e => setWireIdx(Number(e.target.value))}
+                    >
+                      {(compMethod === 'zeroBalance' ? commonWireTypes : spanWireTypes).map((w, i) => (
+                        <option key={i} value={i}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Input form */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200">
+                <div className="grid grid-cols-1 gap-y-3">
+                  {(COMP_FIELDS[compMethod] ?? []).map(f => {
+                    const displayVal = toDisplay(cp[f.key] ?? f.si, f.unit, us)
+                    const suffix = unitLabel(f.unit, us)
+                    return (
+                      <div key={f.key} className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-tight flex-1 text-left">
+                          {f.label}
+                          {suffix && <span className="ml-1 text-[9px] text-slate-400 lowercase font-normal">({suffix})</span>}
+                        </label>
+                        <input
+                          type="number"
+                          className="w-32 px-3 py-1.5 text-right text-xs font-mono font-bold rounded-lg bg-slate-50 border border-slate-300 text-blue-700 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all outline-none"
+                          value={Number.isFinite(displayVal) ? displayVal : ''}
+                          step={f.step ?? 0.01}
+                          min={f.min}
+                          onChange={e => setCompField(f.key, toSI(Number(e.target.value), f.unit, us))}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* Input form */}
-          <div className="bino-grid">
-            {(COMP_FIELDS[compMethod] ?? []).map(f =>
-              renderField(f, cp[f.key] ?? f.si, (key, val) => setCompField(key, val))
-            )}
+            {/* Results */}
+            <div className="space-y-4">
+              {compResult && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm h-full">
+                  <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Compensation Output</h3>
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${compResult.isValid ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                      {compResult.isValid ? 'Computed' : 'Invalid'}
+                    </span>
+                  </div>
+
+                  {compResult.isValid ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-slate-50 rounded-xl border border-emerald-100 text-center">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Target Resistor Value</span>
+                        <div className="flex items-baseline justify-center gap-2">
+                          <span className="text-2xl font-black text-emerald-600 font-mono tracking-tighter">{show(compResult.primaryResistance, 3)}</span>
+                          <span className="text-xs font-bold text-slate-400 uppercase italic">Ω</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        {compResult.secondaryResistance !== undefined && (
+                          <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">Secondary Resistance</span>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-sm font-black text-slate-700 font-mono">{show(compResult.secondaryResistance, 3)}</span>
+                              <span className="text-[9px] font-bold text-slate-500 uppercase italic">Ω</span>
+                            </div>
+                          </div>
+                        )}
+                        {compResult.bridgeArm !== undefined && (
+                          <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">Installation Point</span>
+                            <span className="text-sm font-black text-blue-600 font-mono italic">{compResult.bridgeArm}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3">
+                       <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-200">
+                          <span className="text-red-600 font-black">!</span>
+                       </div>
+                       <p className="text-xs text-red-600 font-bold max-w-[200px] text-center">{compResult.error ?? 'Missing calculation parameters'}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* Results */}
-          {compResult && (
-            <table className="bino-table">
-              <tbody>
-                <tr><th colSpan={3}>Compensation Result</th></tr>
-                {compResult.isValid ? (
-                  <>
-                    <tr>
-                      <td>Required Resistance</td>
-                      <td>{show(compResult.primaryResistance, 3)}</td>
-                      <td>Ω</td>
-                    </tr>
-                    {compResult.secondaryResistance !== undefined && (
-                      <tr>
-                        <td>Secondary Resistance</td>
-                        <td>{show(compResult.secondaryResistance, 3)}</td>
-                        <td>Ω</td>
-                      </tr>
-                    )}
-                    {compResult.bridgeArm !== undefined && (
-                      <tr>
-                        <td>Bridge Arm</td>
-                        <td colSpan={2}>{compResult.bridgeArm}</td>
-                      </tr>
-                    )}
-                  </>
-                ) : (
-                  <tr><td colSpan={3} className="comp-error">{compResult.error ?? 'Invalid inputs'}</td></tr>
-                )}
-              </tbody>
-            </table>
-          )}
 
           <div className="wizard-nav">
             <button className="wizard-back" onClick={() => setStep(1)}>← Back</button>
@@ -1491,22 +1592,22 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
 
       {/* ── Step 3: Trim Realization ──────────────────────────── */}
       {step === 3 && (
-        <div className="wizard-section">
-          <div className="wizard-section-header">
-            <h3>Step 3 — Trim Realization</h3>
+        <div className="wizard-section space-y-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Step 3 — Trim Realization</h3>
             {compResult?.isValid && (
-              <span className="wizard-carry">
-                Target from comp: {show(compResult.primaryResistance, 3)} Ω
+              <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 uppercase tracking-wider">
+                Target: {show(compResult.primaryResistance, 3)} Ω
               </span>
             )}
           </div>
 
           {/* Family picker */}
-          <div className="wizard-type-grid">
+          <div className="wizard-type-grid border-b border-slate-200 pb-6 mb-6">
             {TRIM_FAMILIES.map(f => (
               <button
                 key={f.key}
-                className={`tool-card${trimFamily === f.key ? ' active' : ''}`}
+                className={`tool-card transition-all duration-200 ${trimFamily === f.key ? 'active bg-blue-600 border-blue-400 text-white shadow-md' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                 onClick={() => setTrimFamily(f.key)}
               >
                 {f.label}
@@ -1514,84 +1615,119 @@ export default function WorkflowWizard({ unitSystem, onUnitChange }: Props) {
             ))}
           </div>
 
-          {/* Unit picker */}
-          <div className="wizard-wire-row">
-            <label>
-              Network Unit
-              <select
-                value={trimUnit}
-                onChange={e => setTrimUnit(e.target.value)}
-              >
-                {(() => {
-                  const meta = TRIM_FAMILIES.find(f => f.key === trimFamily)
-                  if (!meta) return null
-                  return LADDER_UNIT_KEYS[meta.unitListKey].map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))
-                })()}
-              </select>
-            </label>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              {/* Unit picker */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block text-left text-slate-500 uppercase tracking-widest block text-left">Network Unit</label>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                    value={trimUnit}
+                    onChange={e => setTrimUnit(e.target.value)}
+                  >
+                    {(() => {
+                      const meta = TRIM_FAMILIES.find(f => f.key === trimFamily)
+                      if (!meta) return null
+                      return LADDER_UNIT_KEYS[meta.unitListKey].map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))
+                    })()}
+                  </select>
+                </div>
+              </div>
+
+              {/* Inputs */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200">
+                <div className="grid grid-cols-1 gap-y-3">
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-tight flex-1 text-left">
+                      Start Resistance <span className="ml-1 text-[9px] text-slate-400 lowercase font-normal">(Ω)</span>
+                    </label>
+                    <input
+                      type="number"
+                      className="w-32 px-3 py-1.5 text-right text-xs font-mono font-bold rounded-lg bg-slate-50 border border-slate-300 text-blue-700 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all outline-none"
+                      value={Number.isFinite(trimStart) ? trimStart : ''}
+                      min={0}
+                      step={1}
+                      onChange={e => setTrimStart(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-tight flex-1 text-left">
+                      Target Resistance <span className="ml-1 text-[9px] text-slate-400 lowercase font-normal">(Ω)</span>
+                    </label>
+                    <input
+                      type="number"
+                      className="w-32 px-3 py-1.5 text-right text-xs font-mono font-bold rounded-lg bg-slate-50 border border-slate-300 text-blue-700 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all outline-none"
+                      value={Number.isFinite(trimTarget) ? trimTarget : ''}
+                      min={0}
+                      step={0.1}
+                      onChange={e => setTrimTarget(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Results */}
+            <div className="space-y-4">
+              {trimResult && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm h-full">
+                  <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Trim Outcome</h3>
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${trimResult.achievedResistance !== undefined ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                      {trimResult.achievedResistance !== undefined ? 'Solved' : 'Failed'}
+                    </span>
+                  </div>
+
+                  {trimResult.achievedResistance !== undefined ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-slate-50 rounded-xl border border-emerald-100 text-center">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Achieved Resistance</span>
+                        <div className="flex items-baseline justify-center gap-2">
+                          <span className="text-2xl font-black text-emerald-600 font-mono tracking-tighter">{show(trimResult.achievedResistance, 4)}</span>
+                          <span className="text-xs font-bold text-slate-400 uppercase italic">Ω</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">Absolute Error</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-sm font-black text-slate-700 font-mono">{show(trimResult.absoluteError, 4)}</span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase italic">Ω</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">Relative Error</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-sm font-black text-blue-600 font-mono">
+                              {show(trimTarget > 0 ? (trimResult.absoluteError / trimTarget) * 100 : 0, 3)}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase italic">%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+                       <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-200 text-red-600 font-black">!</div>
+                       <p className="text-xs text-red-600 font-bold max-w-[200px]">Unable to solve trim for these inputs.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Inputs */}
-          <div className="bino-grid">
-            <label>
-              Start Resistance (Ω)
-              <input
-                type="number"
-                value={Number.isFinite(trimStart) ? trimStart : ''}
-                min={0}
-                step={1}
-                onChange={e => setTrimStart(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Target Resistance (Ω)
-              <input
-                type="number"
-                value={Number.isFinite(trimTarget) ? trimTarget : ''}
-                min={0}
-                step={0.1}
-                onChange={e => setTrimTarget(Number(e.target.value))}
-              />
-            </label>
-          </div>
-
-          {/* Results */}
-          {trimResult && (
-            <table className="bino-table">
-              <tbody>
-                <tr><th colSpan={3}>Trim Result</th></tr>
-                {trimResult.achievedResistance !== undefined ? (
-                  <>
-                    <tr>
-                      <td>Achieved Resistance</td>
-                      <td>{show(trimResult.achievedResistance, 4)}</td>
-                      <td>Ω</td>
-                    </tr>
-                    <tr>
-                      <td>Absolute Error</td>
-                      <td>{show(trimResult.absoluteError, 4)}</td>
-                      <td>Ω</td>
-                    </tr>
-                    <tr>
-                      <td>Relative Error</td>
-                      <td>{show(
-                        trimTarget > 0 ? (trimResult.absoluteError / trimTarget) * 100 : 0,
-                        3
-                      )}</td>
-                      <td>%</td>
-                    </tr>
-                  </>
-                ) : (
-                  <tr><td colSpan={3} className="comp-error">Unable to solve trim for these inputs.</td></tr>
-                )}
-              </tbody>
-            </table>
-          )}
-
-          <div className="wizard-nav">
-            <button className="wizard-back" onClick={() => setStep(2)}>← Back</button>
+          <div className="pt-4 border-t border-slate-100 flex justify-start">
+            <button 
+              className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-widest rounded-xl transition-all border border-slate-200 flex items-center gap-2"
+              onClick={() => setStep(2)}
+            >
+              <span className="text-lg">←</span> Back to Compensation
+            </button>
           </div>
         </div>
       )}

@@ -114,9 +114,30 @@ export function calculateHalfBridge(
   return (strain * gageFactor) / 2 * 1e-3
 }
 
+/**
+ * Calculate quarter-bridge output (single active gage, nonlinear)
+ * TN-507-1 Case 1: single active gage in uniaxial tension or compression
+ *
+ * Output (mV/V) = (F × ε × 10⁻³) / (4 + 2 × F × ε × 10⁻⁶)
+ *
+ * Intrinsically nonlinear — denominator grows with strain. The linear
+ * approximation (K = F/4) overestimates output in tension and underestimates
+ * in compression. Error ≈ 0.1% at 1000 με, 1% at 10 000 με (TN-507-1 §3).
+ *
+ * @param strain Strain in microstrain (με)
+ * @param gageFactor Gauge factor (unitless)
+ * @returns Bridge output in mV/V
+ */
+export function calculateQuarterBridge(
+  strain: number,
+  gageFactor: number
+): number {
+  return (gageFactor * strain * 1e-3) / (4 + 2 * gageFactor * strain * 1e-6)
+}
+
 // Generic bridge calculator dispatcher
 export function calculateBridgeOutput(
-  bridgeType: 'linear' | 'nonLinearPoisson' | 'fullTwo' | 'fullFour' | 'halfBridge',
+  bridgeType: 'linear' | 'nonLinearPoisson' | 'fullTwo' | 'fullFour' | 'halfBridge' | 'quarterBridge',
   params: BridgeParams
 ): number {
   switch (bridgeType) {
@@ -130,6 +151,8 @@ export function calculateBridgeOutput(
       return calculateFullFourBridge(params.strain12 ?? params.strain, params.strain34 ?? 0, params.gageFactor)
     case 'halfBridge':
       return calculateHalfBridge(params.strain, params.gageFactor)
+    case 'quarterBridge':
+      return calculateQuarterBridge(params.strain, params.gageFactor)
     default:
       throw new Error(`Unknown bridge type: ${bridgeType}`)
   }

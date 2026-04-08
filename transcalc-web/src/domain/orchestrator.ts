@@ -97,16 +97,16 @@ export interface CantileverDesignParams {
   gageLengthMm: number
   /** Young's modulus (Pa; values < 1e6 are treated as GPa and auto-converted) */
   youngsModulusPa: number
-  /** Poisson's Ratio (dimensionless) */
-  poissonRatio: number
+  /** Poisson's Ratio (dimensionless, default: 0.3) */
+  poissonRatio?: number
   /** Beam width (mm) */
   beamWidthMm: number
   /** Beam thickness (mm) */
   thicknessMm: number
   /** Gage factor (dimensionless) */
   gageFactor: number
-  /** Bridge configuration */
-  bridgeConfig: BridgeConfig
+  /** Bridge configuration (default: 'fullBending' — 4 active arms, most common for transducers) */
+  bridgeConfig?: BridgeConfig
 }
 
 /**
@@ -134,6 +134,7 @@ export type DesignInput =
   | { type: 'roundHollowColumn'; params: RoundHollowColumnInput }
   | { type: 'squareShear';       params: ShearSpanParams }
   | { type: 'roundShear';        params: ShearSpanParams }
+  | { type: 'roundHollowShear';  params: ShearSpanParams }
   | { type: 'roundSBeamShear';   params: ShearSpanParams }
   | { type: 'squareTorque';      params: SqTorqueInput }
   | { type: 'roundSolidTorque';  params: RoundSolidTorqueInput }
@@ -156,9 +157,14 @@ export interface DesignResult {
   error?: string
 }
 
-/** Full-bridge sensitivity from average strain. */
+/**
+ * Quarter-bridge baseline sensitivity from average strain.
+ * = (GF × ε × 1e-3) / 4 — the single-gage Wheatstone bridge output.
+ * Multiply by bridgeGain (1, 2, 4, (1+ν), 2(1+ν)…) to get the config-specific output.
+ * Derived from the standard Wheatstone formula: Eo/E = (GF/4) × Σεi
+ */
 const sensitivityFromStrain = (avgStrain: number, gageFactor: number): number =>
-  avgStrain * gageFactor * 1e-3
+  (avgStrain * gageFactor * 1e-3) / 4
 
 export function runDesign(input: DesignInput): DesignResult {
   try {
@@ -171,23 +177,24 @@ export function runDesign(input: DesignInput): DesignResult {
         const gradient  = calculateCantileverGradient(maxStrain, minStrain)
         const naturalFrequency = calculateCantileverNaturalFrequency(p.youngsModulusPa, p.beamWidthMm, p.thicknessMm, p.momentArmMm, p.loadN)
 
-        // Calculate gain multiplier based on bridge configuration
-        // Quarter: 1 gage
-        // Half (Bending): 1 Top (+), 1 Bottom (-) = 2 units
-        // Full (Bending): 2 Top (+), 2 Bottom (-) = 4 units
-        // Poisson Half: 1 Active (+), 1 Poisson (-) = (1 + nu) units
-        // Poisson Full (Top): 2 Active (+), 2 Poisson (-) = 2 * (1 + nu) units
-        // Poisson Full (Differential): 1 Top(+), 1 TopPoisson(-), 1 Bottom(-), 1 BottomPoisson(+) = 2 * (1 + nu) units
-        let bridgeGain = 1.0;
-        const nu = p.poissonRatio;
+        // bridgeGain is relative to the quarter-bridge baseline (sensitivityFromStrain ÷ 4).
+        // Confirmed against Delphi source (Active11.pas, linear.pas, fullfour.pas, twoAdj.pas):
+        //   quarter:                 (GF/4) × ε × 1e-3
+        //   halfBending:             (GF/2) × ε × 1e-3    (twoAdj.pas)
+        //   fullBending:              GF    × ε × 1e-3    (fullfour.pas, strain12=+ε, strain34=-ε)
+        //   poissonHalf:        (GF/4) × ε × (1+ν) × 1e-3 (Active11.pas, denominator=4)
+        //   poissonFullTop:     (GF/2) × ε × (1+ν) × 1e-3 (linear.pas / nonline.pas)
+        //   poissonFullDiff:    (GF/2) × ε × (1+ν) × 1e-3 (same bridge topology as poissonFullTop)
+        const nu = p.poissonRatio ?? 0.3;
+        let bridgeGain = 4.0; // default: 'fullBending'
 
         switch (p.bridgeConfig) {
-          case 'quarter': bridgeGain = 1.0; break;
-          case 'halfBending': bridgeGain = 2.0; break;
-          case 'fullBending': bridgeGain = 4.0; break;
-          case 'poissonHalf': bridgeGain = 1.0 + nu; break;
-          case 'poissonFullTop': bridgeGain = 2.0 * (1.0 + nu); break;
-          case 'poissonFullDifferential': bridgeGain = 2.0 * (1.0 + nu); break;
+          case 'quarter':                bridgeGain = 1.0; break;
+          case 'halfBending':            bridgeGain = 2.0; break;
+          case 'fullBending':            bridgeGain = 4.0; break;
+          case 'poissonHalf':            bridgeGain = 1.0 + nu; break;
+          case 'poissonFullTop':         bridgeGain = 2.0 * (1.0 + nu); break;
+          case 'poissonFullDifferential':bridgeGain = 2.0 * (1.0 + nu); break;
         }
 
         const validation = validateCantilever(
@@ -254,12 +261,17 @@ export function runDesign(input: DesignInput): DesignResult {
 
       case 'roundShear': {
         const span = calculateRoundShearSpan(input.params)
-        return { type: 'roundShear', fullSpanSensitivity: span, avgStrain: 0, isValid: true }
+        return { type: 'roundShear', fullSpanSensitivity: span, avgStrain: (span / input.params.gageFactor) * 1000, isValid: true }
+      }
+
+      case 'roundHollowShear': {
+        const span = calculateRoundShearSpan(input.params)
+        return { type: 'roundHollowShear', fullSpanSensitivity: span, avgStrain: (span / input.params.gageFactor) * 1000, isValid: true }
       }
 
       case 'roundSBeamShear': {
         const span = calculateRoundSBeamSpan(input.params)
-        return { type: 'roundSBeamShear', fullSpanSensitivity: span, avgStrain: 0, isValid: true }
+        return { type: 'roundSBeamShear', fullSpanSensitivity: span, avgStrain: (span / input.params.gageFactor) * 1000, isValid: true }
       }
 
       case 'squareTorque': {
@@ -285,7 +297,13 @@ export function runDesign(input: DesignInput): DesignResult {
       case 'roundHollowTorque': {
         const r = calculateRoundHollowTorqueStrain(input.params)
         if (!r.isValid) return { type: 'roundHollowTorque', fullSpanSensitivity: 0, avgStrain: 0, isValid: false, error: 'Invalid torque geometry' }
-        return { type: 'roundHollowTorque', fullSpanSensitivity: r.fullSpanOutput, avgStrain: r.shearStrain, isValid: true }
+        return { 
+          type: 'roundHollowTorque', 
+          fullSpanSensitivity: r.fullSpanOutput, 
+          avgStrain: r.shearStrain, 
+          minStrain: r.normalStrain, // Normal strain for output display
+          isValid: true 
+        }
       }
 
       case 'pressure': {

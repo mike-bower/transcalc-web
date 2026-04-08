@@ -9,6 +9,11 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}']
   },
   server: {
-    port: 5173
+    port: 5173,
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
   }
 })

@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { calculateReversebeamStrain } from '../../domain/reversebeam'
 import { solveReverseBeamFea } from '../../domain/fea/reverseBeamSolver'
 import StrainFieldViewer from '../StrainFieldViewer'
+import ReverseBeamDiagram from '../diagrams/ReverseBeamDiagram'
+import ReverseBeamModelPreview from '../ReverseBeamModelPreview'
+
+const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
 
 type UnitSystem = 'SI' | 'US'
 type AnalysisMode = 'closed-form' | 'fea'
@@ -116,17 +120,36 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
       <div className="workspace-controls">
         <div className="analysis-toggle">
-          <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-        <div className="analysis-toggle">
           <button className={analysisMode === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisMode('closed-form')}>Closed-form</button>
           <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
         </div>
+        <div className="analysis-toggle">
+          <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
+          <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
+        </div>
       </div>
 
-      <div className="bino-illustration">
-        <img src="/legacy-help/revbb.jpg" alt="Reverse bending beam geometry" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="bino-illustration m-0 h-[300px]">
+          <ReverseBeamDiagram
+            load={load}
+            width={width}
+            thickness={thickness}
+            distBetweenGages={distBetweenGages}
+            gageLength={gageLength}
+            unitSystem={unitSystem}
+          />
+        </div>
+        <div className="bino-illustration m-0 h-[300px]">
+          <ReverseBeamModelPreview
+            load={load}
+            width={width}
+            thickness={thickness}
+            distBetweenGages={distBetweenGages}
+            gageLength={gageLength}
+            unitSystem={unitSystem}
+          />
+        </div>
       </div>
 
       <div className="bino-grid">
@@ -153,18 +176,21 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
       </table>
 
       {analysisMode === 'fea' && (
-        <div className="fea-analysis-section">
+        <div className="viewer-block">
+          <h3>FEA Analysis</h3>
           {feaSolution ? (
-            <StrainFieldViewer
-              solution={feaSolution}
-              strainKey="exx"
-              gageMarkersMm={[gageMm, span - gageMm]}
-              label={`ε_xx field — simply-supported span ${span.toFixed(1)} mm · gage markers at ±${gageMm.toFixed(1)} mm from supports`}
-            />
+            <>
+              <StrainFieldViewer
+                solution={feaSolution}
+                strainKey="exx"
+                gageMarkersMm={[gageMm, span - gageMm]}
+                label={`ε_xx field — simply-supported span ${span.toFixed(1)} mm · gage markers at ±${gageMm.toFixed(1)} mm from supports`}
+              />
+              <p className="fea-note">2D plane-stress CST · linear elastic · dashed lines show gage centre positions</p>
+            </>
           ) : (
             <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
           )}
-          <p className="fea-note">2D plane-stress CST · linear elastic · dashed lines show gage centre positions</p>
         </div>
       )}
     </div>

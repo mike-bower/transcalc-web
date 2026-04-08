@@ -40,6 +40,7 @@ const CALCULATORS: CalculatorTopic[] = [
 
 export default function App() {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('SI')
+  const [selectedFrame, setSelectedFrame] = useState<1 | 2 | 3>(1)
   const [selectedHelpKey, setSelectedHelpKey] = useState('bbcant')
   const [helpSearch, setHelpSearch] = useState('')
   const [helpHtml, setHelpHtml] = useState<string>('')
@@ -86,10 +87,11 @@ export default function App() {
         <div className="brand">
           <span className="brand-mark">TC</span>
           <div>
-            <h1>Transcalc Workflow Frames</h1>
-            <p>Frame 1 Design, Frame 2 Compensation, Frame 3 Trim</p>
+            <h1>Transcalc Workflow</h1>
+            <p className="text-xs text-slate-400">Integrated Load Cell Design Environment</p>
           </div>
         </div>
+
         <div className="topbar-right">
           <ProjectPanel onGetState={handleGetState} onLoadState={handleLoadState} />
           <div className="analysis-toggle">
@@ -100,9 +102,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="layout layout-single">
-        <section className="panel workspace">
-          <WorkflowWizard unitSystem={unitSystem} onUnitChange={setUnitSystem} />
+      <main className="layout layout-single p-0 bg-slate-900">
+        <section className="h-full">
+          <WorkflowWizard 
+            unitSystem={unitSystem} 
+            onUnitChange={setUnitSystem} 
+            initialStep={selectedFrame}
+          />
         </section>
       </main>
 
