@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { calculateRoundHollowColumnStrain } from '../../domain/rndhlwc'
+import { solveRoundHollowColumnFea } from '../../domain/fea/roundHollowColumnSolver'
+import RoundHollowColumnModelPreview from '../RoundHollowColumnModelPreview'
+import RoundHollowColumnDiagram from '../diagrams/RoundHollowColumnDiagram'
+import type { CstFeaViewMode } from '../CstFeaViewer'
+
+const CstFeaViewer = lazy(() => import('../CstFeaViewer'))
 
 type UnitSystem = 'SI' | 'US'
+type AnalysisMode = 'closed-form' | 'fea'
 
 const N_PER_LBF = 4.4482216152605
 const MM_PER_IN = 25.4
@@ -16,9 +23,12 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
   const [load, setLoad] = useState(5000)
   const [outerDia, setOuterDia] = useState(30)
   const [innerDia, setInnerDia] = useState(20)
+  const [columnLength, setColumnLength] = useState(180)
   const [modulusGPa, setModulusGPa] = useState(200)
   const [poisson, setPoisson] = useState(0.3)
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
+  const [viewMode, setViewMode] = useState<CstFeaViewMode>('contour')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -28,14 +38,37 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
       setLoad(v => round(v / N_PER_LBF))
       setOuterDia(v => round(v / MM_PER_IN))
       setInnerDia(v => round(v / MM_PER_IN))
+      setColumnLength(v => round(v / MM_PER_IN))
       setModulusGPa(v => round(v / GPA_PER_MPSI))
     } else {
       setLoad(v => round(v * N_PER_LBF))
       setOuterDia(v => round(v * MM_PER_IN))
       setInnerDia(v => round(v * MM_PER_IN))
+      setColumnLength(v => round(v * MM_PER_IN))
       setModulusGPa(v => round(v * GPA_PER_MPSI))
     }
   }, [unitSystem])
+
+  const siInputs = useMemo(() => {
+    const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+    return {
+      loadN: unitSystem === 'SI' ? load : load * N_PER_LBF,
+      outerDiaMm: outerDia * mm,
+      innerDiaMm: innerDia * mm,
+      lengthMm: columnLength * mm,
+      modulusGPa: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+    }
+  }, [unitSystem, load, outerDia, innerDia, columnLength, modulusGPa])
+
+  const columnLengthWarning = useMemo(() => {
+    const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+    const lenMm = columnLength * mm
+    const maxDim = outerDia * mm
+    if (Number.isFinite(lenMm) && Number.isFinite(maxDim) && maxDim > 0 && lenMm < 5 * maxDim) {
+      return `Column length should be ≥ 5× outer diameter (${(5 * maxDim).toFixed(1)} ${unitSystem === 'SI' ? 'mm' : 'in'}) for uniform strain at gage locations (VMM-26).`
+    }
+    return ''
+  }, [unitSystem, columnLength, outerDia])
 
   const result = useMemo(() => {
     const modulusForDomain = unitSystem === 'US' ? modulusGPa * 1e6 : modulusGPa
@@ -53,6 +86,38 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
     } catch (e) { return { error: e instanceof Error ? e.message : 'Calculation error', data: null } }
   }, [unitSystem, load, outerDia, innerDia, modulusGPa, poisson, gageFactor])
 
+  const naturalFreqHz = useMemo(() => {
+    const { loadN, outerDiaMm, innerDiaMm, lengthMm, modulusGPa: modGPa } = siInputs
+    if ([loadN, outerDiaMm, innerDiaMm, lengthMm, modGPa].some(v => !Number.isFinite(v) || v <= 0)) return NaN
+    if (innerDiaMm >= outerDiaMm) return NaN
+    const E = modGPa * 1e9
+    const Ro = outerDiaMm / 2000, Ri = innerDiaMm / 2000
+    const A = Math.PI * (Ro * Ro - Ri * Ri)
+    const L = lengthMm / 1000
+    const k = A * E / L
+    const mLoad = loadN / 9.80665
+    const mCol = 7850 * A * L
+    const mEff = mLoad + mCol / 3
+    return mEff > 0 ? (1 / (2 * Math.PI)) * Math.sqrt(k / mEff) : NaN
+  }, [siInputs])
+
+  const feaSolution = useMemo(() => {
+    if (analysisMode !== 'fea') return null
+    const { loadN, outerDiaMm, innerDiaMm, modulusGPa: modGPa } = siInputs
+    if ([loadN, outerDiaMm, innerDiaMm, modGPa].some(v => !Number.isFinite(v) || v <= 0)) return null
+    if (!Number.isFinite(poisson) || poisson <= 0 || poisson >= 0.5) return null
+    if (innerDiaMm >= outerDiaMm) return null
+    try {
+      return solveRoundHollowColumnFea({
+        appliedForceN: loadN,
+        outerDiameterMm: outerDiaMm,
+        innerDiameterMm: innerDiaMm,
+        modulusGPa: modGPa,
+        poissonRatio: poisson,
+      })
+    } catch { return null }
+  }, [analysisMode, siInputs, poisson])
+
   const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
   const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
   const modUnit = unitSystem === 'SI' ? 'GPa' : 'Mpsi'
@@ -64,27 +129,87 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
           <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
+        <div className="analysis-toggle">
+          <button className={analysisMode === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisMode('closed-form')}>Closed-form</button>
+          <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
+        </div>
       </div>
-      <div className="bino-illustration">
-        <img src="/legacy-help/RndHlw.jpg" alt="Round hollow column" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <div className="calc-preview-pair">
+        <div className="calc-diagram-2d">
+          <RoundHollowColumnDiagram
+            load={siInputs.loadN}
+            outerDiameter={siInputs.outerDiaMm}
+            innerDiameter={siInputs.innerDiaMm}
+            length={siInputs.lengthMm}
+            unitSystem={unitSystem}
+          />
+        </div>
+        <div className="calc-model-3d">
+          <RoundHollowColumnModelPreview
+            params={{
+              load: siInputs.loadN,
+              outerDiameter: siInputs.outerDiaMm,
+              innerDiameter: siInputs.innerDiaMm,
+              length: siInputs.lengthMm,
+              modulus: siInputs.modulusGPa,
+              poisson,
+              gageFactor,
+            }}
+            us={unitSystem === 'US'}
+          />
+        </div>
       </div>
       <div className="bino-grid">
         <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Outer diameter ({lenUnit})<input type="number" value={Number.isFinite(outerDia) ? outerDia : ''} onChange={e => setOuterDia(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Inner diameter ({lenUnit})<input type="number" value={Number.isFinite(innerDia) ? innerDia : ''} onChange={e => setInnerDia(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Column length ({lenUnit})<input type="number" value={Number.isFinite(columnLength) ? columnLength : ''} onChange={e => setColumnLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
       </div>
       {result.error && <p className="workspace-note">{result.error}</p>}
+      {columnLengthWarning && <p className="fea-accuracy-warn">{columnLengthWarning}</p>}
       <table className="bino-table">
         <tbody>
           <tr><th colSpan={3}>Calculated Values</th></tr>
           <tr><td>Axial Strain:</td><td>{show(result.data?.axialStrain ?? NaN, 1)}</td><td>µε</td></tr>
           <tr><td>Transverse Strain:</td><td>{show(result.data?.transverseStrain ?? NaN, 1)}</td><td>µε</td></tr>
           <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpanOutput ?? NaN, 4)}</td><td>mV/V</td></tr>
+          <tr><td>Natural Frequency:</td><td>{show(naturalFreqHz, 1)}</td><td>Hz</td></tr>
         </tbody>
       </table>
+
+      {analysisMode === 'fea' && (
+        <div className="fea-analysis-section">
+          {feaSolution ? (
+            <>
+              <div className="analysis-toggle" style={{ marginBottom: 8 }}>
+                {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
+                  <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
+                ))}
+              </div>
+              <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
+                <CstFeaViewer
+                  solution={feaSolution}
+                  depthMm={siInputs.outerDiaMm}
+                  viewMode={viewMode}
+                  strainKey="exx"
+                  bcType="axial"
+                  unitSystem={unitSystem}
+                  dimLabels={[
+                    { label: '⌀o', value: siInputs.outerDiaMm },
+                    { label: '⌀i', value: siInputs.innerDiaMm },
+                  ]}
+                />
+              </Suspense>
+              <p className="fea-note">2D plane-stress CST · equivalent rectangular section (area = π·(Ro²−Ri²))</p>
+            </>
+          ) : (
+            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

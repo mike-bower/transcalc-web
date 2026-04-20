@@ -6,7 +6,6 @@
  * @module zeroBalance
  */
 
-import { detectUnits, Unit } from './core';
 
 export interface WireType {
   name: string;

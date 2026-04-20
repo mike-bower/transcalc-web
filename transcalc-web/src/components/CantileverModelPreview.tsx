@@ -71,6 +71,41 @@ function addDimensionLine(
   group.add(label)
 }
 
+/**
+ * Tapered box geometry: width tapers from wRoot at x=0 to wTip at x=length.
+ * Thickness T is constant. Used for constant-stress cantilever visualisation.
+ */
+function makeTaperedBeamGeometry(length: number, thickness: number, wRoot: number, wTip: number): THREE.BufferGeometry {
+  const hy = thickness / 2
+  // 8 corners: [fixed-end back, fixed-end front, free-end front, free-end back] × [top, bottom]
+  const verts = new Float32Array([
+    // top face (y = +hy)
+    0,      +hy, -wRoot / 2, // 0 fixed-back-top
+    0,      +hy, +wRoot / 2, // 1 fixed-front-top
+    length, +hy, +wTip  / 2, // 2 free-front-top
+    length, +hy, -wTip  / 2, // 3 free-back-top
+    // bottom face (y = -hy)
+    0,      -hy, -wRoot / 2, // 4 fixed-back-bot
+    0,      -hy, +wRoot / 2, // 5 fixed-front-bot
+    length, -hy, +wTip  / 2, // 6 free-front-bot
+    length, -hy, -wTip  / 2, // 7 free-back-bot
+  ])
+  // 12 triangles, 36 indices
+  const idx = new Uint16Array([
+    0, 1, 2,  0, 2, 3, // top
+    5, 4, 7,  5, 7, 6, // bottom (reversed winding)
+    0, 4, 5,  0, 5, 1, // fixed end (back wall)
+    2, 6, 7,  2, 7, 3, // free end
+    1, 5, 6,  1, 6, 2, // front face
+    0, 3, 7,  0, 7, 4, // back face
+  ])
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
+  geo.setIndex(new THREE.BufferAttribute(idx, 1))
+  geo.computeVertexNormals()
+  return geo
+}
+
 function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boolean }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
@@ -85,7 +120,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     const targetOutput = params.targetOutput || 0
     let loadN = p(params, 'load', 100)
     
-    const bridgeConfig = params.bridgeConfig as BridgeConfig || 'quarter'
+    const bridgeConfig = (params.bridgeConfig as unknown as BridgeConfig) || 'quarter'
     const poissonRatio = p(params, 'poisson', 0.3)
     const modulus = p(params, 'modulus', 200) * 1e9 // GPa to Pa
     const gFactor = p(params, 'gageFactor', 2.0)
@@ -149,10 +184,21 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     const gageCenter = clamp(gageOffsetMm * mmToScene, gageLen * 0.55, L - gageLen * 0.55)
     const loadArrowLength = clamp(0.18 + Math.log10(Math.max(loadN, 1)) * 0.12, 0.22, 0.58)
 
+    const isTapered = params['tapered'] === 1
+
     const mat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1 })
     const softMat = new THREE.MeshStandardMaterial({ color: 0x8aa7be, roughness: 0.55, metalness: 0.05 })
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(L, T, W), mat)
-    beam.position.x = L * 0.5
+
+    let beamGeom: THREE.BufferGeometry
+    if (isTapered) {
+      // Constant-stress taper: root width = W, tip width ≈ 0 (minimum for visibility)
+      const wTip = Math.max(W * 0.04, 0.01)
+      beamGeom = makeTaperedBeamGeometry(L, T, W, wTip)
+    } else {
+      beamGeom = new THREE.BoxGeometry(L, T, W)
+    }
+    const beam = new THREE.Mesh(beamGeom, mat)
+    if (!isTapered) beam.position.x = L * 0.5
     g.add(beam)
 
     const clampBlock = new THREE.Mesh(new THREE.BoxGeometry(clampLen, T * 2.6, W * 1.25), softMat)

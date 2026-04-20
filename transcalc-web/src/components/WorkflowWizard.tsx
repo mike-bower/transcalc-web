@@ -45,6 +45,10 @@ import {
   solvePressureForTargetSpan,
 } from '../domain/inverse/designInverse'
 import CantileverModelPreview from './CantileverModelPreview'
+import CantileverDiagram from './diagrams/CantileverDiagram'
+import ReverseBeamModelPreview from './ReverseBeamModelPreview'
+import ReverseBeamDiagram from './diagrams/ReverseBeamDiagram'
+import ReverseBeamBridgeDiagram from './diagrams/ReverseBeamBridgeDiagram'
 import { BinocularSketch2D } from './BinocularSketch2D'
 import { TorqueHollowSketch2D } from './diagrams/TorqueHollowSketch2D'
 import { TorqueHollow3D } from './diagrams/TorqueHollow3D'
@@ -216,13 +220,14 @@ const DESIGN_FIELDS: Record<string, FieldDef[]> = {
     { key: 'bridgeConfig', label: 'Bridge Config', unit: 'none', si: 0 }, // Placeholder for mapping
   ],
   reverseBeam: [
-    { key: 'load',      label: 'Applied Load',      unit: 'force',   si: 100 },
-    { key: 'width',     label: 'Beam Width',         unit: 'length',  si: 25 },
-    { key: 'thickness', label: 'Thickness',          unit: 'length',  si: 2 },
-    { key: 'distGages', label: 'Dist. Between Gages',unit: 'length',  si: 50 },
-    { key: 'modulus',   label: 'Modulus',            unit: 'modulus', si: 200 },
-    { key: 'gageLen',   label: 'Gage Length',        unit: 'length',  si: 5 },
-    { key: 'gageFactor',label: 'Gage Factor',        unit: 'none',    si: 2.0 },
+    { key: 'load',       label: 'Applied Load',         unit: 'force',   si: 100 },
+    { key: 'width',      label: 'Beam Width',           unit: 'length',  si: 25 },
+    { key: 'thickness',  label: 'Thickness',            unit: 'length',  si: 2 },
+    { key: 'beamLength', label: 'Beam Length, L',       unit: 'length',  si: 150 },
+    { key: 'distGages',  label: 'Dist. Between Gages, D', unit: 'length', si: 50 },
+    { key: 'modulus',    label: 'Modulus',              unit: 'modulus', si: 200 },
+    { key: 'gageLen',    label: 'Gage Length',          unit: 'length',  si: 5 },
+    { key: 'gageFactor', label: 'Gage Factor',          unit: 'none',    si: 2.0 },
   ],
   dualBeam: [
     { key: 'load',       label: 'Applied Load',       unit: 'force',   si: 100 },
@@ -458,6 +463,7 @@ function buildDesignInput(type: TransducerType, p: Record<string, any>): DesignI
           appliedLoad: p.load,
           beamWidth: p.width * 0.001,
           thickness: p.thickness * 0.001,
+          beamLength: p.beamLength ? p.beamLength * 0.001 : undefined,
           distanceBetweenGages: p.distGages * 0.001,
           modulus: p.modulus * 1e9,
           gageLength: p.gageLen * 0.001,
@@ -777,8 +783,8 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
   }, [initialStep])
 
   // ── Step 1: Design ────────────────────────────────────────────
-  const [designType, setDesignType] = useState<TransducerType>('binocularBeam')
-  const [dp, setDp] = useState<Record<string, number>>(initParams(DESIGN_FIELDS.binoBeam))
+  const [designType, setDesignType] = useState<TransducerType>('binoBeam')
+  const [dp, setDp] = useState<Record<string, number>>(initParams(DESIGN_FIELDS.binoBeam) as unknown as Record<string, number>)
   const [designMode, setDesignMode] = useState<DesignMode>('forward')
   const [targetSpanMvV, setTargetSpanMvV] = useState(2.0)
   const [inverseUnknownByType, setInverseUnknownByType] = useState<Partial<Record<TransducerType, string>>>({
@@ -792,7 +798,6 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
     binoBeam: INVERSE_META.binoBeam?.[0]?.key,
     squareShear: INVERSE_META.squareShear?.[0]?.key,
     roundShear: INVERSE_META.roundShear?.[0]?.key,
-    roundHollowShear: INVERSE_META.roundShear?.[0]?.key,
     roundSBeamShear: INVERSE_META.roundSBeamShear?.[0]?.key,
     squareTorque: INVERSE_META.squareTorque?.[0]?.key,
     roundSolidTorque: INVERSE_META.roundSolidTorque?.[0]?.key,
@@ -802,7 +807,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
 
   // ── Step 2: Compensation ──────────────────────────────────────
   const [compMethod, setCompMethod] = useState<CompensationMethod>('spanSet')
-  const [cp, setCp] = useState<Record<string, number>>(initParams(COMP_FIELDS.spanSet))
+  const [cp, setCp] = useState<Record<string, number>>(initParams(COMP_FIELDS.spanSet) as unknown as Record<string, number>)
   const [wireIdx, setWireIdx] = useState(0)
 
   // ── Step 3: Trim ─────────────────────────────────────────────
@@ -816,7 +821,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
     if (DESIGN_FIELDS[designType]) {
       const newParams = initParams(DESIGN_FIELDS[designType]);
       console.log('Resetting params for:', designType, newParams);
-      setDp(newParams as Record<string, number>);
+      setDp(newParams as unknown as Record<string, number>);
     }
     const supported = Boolean(INVERSE_META[designType]?.length)
     if (!supported) setDesignMode('forward')
@@ -830,7 +835,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
 
   // ── Reset comp params when method changes ─────────────────────
   useEffect(() => {
-    setCp(initParams(COMP_FIELDS[compMethod]))
+    setCp(initParams(COMP_FIELDS[compMethod]) as unknown as Record<string, number>)
     setWireIdx(0)
   }, [compMethod])
 
@@ -1160,7 +1165,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
       [solvedFieldKey]: inverseResult.solvedValue,
       isTargetDriven: 1,
       targetOutput: targetSpanMvV
-    };
+    } as Record<string, number>;
   }, [dp, designMode, inverseResult, targetSpanMvV]);
 
   // ── Render ────────────────────────────────────────────────────
@@ -1295,7 +1300,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
                           <select
                             className="bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                             value={dp[f.key] ?? 'quarter'}
-                            onChange={e => setDp(prev => ({ ...prev, [f.key]: e.target.value }))}
+                            onChange={e => setDp(prev => ({ ...prev, [f.key]: e.target.value } as unknown as Record<string, number>))}
                           >
                             {Object.entries(BRIDGE_CONFIG_LABELS).map(([k, label]) => (
                               <option key={k} value={k}>{label}</option>
@@ -1388,42 +1393,84 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
             </div>
 
             <aside className="design-frame-preview bg-slate-50 border-none p-0 flex flex-col gap-4">
-              <div className="bg-white rounded-2xl border border-slate-200 p-1 overflow-hidden shadow-sm">
-                <div className="p-3 border-b border-slate-100 flex justify-between items-center">
-                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest m-0">Interactive Model</h4>
-                </div>
-                <div className="h-[380px] w-full relative">
-                  {designType === 'cantilever' ? (
-                    <CantileverModelPreview params={dpWithSolved} us={us} />
-                  ) : designType === 'binoBeam' ? (
+              {designType === 'binoBeam' ? (
+                <div className="calc-preview-pair">
+                  <div className="calc-diagram-2d">
+                    <BinocularSketch2D params={dpWithSolved} us={us} />
+                  </div>
+                  <div className="calc-model-3d">
                     <BinocularModelPreview params={dpWithSolved} us={us} />
-                  ) : designType === 'roundHollowTorque' ? (
-                    <TorqueHollow3D 
-                      outerDiameter={toDisplay(dpWithSolved.outerDiameter, 'length', us)} 
-                      innerDiameter={toDisplay(dpWithSolved.innerDiameter, 'length', us)} 
-                      appliedTorque={toDisplay(dpWithSolved.appliedTorque, 'none', us)} 
+                  </div>
+                </div>
+              ) : designType === 'reverseBeam' ? (
+                <div className="calc-preview-pair">
+                  <div className="calc-diagram-2d">
+                    <ReverseBeamDiagram
+                      load={toDisplay(dpWithSolved.load, 'force', us)}
+                      width={toDisplay(dpWithSolved.width, 'length', us)}
+                      thickness={toDisplay(dpWithSolved.thickness, 'length', us)}
+                      beamLength={toDisplay(dpWithSolved.beamLength ?? 150, 'length', us)}
+                      distBetweenGages={toDisplay(dpWithSolved.distGages, 'length', us)}
+                      gageLength={toDisplay(dpWithSolved.gageLen, 'length', us)}
+                      unitSystem={unitSystem}
+                    />
+                    <ReverseBeamBridgeDiagram />
+                  </div>
+                  <div className="calc-model-3d">
+                    <ReverseBeamModelPreview
+                      load={toDisplay(dpWithSolved.load, 'force', us)}
+                      width={toDisplay(dpWithSolved.width, 'length', us)}
+                      thickness={toDisplay(dpWithSolved.thickness, 'length', us)}
+                      beamLength={toDisplay(dpWithSolved.beamLength ?? 150, 'length', us)}
+                      distBetweenGages={toDisplay(dpWithSolved.distGages, 'length', us)}
+                      gageLength={toDisplay(dpWithSolved.gageLen, 'length', us)}
+                      unitSystem={unitSystem}
+                    />
+                  </div>
+                </div>
+              ) : designType === 'roundHollowTorque' ? (
+                <div className="calc-preview-pair">
+                  <div className="calc-diagram-2d">
+                    <TorqueHollowSketch2D
+                      outerDiameter={toDisplay(dpWithSolved.outerDiameter, 'length', us)}
+                      innerDiameter={toDisplay(dpWithSolved.innerDiameter, 'length', us)}
+                      appliedTorque={toDisplay(dpWithSolved.appliedTorque, 'none', us)}
                       us={us}
                     />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-slate-400 text-xs uppercase tracking-tighter">Model preview coming soon</div>
-                  )}
-                </div>
-              </div>
-
-              {designType === 'binoBeam' && (
-                <div className="grid gap-4">
-                   <BinocularSketch2D params={dpWithSolved} us={us} />
-                </div>
-              )}
-
-              {designType === 'roundHollowTorque' && (
-                <div className="grid gap-4">
-                   <TorqueHollowSketch2D 
-                      outerDiameter={toDisplay(dpWithSolved.outerDiameter, 'length', us)} 
-                      innerDiameter={toDisplay(dpWithSolved.innerDiameter, 'length', us)} 
-                      appliedTorque={toDisplay(dpWithSolved.appliedTorque, 'none', us)} 
+                  </div>
+                  <div className="calc-model-3d">
+                    <TorqueHollow3D
+                      outerDiameter={toDisplay(dpWithSolved.outerDiameter, 'length', us)}
+                      innerDiameter={toDisplay(dpWithSolved.innerDiameter, 'length', us)}
+                      appliedTorque={toDisplay(dpWithSolved.appliedTorque, 'none', us)}
                       us={us}
-                   />
+                    />
+                  </div>
+                </div>
+              ) : designType === 'cantilever' ? (
+                <div className="calc-preview-pair">
+                  <div className="calc-diagram-2d">
+                    <CantileverDiagram
+                      load={toDisplay(dpWithSolved.load, 'force', us)}
+                      width={toDisplay(dpWithSolved.width, 'length', us)}
+                      thickness={toDisplay(dpWithSolved.thickness, 'length', us)}
+                      momentArm={toDisplay(dpWithSolved.momentArm, 'length', us)}
+                      gageLength={toDisplay(dpWithSolved.gageLen, 'length', us)}
+                      unitSystem={unitSystem}
+                    />
+                  </div>
+                  <div className="calc-model-3d">
+                    <CantileverModelPreview params={dpWithSolved} us={us} />
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200 p-1 overflow-hidden shadow-sm">
+                  <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest m-0">Interactive Model</h4>
+                  </div>
+                  <div className="h-[380px] w-full relative">
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs uppercase tracking-tighter">Model preview coming soon</div>
+                  </div>
                 </div>
               )}
             </aside>

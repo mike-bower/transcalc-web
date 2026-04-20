@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
 import { calculateRadial, calculateTangential } from '../../domain/pressure'
+import PressureModelPreview from '../PressureModelPreview'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -72,9 +73,10 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
       </div>
-      <div className="bino-illustration">
-        <img src="/legacy-help/Pressure.jpg" alt="Pressure diaphragm" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-      </div>
+      <PressureModelPreview
+        params={{ pressure, thickness, diameter, modulus: modulusGPa }}
+        us={unitSystem === 'US'}
+      />
       <div className="bino-grid">
         <label>Applied pressure ({pressureUnit})<input type="number" value={Number.isFinite(pressure) ? pressure : ''} onChange={e => setPressure(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Diaphragm thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>

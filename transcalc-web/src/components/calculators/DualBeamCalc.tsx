@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { calculateDualbeamStrain } from '../../domain/dualbeam'
 import { solveDualBeamFea, sampleDualBeamGageStrains } from '../../domain/fea/dualBeamSolver'
-import StrainFieldViewer from '../StrainFieldViewer'
+import DualBeamModelPreview from '../DualBeamModelPreview'
+import DualBeamDiagram from '../diagrams/DualBeamDiagram'
+import type { CstFeaViewMode } from '../CstFeaViewer'
+
+const CstFeaViewer = lazy(() => import('../CstFeaViewer'))
 
 type UnitSystem = 'SI' | 'US'
 type AnalysisMode = 'closed-form' | 'fea'
@@ -28,6 +32,7 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [gageLength, setGageLength] = useState(5)
   const [gageFactor, setGageFactor] = useState(2.1)
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
+  const [viewMode, setViewMode] = useState<CstFeaViewMode>('contour')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -129,8 +134,32 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       </div>
 
-      <div className="bino-illustration">
-        <img src="/legacy-help/DualBB.jpg" alt="Dual bending beam geometry" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <div className="calc-preview-pair">
+        <div className="calc-diagram-2d">
+          <DualBeamDiagram
+            load={siInputs.loadN}
+            width={siInputs.widthMm}
+            thickness={siInputs.thicknessMm}
+            distBetweenGages={siInputs.distMm}
+            gageLength={siInputs.gageLenMm}
+            unitSystem={unitSystem}
+          />
+        </div>
+        <div className="calc-model-3d">
+          <DualBeamModelPreview
+            params={{
+              load: siInputs.loadN,
+              width: siInputs.widthMm,
+              thickness: siInputs.thicknessMm,
+              distBetweenGages: siInputs.distMm,
+              distLoadToCL: siInputs.distLoadMm,
+              gageLen: siInputs.gageLenMm,
+              modulus: siInputs.modulusGPa,
+              gageFactor,
+            }}
+            us={unitSystem === 'US'}
+          />
+        </div>
       </div>
 
       <div className="bino-grid">
@@ -161,15 +190,26 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
         <div className="fea-analysis-section">
           {feaResult ? (
             <>
-              <StrainFieldViewer
-                solution={feaResult.solution}
-                strainKey="exx"
-                gageMarkersMm={[
-                  siInputs.distMm / 2 - siInputs.distMm * 0.2,
-                  siInputs.distMm / 2 + siInputs.distMm * 0.2,
-                ]}
-                label="ε_xx field — simply-supported · load at centre · dashed lines show gage pair positions"
-              />
+              <div className="analysis-toggle" style={{ marginBottom: 8 }}>
+                {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
+                  <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
+                ))}
+              </div>
+              <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
+                <CstFeaViewer
+                  solution={feaResult.solution}
+                  depthMm={siInputs.widthMm}
+                  viewMode={viewMode}
+                  strainKey="exx"
+                  bcType="simply-supported"
+                  unitSystem={unitSystem}
+                  dimLabels={[
+                    { label: 'span', value: siInputs.distMm },
+                    { label: 'w', value: siInputs.widthMm },
+                    { label: 't', value: siInputs.thicknessMm },
+                  ]}
+                />
+              </Suspense>
               <table className="bino-table" style={{ marginTop: 8 }}>
                 <tbody>
                   <tr><th colSpan={3}>FEA Sampled Gage Strains</th></tr>
@@ -179,11 +219,11 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
                   <tr><td>D (compression, right):</td><td>{show(feaResult.gages.strainD, 1)}</td><td>µε</td></tr>
                 </tbody>
               </table>
+              <p className="fea-note">2D plane-stress CST · linear elastic · gage pair separation = 40% of span</p>
             </>
           ) : (
             <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
           )}
-          <p className="fea-note">2D plane-stress CST · linear elastic · gage pair separation = 40% of span</p>
         </div>
       )}
     </div>

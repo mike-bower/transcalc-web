@@ -302,4 +302,3 @@ export function calculateBinobeamStrain(params: BinobeamInput): BinobeamOutput {
   return solveFromNormalizedSI(normalized);
 }
 
-export { BinobeamInput, BinobeamOutput };

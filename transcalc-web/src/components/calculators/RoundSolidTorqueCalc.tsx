@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateRoundSolidTorqueStrain } from '../../domain/rndsldtq'
+import RoundSolidTorqueModelPreview from '../RoundSolidTorqueModelPreview'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -60,9 +61,10 @@ export default function RoundSolidTorqueCalc({ unitSystem, onUnitChange }: Props
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
       </div>
-      <div className="bino-illustration">
-        <img src="/legacy-help/RndSld.jpg" alt="Round solid torque shaft" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-      </div>
+      <RoundSolidTorqueModelPreview
+        params={{ torque, diameter, modulus: modulusGPa }}
+        us={unitSystem === 'US'}
+      />
       <div className="bino-grid">
         <label>Applied torque ({torqueUnit})<input type="number" value={Number.isFinite(torque) ? torque : ''} onChange={e => setTorque(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Shaft diameter ({lenUnit})<input type="number" value={Number.isFinite(diameter) ? diameter : ''} onChange={e => setDiameter(e.target.value === '' ? NaN : Number(e.target.value))} /></label>

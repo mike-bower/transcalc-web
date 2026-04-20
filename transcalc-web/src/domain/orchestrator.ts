@@ -134,7 +134,6 @@ export type DesignInput =
   | { type: 'roundHollowColumn'; params: RoundHollowColumnInput }
   | { type: 'squareShear';       params: ShearSpanParams }
   | { type: 'roundShear';        params: ShearSpanParams }
-  | { type: 'roundHollowShear';  params: ShearSpanParams }
   | { type: 'roundSBeamShear';   params: ShearSpanParams }
   | { type: 'squareTorque';      params: SqTorqueInput }
   | { type: 'roundSolidTorque';  params: RoundSolidTorqueInput }
@@ -264,11 +263,6 @@ export function runDesign(input: DesignInput): DesignResult {
         return { type: 'roundShear', fullSpanSensitivity: span, avgStrain: (span / input.params.gageFactor) * 1000, isValid: true }
       }
 
-      case 'roundHollowShear': {
-        const span = calculateRoundShearSpan(input.params)
-        return { type: 'roundHollowShear', fullSpanSensitivity: span, avgStrain: (span / input.params.gageFactor) * 1000, isValid: true }
-      }
-
       case 'roundSBeamShear': {
         const span = calculateRoundSBeamSpan(input.params)
         return { type: 'roundSBeamShear', fullSpanSensitivity: span, avgStrain: (span / input.params.gageFactor) * 1000, isValid: true }
@@ -314,6 +308,8 @@ export function runDesign(input: DesignInput): DesignResult {
         const fullSpanSensitivity = (tangential - radial) * gageFactor * 1e-3
         return { type: 'pressure', fullSpanSensitivity, avgStrain: tangential, minStrain: radial, maxStrain: tangential, isValid: true }
       }
+      default:
+        throw new Error(`Unhandled design type: ${(input as { type: string }).type}`)
     }
   } catch (err) {
     return {

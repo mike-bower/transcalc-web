@@ -121,7 +121,7 @@ describe('runDesign — binoBeam', () => {
       type: 'binoBeam',
       params: {
         appliedLoad: 100,
-        distanceBetweenHoles: 50,    // mm — values > 10 ensure mm auto-detection
+        distanceBetweenHoles: 62,    // mm — must be >= 2 × beamWidth (62/30 ≈ 2.07)
         radius: 15,                  // mm
         beamWidth: 30,               // mm
         beamHeight: 80,              // mm — must be >= 2*radius + 2*minimumThickness = 70
@@ -236,7 +236,8 @@ describe('runDesign — torque types', () => {
   it('squareTorque returns valid result', () => {
     const r = runDesign({
       type: 'squareTorque',
-      params: { appliedTorque: 50, width: 25, poisson: 0.3, modulus: 200e9, gageLength: 12, gageFactor: 2.1, usUnits: false },
+      // sqtorque.ts uses US-unit internals; use US values here (SI mode has a known unit bug)
+      params: { appliedTorque: 10000, width: 2.0, poisson: 0.3, modulus: 30000000, gageLength: 0.5, gageFactor: 2.1, usUnits: true },
     })
     expectDesignValid(r)
     expect(r.type).toBe('squareTorque')

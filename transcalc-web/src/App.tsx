@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import ProjectPanel from './components/ProjectPanel'
 import WorkflowWizard from './components/WorkflowWizard'
 import { newProject, type ProjectState } from './domain/projectSchema'
+import { initWasm, isWasmLoaded } from './domain/wasmBridge'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -45,6 +47,14 @@ export default function App() {
   const [helpSearch, setHelpSearch] = useState('')
   const [helpHtml, setHelpHtml] = useState<string>('')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [wasmReady, setWasmReady] = useState(false)
+
+  // Attempt WASM load on mount — silently falls back to JS if not built
+  useEffect(() => {
+    initWasm().then((loaded) => {
+      if (loaded) setWasmReady(true)
+    })
+  }, [])
 
   const handleGetState = (): ProjectState => ({
     ...newProject(),
@@ -95,20 +105,26 @@ export default function App() {
         <div className="topbar-right">
           <ProjectPanel onGetState={handleGetState} onLoadState={handleLoadState} />
           <div className="analysis-toggle">
-            <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => setUnitSystem('SI')}>SI</button>
-            <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => setUnitSystem('US')}>US</button>
+            <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => setUnitSystem('SI')} aria-pressed={unitSystem === 'SI'}>SI</button>
+            <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => setUnitSystem('US')} aria-pressed={unitSystem === 'US'}>US</button>
           </div>
+          {wasmReady && isWasmLoaded() && (
+            <span className="status-pill" title="Rust/WASM solver active">WASM</span>
+          )}
+          <button className="export-btn" onClick={() => window.print()} aria-label="Print engineering report">Print Report</button>
           <button className="export-btn" onClick={() => setHelpOpen(true)}>Help</button>
         </div>
       </header>
 
       <main className="layout layout-single p-0 bg-slate-900">
         <section className="h-full">
-          <WorkflowWizard 
-            unitSystem={unitSystem} 
-            onUnitChange={setUnitSystem} 
-            initialStep={selectedFrame}
-          />
+          <ErrorBoundary label="Workflow">
+            <WorkflowWizard
+              unitSystem={unitSystem}
+              onUnitChange={setUnitSystem}
+              initialStep={selectedFrame}
+            />
+          </ErrorBoundary>
         </section>
       </main>
 

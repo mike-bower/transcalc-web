@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"FeaSolution\\\\|feaSolve\\\\|FEA\\\\|fea\" \"c:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web/src/components/calculators/\"*.tsx)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(npm test:*)",
+      "Bash(xargs grep:*)",
+      "Bash(cd \"c:\\Users\\Mike\\OneDrive\\MM Projects\\transcalc\\transcalc-web\" && npm test -- --run *)",
+      "Bash(cd \"c:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web\" && npm test -- --run *)",
+      "Bash(cd \"c:\\Users\\Mike\\OneDrive\\MM Projects\\transcalc\\transcalc-web\" && npx tsc --noEmit *)",
+      "Bash(cd \"c:/Users/Mike/OneDrive/MM Projects/transcalc/transcalc-web\" && npx tsc --noEmit *)"
+    ]
+  }
+}

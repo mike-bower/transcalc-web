@@ -59,7 +59,9 @@ export const calculateRoundSBeamSpan = (params: ShearSpanParams): number => {
 export const calculateSquareShearSpan = (params: ShearSpanParams): number => {
   const d = params.diameter / 2
   const flange = (params.height - params.diameter) / 2
-  const factor1 = flange * params.width * (d - 2 * flange / 2)
+  // SHEARSQR.PAS: Factor1 = Flange * w * (d - Flange / 2)
+  // Differs from SBeam which uses (d - Flange); both confirmed from Delphi source.
+  const factor1 = flange * params.width * (d - flange / 2)
   const maxStrain = calculateMaxStrain(
     params.load,
     params.width,

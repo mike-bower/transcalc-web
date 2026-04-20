@@ -222,4 +222,3 @@ export function calculateSbeamStrain(params: SbeamInput): SbeamOutput {
   };
 }
 
-export { SbeamInput, SbeamOutput };

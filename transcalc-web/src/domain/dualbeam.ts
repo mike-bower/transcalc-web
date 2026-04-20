@@ -195,4 +195,3 @@ export function calculateDualbeamStrain(params: DualbeamInput): DualbeamOutput {
   };
 }
 
-export { DualbeamInput, DualbeamOutput };

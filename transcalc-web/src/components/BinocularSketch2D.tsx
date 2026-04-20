@@ -1,269 +1,221 @@
-import React from 'react';
+import React from 'react'
+import { buildBinocularGeometry, type BinocularRawParams } from '../domain/binocularGeometry'
 
-// Helper for param retrieval
-function p(params: Record<string, number>, key: string, fallback: number): number {
-  const v = params[key]
-  return Number.isFinite(v) && v > 0 ? v : fallback
+type Props = {
+  params: BinocularRawParams
+  us?: boolean
 }
 
-/**
- * Renders a 2D SVG sketch of a Binocular Beam Load Cell based on the provided H-pattern flexure.
- */
-export const BinocularSketch2D: React.FC<{ params: any; us?: boolean }> = ({ params, us }) => {
-  const width = 400;
-  const height = 200;
-  const plotHeight = 120; // Height for the strain plot
-  
-  // 1. Scene scaling
-  const mmToPx = 2.5;
+function formatDimension(value: number, us: boolean | undefined, digits: number = 2): string {
+  return `${value.toFixed(digits)} ${us ? 'in' : 'mm'}`
+}
 
-  // 2. Geometric Params
-  const L_mm = p(params, 'totalLength', p(params, 'distHoles', 100) + 40);
-  const H_mm = p(params, 'beamHeight', 50);
-  const R_mm = p(params, 'radius', 12);
-  const s_mm = p(params, 'distHoles', 60);
-  const t_mm = p(params, 'minThick', 4);
-  const cutH_mm = p(params, 'cutThick', 4);
-  const mod_GPa = p(params, 'modulus', 200);
-  const width_mm = p(params, 'beamWidth', 25);
-  const load_N = p(params, 'load', 100);
-  const gageLen_mm = p(params, 'gageLen', 5);
+function formatForce(value: number, us: boolean | undefined): string {
+  return `${value.toFixed(us ? 1 : 0)} ${us ? 'lbf' : 'N'}`
+}
 
-  const holeCenterOffset = Math.max(0, (H_mm / 2) - t_mm - R_mm);
+export const BinocularSketch2D: React.FC<Props> = ({ params, us }) => {
+  const geometry = buildBinocularGeometry(params)
+  const width = 880
+  const height = 420
+  const sideView = { x: 56, y: 58, w: 470, h: 280 }
+  const topView = { x: 590, y: 92, w: 220, h: 240 }
+  const detailView = { x: 590, y: 28, w: 220, h: 52 }
 
-  const L = L_mm * mmToPx;
-  const H = H_mm * mmToPx;
-  const R = R_mm * mmToPx;
-  const s = s_mm * mmToPx;
-  const hOff = holeCenterOffset * mmToPx;
-  const cutH = cutH_mm * mmToPx;
+  const scale = Math.min(sideView.w / geometry.totalLength, sideView.h / geometry.beamHeight)
+  const toX = (x: number) => sideView.x + (x - geometry.xMin) * scale
+  const toY = (y: number) => sideView.y + sideView.h - (y - geometry.yMin) * scale
 
-  const centerX = width / 2;
-  const centerY = height / 2;
-  
-  const leftX = centerX - s / 2;
-  const rightX = centerX + s / 2;
+  const beamLeft = toX(geometry.xMin)
+  const beamRight = toX(geometry.xMax)
+  const beamTop = toY(geometry.yMax)
+  const beamBottom = toY(geometry.yMin)
+  const centerY = toY(0)
 
-  // --- Bridge Configuration Support ---
-  // Mapping placeholder bridgeConfig values to actual multiplier logic
-  // 0: Full Bending (4 active arms ε, -ε, ε, -ε) -> Gain 4.0 relative to ε/4
-  // 1: Half Bending (2 active arms ε, -ε) -> Gain 2.0 relative to ε/4
-  // 2: Poisson Full (2 active + 2 poisson ν) -> Gain 2(1+ν) relative to ε/4
-  // 3: Quarter Bridge (1 active arm ε) -> Gain 1.0 relative to ε/4
-  const bridgeConfig = p(params, 'bridgeConfig', 0);
-  const poisson = p(params, 'poisson', 0.3);
-  
-  let bridgeGain = 4.0; // Default Full Bending
-  let bridgeName = "Full Bending Bridge";
-  
-  if (bridgeConfig === 1) { bridgeGain = 2.0; bridgeName = "Half Bending Bridge"; }
-  else if (bridgeConfig === 2) { bridgeGain = 2.0 * (1 + poisson); bridgeName = "Poisson Full Bridge"; }
-  else if (bridgeConfig === 3) { bridgeGain = 1.0; bridgeName = "Quarter Bridge"; }
+  const slotTop = toY(geometry.centerSlotHalfHeight)
+  const slotBottom = toY(-geometry.centerSlotHalfHeight)
+  const holeRadiusPx = geometry.radius * scale
+  const leftHoleX = toX(geometry.holeLeftX)
+  const rightHoleX = toX(geometry.holeRightX)
+  const tangentDx = Math.sqrt(
+    Math.max(0, holeRadiusPx * holeRadiusPx - (centerY - slotTop) * (centerY - slotTop))
+  )
 
-  // --- Strain Plot Calculation ---
-  // We plot strain vs X (distance from centerline) under the gages.
-  // Centerline is at +/- s_mm/2. Gage extends +/- gageLen_mm/2 around that.
-  const plotPoints = 50;
-  const g = H_mm / 2 - (R_mm + t_mm);
-  const K2 = H_mm / 2 - g;
-  const K1 = 0; // Assuming load-hole-dist L_hd = 0 for standard binocular
-  const E = mod_GPa * 1e9;
-  const W = width_mm * 0.001;
-  const F = load_N;
-  const r_m = R_mm * 0.001;
-  const s_m = s_mm * 0.001;
-  const K2_m = K2 * 0.001;
+  const topScale = topView.w / geometry.totalLength
+  const topLeft = topView.x
+  const topTop = topView.y + topView.h * 0.2
+  const topHeight = Math.max(28, geometry.beamDepth * topScale)
+  const topToX = (x: number) => topLeft + (x - geometry.xMin) * topScale
 
-  const calculateStrain = (x_rel_mm: number) => {
-    const x_m = x_rel_mm * 0.001;
-    const firstTerm = F / (E * W);
-    const rSqMinXSq = Math.sqrt(Math.pow(r_m, 2) - Math.pow(x_m, 2));
-    const denominator = K2_m - rSqMinXSq;
-    const secondTerm = K1 / denominator;
-    const thirdTerm = (3 * (s_m / 2 + x_m)) / Math.pow(denominator, 2);
-    return (firstTerm * (secondTerm + thirdTerm)) * 1e6;
-  };
-
-  const strainData = Array.from({ length: plotPoints + 1 }, (_, i) => {
-    const x_rel = -gageLen_mm/2 + (i * gageLen_mm / plotPoints);
-    return { x: x_rel, y: calculateStrain(x_rel) };
-  });
-
-  const maxVal = Math.max(...strainData.map(d => Math.abs(d.y)), 1);
-  const plotYScale = (plotHeight - 20) / (maxVal * 1.2);
+  const gageLengthPx = Math.max(16, geometry.gageLength * scale)
+  const gageHeightPx = Math.max(10, geometry.minThickness * scale * 0.85)
+  const activeTopY = beamTop + 8
+  const activeBottomY = beamBottom - gageHeightPx - 8
 
   return (
-    <div className="flex flex-col items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-      <h4 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wider">Binocular Flexure Profile</h4>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="bg-slate-50 border border-slate-100 rounded">
-        {/* Main Body Outline */}
-        <rect 
-          x={centerX - L/2} 
-          y={centerY - H/2} 
-          width={L} 
-          height={H} 
-          fill="none" 
-          stroke="#475569" 
-          strokeWidth="2" 
-        />
-        
-        {/* Unified "O=O" path for full cross-slot pattern with variable cut thickness */}
-        <path 
-          d={`
-            M ${leftX - R} ${centerY - hOff} 
-            A ${R} ${R} 0 0 1 ${leftX + R} ${centerY - hOff}
-            L ${leftX + R} ${centerY - cutH/2}
-            L ${rightX - R} ${centerY - cutH/2}
-            L ${rightX - R} ${centerY - hOff}
-            A ${R} ${R} 0 0 1 ${rightX + R} ${centerY - hOff}
-            L ${rightX + R} ${centerY + hOff}
-            A ${R} ${R} 0 0 1 ${rightX - R} ${centerY + hOff}
-            L ${rightX - R} ${centerY + cutH/2}
-            L ${leftX + R} ${centerY + cutH/2}
-            L ${leftX + R} ${centerY + hOff}
-            A ${R} ${R} 0 0 1 ${leftX - R} ${centerY + hOff}
-            Z
-          `}
-          fill="#ffffff" 
-          stroke="#1e293b" 
-          strokeWidth="2.5" 
-        />
-
-        {/* Labels/Annotations */}
-        <g fill="#475569" fontSize="10" fontWeight="bold" fontFamily="sans-serif">
-          <text x={centerX - L/2 + 5} y={centerY - H/2 - 10}>FIXED END</text>
-          <text x={centerX + L/2 - 45} y={centerY - H/2 - 10}>LOAD END (P)</text>
-          
-          {/* Arrow for Load - Positioned at the right end of the beam */}
-          <path 
-            d={`M ${centerX + L/2 - 15} ${centerY - H/2 - 35} L ${centerX + L/2 - 15} ${centerY - H/2 - 5}`} 
-            stroke="red" 
-            strokeWidth="2" 
-            fill="none" 
-            markerEnd="url(#arrow)" 
-          />
-          <defs>
-            <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="red" />
-            </marker>
-          </defs>
-        </g>
-      </svg>
-
-      {/* Strain Plot */}
-      <h4 className="text-sm font-bold text-gray-700 mt-6 mb-2 uppercase tracking-wider">Strain vs. Gage Offset</h4>
-      <svg width={width} height={plotHeight} className="bg-white border border-gray-100 rounded">
-        <defs>
-          <linearGradient id="strainGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-        
-        {/* Horizontal Axis (0 Strain) */}
-        <line x1="40" y1={plotHeight/2} x2={width-20} y2={plotHeight/2} stroke="#ccc" strokeDasharray="4" />
-        <text x="5" y={plotHeight/2 + 4} fontSize="9" fill="#999">0με</text>
-        
-        {/* Strain Curve Path (Area) */}
-        <path
-          d={`
-            M ${40} ${plotHeight/2}
-            ${strainData.map((d, i) => {
-              const x = 40 + (i * (width - 60) / plotPoints);
-              const y = plotHeight/2 - (d.y * plotYScale);
-              return `L ${x} ${y}`;
-            }).join(' ')}
-            L ${width-20} ${plotHeight/2}
-            Z
-          `}
-          fill="url(#strainGradient)"
-        />
-
-        {/* Strain Curve Path (Line) */}
-        <path
-          d={`
-            M ${40} ${plotHeight/2 - (strainData[0].y) * plotYScale}
-            ${strainData.map((d, i) => {
-              const x = 40 + (i * (width - 60) / plotPoints);
-              const y = plotHeight/2 - (d.y * plotYScale);
-              return `L ${x} ${y}`;
-            }).join(' ')}
-          `}
-          fill="none"
-          stroke="#3b82f6"
-          strokeWidth="2"
-        />
-
-        {/* Labels */}
-        <text x="40" y={plotHeight - 5} fontSize="10" fill="#666" textAnchor="middle">-{gageLen_mm/2}mm</text>
-        <text x={40 + (width - 60)/2} y={plotHeight - 5} fontSize="10" fill="#666" textAnchor="middle">0 (Centerline)</text>
-        <text x={width - 20} y={plotHeight - 5} fontSize="10" fill="#666" textAnchor="middle">{gageLen_mm/2}mm</text>
-        
-        {/* Max Strain Label */}
-        <text x="45" y="15" fontSize="10" fontWeight="bold" fill="#3b82f6">Max: {Math.round(maxVal)} με</text>
-      </svg>
-      <p className="text-[10px] text-gray-500 mt-2 italic">Strain profile across gage length at hinge location</p>
-
-      {/* Strain Plot */}
-      <div className="flex justify-between items-center mt-6 mb-2">
-        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Strain vs. Offset (με)</h4>
-        <span className="text-[10px] font-medium px-2 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100 shadow-sm">
-          {bridgeName}
-        </span>
+    <div className="flex flex-col items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="w-full flex items-center justify-between mb-3">
+        <div>
+          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Binocular Beam Engineering Sketch</h4>
+          <p className="text-[11px] text-slate-500">Shared geometry reference for sketch, model, mesh, and result overlays</p>
+        </div>
+        <div className="text-right text-[10px] font-mono text-slate-500">
+          <div>Spacing: {formatDimension(geometry.holeSpacing, us)}</div>
+          <div>Hole radius: {formatDimension(geometry.radius, us)}</div>
+          <div>Load: {formatForce(geometry.load, us)}</div>
+        </div>
       </div>
-      <svg width={width} height={plotHeight} className="bg-white border border-gray-100 rounded">
-        <defs>
-          <linearGradient id="strainGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-        
-        {/* Horizontal Axis (0 Strain) */}
-        <line x1="40" y1={plotHeight/2} x2={width-20} y2={plotHeight/2} stroke="#ccc" strokeDasharray="4" />
-        <text x="5" y={plotHeight/2 + 4} fontSize="9" fill="#999">0με</text>
-        
-        {/* Strain Curve Path (Area) */}
-        <path
-          d={`
-            M ${40} ${plotHeight/2}
-            ${strainData.map((d, i) => {
-              const xValue = 40 + (i * (width - 60) / plotPoints);
-              const plotVal = d.y * bridgeGain;
-              const yValue = plotHeight/2 - (plotVal * plotYScale);
-              return `L ${xValue} ${yValue}`;
-            }).join(' ')}
-            L ${width-20} ${plotHeight/2}
-            Z
-          `}
-          fill="url(#strainGradient)"
-        />
 
-        {/* Strain Curve Path (Line) */}
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="bg-slate-50 border border-slate-200 rounded-lg">
+        <defs>
+          <marker id="binocularArrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#dc2626" />
+          </marker>
+          <pattern id="binocularHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#94a3b8" strokeWidth="2" />
+          </pattern>
+        </defs>
+
+        <text x={sideView.x} y={30} fontSize="12" fontWeight="800" fill="#0f172a" letterSpacing="0.18em">
+          SIDE VIEW
+        </text>
+        <text x={topView.x} y={30} fontSize="12" fontWeight="800" fill="#0f172a" letterSpacing="0.18em">
+          TOP VIEW
+        </text>
+
+        <line x1={beamLeft - 20} y1={centerY} x2={beamRight + 20} y2={centerY} stroke="#cbd5e1" strokeDasharray="6 6" />
+        <line x1={leftHoleX} y1={beamTop - 18} x2={leftHoleX} y2={beamBottom + 18} stroke="#cbd5e1" strokeDasharray="6 6" />
+        <line x1={rightHoleX} y1={beamTop - 18} x2={rightHoleX} y2={beamBottom + 18} stroke="#cbd5e1" strokeDasharray="6 6" />
+
+        <rect x={beamLeft} y={beamTop} width={beamRight - beamLeft} height={beamBottom - beamTop} fill="#ffffff" stroke="#334155" strokeWidth="2" />
         <path
-          d={`
-            M ${40} ${plotHeight/2 - (strainData[0].y * bridgeGain) * plotYScale}
-            ${strainData.map((d, i) => {
-              const xValue = 40 + (i * (width - 60) / plotPoints);
-              const plotVal = d.y * bridgeGain;
-              const yValue = plotHeight/2 - (plotVal * plotYScale);
-              return `L ${xValue} ${yValue}`;
-            }).join(' ')}
-          `}
-          fill="none"
-          stroke="#3b82f6"
+          d={[
+            `M ${leftHoleX + tangentDx} ${slotTop}`,
+            `L ${rightHoleX - tangentDx} ${slotTop}`,
+            `A ${holeRadiusPx} ${holeRadiusPx} 0 1 1 ${rightHoleX - tangentDx} ${slotBottom}`,
+            `L ${leftHoleX + tangentDx} ${slotBottom}`,
+            `A ${holeRadiusPx} ${holeRadiusPx} 0 1 0 ${leftHoleX + tangentDx} ${slotTop}`,
+            'Z',
+          ].join(' ')}
+          fill="#e2e8f0"
+          stroke="#0f172a"
           strokeWidth="2"
         />
 
-        {/* Labels */}
-        <text x="40" y={plotHeight - 5} fontSize="10" fill="#666" textAnchor="middle">-{gageLen_mm/2}mm</text>
-        <text x={40 + (width - 60)/2} y={plotHeight - 5} fontSize="10" fill="#666" textAnchor="middle">0 (Centerline)</text>
-        <text x={width - 20} y={plotHeight - 5} fontSize="10" fill="#666" textAnchor="middle">{gageLen_mm/2}mm</text>
-        
-        {/* Max Strain Label */}
-        <text x="45" y="15" fontSize="10" fontWeight="bold" fill="#3b82f6">Effective: {Math.round(maxVal * bridgeGain)} με</text>
+        <rect
+          x={toX(geometry.leftActiveX) - gageLengthPx / 2}
+          y={activeTopY}
+          width={gageLengthPx}
+          height={gageHeightPx}
+          rx="2"
+          fill="#f97316"
+          opacity="0.85"
+        />
+        <rect
+          x={toX(geometry.rightActiveX) - gageLengthPx / 2}
+          y={activeBottomY}
+          width={gageLengthPx}
+          height={gageHeightPx}
+          rx="2"
+          fill="#2563eb"
+          opacity="0.85"
+        />
+        <rect
+          x={toX(geometry.leftPassiveX) - gageLengthPx / 2}
+          y={activeBottomY}
+          width={gageLengthPx}
+          height={gageHeightPx}
+          rx="2"
+          fill="#cbd5e1"
+          opacity="0.9"
+        />
+        <rect
+          x={toX(geometry.rightPassiveX) - gageLengthPx / 2}
+          y={activeTopY}
+          width={gageLengthPx}
+          height={gageHeightPx}
+          rx="2"
+          fill="#cbd5e1"
+          opacity="0.9"
+        />
+
+        <rect x={beamLeft - 32} y={beamTop - 6} width="24" height={beamBottom - beamTop + 12} fill="url(#binocularHatch)" stroke="#475569" strokeWidth="1.5" />
+        <line x1={beamRight - 24} y1={beamTop - 28} x2={beamRight - 24} y2={beamTop + 22} stroke="#dc2626" strokeWidth="2.5" markerEnd="url(#binocularArrow)" />
+
+        <text x={beamLeft - 34} y={beamTop - 14} fontSize="10" fontWeight="700" fill="#475569">Fixed support</text>
+        <text x={beamRight - 24} y={beamTop - 36} textAnchor="middle" fontSize="10" fontWeight="700" fill="#dc2626">Load</text>
+        <text x={toX(geometry.leftActiveX)} y={activeTopY - 6} textAnchor="middle" fontSize="10" fontWeight="800" fill="#c2410c">Active +ε</text>
+        <text x={toX(geometry.rightActiveX)} y={beamBottom + 20} textAnchor="middle" fontSize="10" fontWeight="800" fill="#1d4ed8">Active -ε</text>
+
+        <line x1={beamLeft} y1={beamBottom + 34} x2={beamRight} y2={beamBottom + 34} stroke="#475569" strokeWidth="1.5" />
+        <line x1={beamLeft} y1={beamBottom + 26} x2={beamLeft} y2={beamBottom + 42} stroke="#475569" strokeWidth="1.5" />
+        <line x1={beamRight} y1={beamBottom + 26} x2={beamRight} y2={beamBottom + 42} stroke="#475569" strokeWidth="1.5" />
+        <text x={(beamLeft + beamRight) / 2} y={beamBottom + 52} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a">
+          Overall length = {formatDimension(geometry.totalLength, us)}
+        </text>
+
+        <line x1={beamLeft - 42} y1={beamTop} x2={beamLeft - 42} y2={beamBottom} stroke="#475569" strokeWidth="1.5" />
+        <line x1={beamLeft - 50} y1={beamTop} x2={beamLeft - 34} y2={beamTop} stroke="#475569" strokeWidth="1.5" />
+        <line x1={beamLeft - 50} y1={beamBottom} x2={beamLeft - 34} y2={beamBottom} stroke="#475569" strokeWidth="1.5" />
+        <text x={beamLeft - 56} y={(beamTop + beamBottom) / 2} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a" transform={`rotate(-90 ${beamLeft - 56} ${(beamTop + beamBottom) / 2})`}>
+          Height = {formatDimension(geometry.beamHeight, us)}
+        </text>
+
+        <line x1={leftHoleX} y1={beamTop - 48} x2={rightHoleX} y2={beamTop - 48} stroke="#475569" strokeWidth="1.5" />
+        <line x1={leftHoleX} y1={beamTop - 56} x2={leftHoleX} y2={beamTop - 40} stroke="#475569" strokeWidth="1.5" />
+        <line x1={rightHoleX} y1={beamTop - 56} x2={rightHoleX} y2={beamTop - 40} stroke="#475569" strokeWidth="1.5" />
+        <text x={(leftHoleX + rightHoleX) / 2} y={beamTop - 58} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a">
+          Hole spacing = {formatDimension(geometry.holeSpacing, us)}
+        </text>
+
+        <line x1={rightHoleX + holeRadiusPx + 20} y1={centerY} x2={rightHoleX + 20} y2={centerY} stroke="#475569" strokeWidth="1.5" />
+        <line x1={rightHoleX + 20} y1={centerY} x2={rightHoleX + 20} y2={slotTop} stroke="#475569" strokeWidth="1.5" />
+        <text x={rightHoleX + holeRadiusPx + 22} y={centerY - 8} fontSize="11" fontWeight="700" fill="#0f172a">
+          R = {formatDimension(geometry.radius, us)}
+        </text>
+
+        <line x1={leftHoleX - holeRadiusPx - 28} y1={slotTop} x2={leftHoleX - holeRadiusPx - 28} y2={beamTop} stroke="#475569" strokeWidth="1.5" />
+        <line x1={leftHoleX - holeRadiusPx - 36} y1={slotTop} x2={leftHoleX - holeRadiusPx - 20} y2={slotTop} stroke="#475569" strokeWidth="1.5" />
+        <line x1={leftHoleX - holeRadiusPx - 36} y1={beamTop} x2={leftHoleX - holeRadiusPx - 20} y2={beamTop} stroke="#475569" strokeWidth="1.5" />
+        <text x={leftHoleX - holeRadiusPx - 42} y={(slotTop + beamTop) / 2} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a" transform={`rotate(-90 ${leftHoleX - holeRadiusPx - 42} ${(slotTop + beamTop) / 2})`}>
+          t = {formatDimension(geometry.minThickness, us)}
+        </text>
+
+        <rect x={topLeft} y={topTop} width={geometry.totalLength * topScale} height={topHeight} fill="#ffffff" stroke="#334155" strokeWidth="2" />
+        <rect
+          x={topToX(geometry.leftActiveX) - (geometry.gageLength * topScale) / 2}
+          y={topTop + 5}
+          width={geometry.gageLength * topScale}
+          height={topHeight - 10}
+          fill="#f97316"
+          opacity="0.78"
+        />
+        <rect
+          x={topToX(geometry.rightActiveX) - (geometry.gageLength * topScale) / 2}
+          y={topTop + 5}
+          width={geometry.gageLength * topScale}
+          height={topHeight - 10}
+          fill="#2563eb"
+          opacity="0.78"
+        />
+        <line x1={topToX(geometry.xMin)} y1={topTop + topHeight + 26} x2={topToX(geometry.xMax)} y2={topTop + topHeight + 26} stroke="#475569" strokeWidth="1.5" />
+        <line x1={topToX(geometry.xMin)} y1={topTop + topHeight + 18} x2={topToX(geometry.xMin)} y2={topTop + topHeight + 34} stroke="#475569" strokeWidth="1.5" />
+        <line x1={topToX(geometry.xMax)} y1={topTop + topHeight + 18} x2={topToX(geometry.xMax)} y2={topTop + topHeight + 34} stroke="#475569" strokeWidth="1.5" />
+        <text x={topView.x + topView.w / 2} y={topTop + topHeight + 44} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a">
+          Width = {formatDimension(geometry.beamWidth, us)}
+        </text>
+
+        <rect x={detailView.x} y={detailView.y} width={detailView.w} height={detailView.h} fill="#ffffff" stroke="#cbd5e1" strokeDasharray="5 4" />
+        <text x={detailView.x + 12} y={detailView.y + 16} fontSize="10" fontWeight="800" fill="#475569" letterSpacing="0.16em">
+          GAGE LAYOUT
+        </text>
+        <text x={detailView.x + 12} y={detailView.y + 34} fontSize="10" fill="#334155">
+          Active gages straddle the highest bending ligaments.
+        </text>
+        <text x={detailView.x + 12} y={detailView.y + 48} fontSize="10" fill="#334155">
+          Passive gages sit on the opposite surfaces for bridge completion.
+        </text>
       </svg>
-      <p className="text-[10px] text-gray-500 mt-2 italic text-center w-full">Total composite strain profile factoring in {bridgeName}</p>
     </div>
-  );
-};
+  )
+}

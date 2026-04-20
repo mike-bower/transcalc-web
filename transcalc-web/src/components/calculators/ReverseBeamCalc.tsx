@@ -1,11 +1,17 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { calculateReversebeamStrain } from '../../domain/reversebeam'
+import {
+  calculateReversebeamStrain,
+  type BridgeConfig,
+  BRIDGE_CONFIG_LABELS,
+  getActiveGages,
+} from '../../domain/reversebeam'
 import { solveReverseBeamFea } from '../../domain/fea/reverseBeamSolver'
-import StrainFieldViewer from '../StrainFieldViewer'
 import ReverseBeamDiagram from '../diagrams/ReverseBeamDiagram'
+import ReverseBeamBridgeDiagram from '../diagrams/ReverseBeamBridgeDiagram'
 import ReverseBeamModelPreview from '../ReverseBeamModelPreview'
+import type { CstFeaViewMode } from '../CstFeaViewer'
 
-const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
+const CstFeaViewer = lazy(() => import('../CstFeaViewer'))
 
 type UnitSystem = 'SI' | 'US'
 type AnalysisMode = 'closed-form' | 'fea'
@@ -26,11 +32,15 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [load, setLoad] = useState(100)             // N or lbf
   const [width, setWidth] = useState(25)             // mm or in
   const [thickness, setThickness] = useState(2)      // mm or in
+  const [beamLength, setBeamLength] = useState(75)   // mm or in
   const [distBetweenGages, setDistBetweenGages] = useState(25) // mm or in
   const [modulusGPa, setModulusGPa] = useState(200)  // GPa or Mpsi
   const [gageLength, setGageLength] = useState(5)    // mm or in
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [bridgeConfig, setBridgeConfig] = useState<BridgeConfig>('fullBridgeTopBot')
+  const [poissonRatio, setPoissonRatio] = useState(0.3)
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
+  const [viewMode, setViewMode] = useState<CstFeaViewMode>('contour')
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -40,6 +50,7 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
       setLoad(v => round(v / N_PER_LBF))
       setWidth(v => round(v / MM_PER_IN))
       setThickness(v => round(v / MM_PER_IN))
+      setBeamLength(v => round(v / MM_PER_IN))
       setDistBetweenGages(v => round(v / MM_PER_IN))
       setModulusGPa(v => round(v / GPA_PER_MPSI))
       setGageLength(v => round(v / MM_PER_IN))
@@ -47,6 +58,7 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
       setLoad(v => round(v * N_PER_LBF))
       setWidth(v => round(v * MM_PER_IN))
       setThickness(v => round(v * MM_PER_IN))
+      setBeamLength(v => round(v * MM_PER_IN))
       setDistBetweenGages(v => round(v * MM_PER_IN))
       setModulusGPa(v => round(v * GPA_PER_MPSI))
       setGageLength(v => round(v * MM_PER_IN))
@@ -60,11 +72,12 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
       loadN: unitSystem === 'SI' ? load : load * N_PER_LBF,
       widthMm: width * mm,
       thicknessMm: thickness * mm,
+      beamLengthMm: beamLength * mm,
       distMm: distBetweenGages * mm,
       gageLenMm: gageLength * mm,
       modulusGPa: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
     }
-  }, [unitSystem, load, width, thickness, distBetweenGages, modulusGPa, gageLength])
+  }, [unitSystem, load, width, thickness, beamLength, distBetweenGages, modulusGPa, gageLength])
 
   const result = useMemo(() => {
     const { loadN, widthMm, thicknessMm, distMm, gageLenMm, modulusGPa: modGPa } = siInputs
@@ -83,9 +96,12 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
         beamWidth: widthMm,
         thickness: thicknessMm,
         distanceBetweenGages: distMm,
+        beamLength: siInputs.beamLengthMm,
         modulus: modulusPa,
         gageLength: gageLenMm,
         gageFactor,
+        bridgeConfig,
+        poissonRatio,
       })
       return { error: '', data }
     } catch (e) {
@@ -129,37 +145,55 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div className="bino-illustration m-0 h-[300px]">
+      <div className="calc-preview-pair">
+        <div className="calc-diagram-2d">
           <ReverseBeamDiagram
             load={load}
             width={width}
             thickness={thickness}
+            beamLength={beamLength}
             distBetweenGages={distBetweenGages}
             gageLength={gageLength}
             unitSystem={unitSystem}
+            bridgeConfig={bridgeConfig}
           />
+          <ReverseBeamBridgeDiagram bridgeConfig={bridgeConfig} poissonRatio={poissonRatio} />
         </div>
-        <div className="bino-illustration m-0 h-[300px]">
+        <div className="calc-model-3d">
           <ReverseBeamModelPreview
             load={load}
             width={width}
             thickness={thickness}
+            beamLength={beamLength}
             distBetweenGages={distBetweenGages}
             gageLength={gageLength}
             unitSystem={unitSystem}
+            bridgeConfig={bridgeConfig}
           />
         </div>
       </div>
 
       <div className="bino-grid">
+        <label style={{ gridColumn: '1 / -1' }}>Bridge Configuration
+          <select value={bridgeConfig} onChange={e => setBridgeConfig(e.target.value as BridgeConfig)}
+            style={{ display: 'block', width: '100%', marginTop: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid #c8d8e8', fontSize: 13 }}>
+            {(Object.keys(BRIDGE_CONFIG_LABELS) as BridgeConfig[]).map(k => (
+              <option key={k} value={k}>{BRIDGE_CONFIG_LABELS[k]}</option>
+            ))}
+          </select>
+        </label>
         <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        <label>Beam length, L ({lenUnit})<input type="number" value={Number.isFinite(beamLength) ? beamLength : ''} onChange={e => setBeamLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Distance between gages, D ({lenUnit})<input type="number" value={Number.isFinite(distBetweenGages) ? distBetweenGages : ''} onChange={e => setDistBetweenGages(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+        {bridgeConfig === 'fullBridgeTop' && (
+          <label>Poisson's Ratio<input type="number" value={poissonRatio} step={0.01} min={0.1} max={0.5}
+            onChange={e => setPoissonRatio(e.target.value === '' ? 0.3 : Number(e.target.value))} /></label>
+        )}
       </div>
 
       {result.error && <p className="workspace-note">{result.error}</p>}
@@ -180,13 +214,27 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
           <h3>FEA Analysis</h3>
           {feaSolution ? (
             <>
-              <StrainFieldViewer
-                solution={feaSolution}
-                strainKey="exx"
-                gageMarkersMm={[gageMm, span - gageMm]}
-                label={`ε_xx field — simply-supported span ${span.toFixed(1)} mm · gage markers at ±${gageMm.toFixed(1)} mm from supports`}
-              />
-              <p className="fea-note">2D plane-stress CST · linear elastic · dashed lines show gage centre positions</p>
+              <div className="analysis-toggle" style={{ marginBottom: 8 }}>
+                {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
+                  <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
+                ))}
+              </div>
+              <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
+                <CstFeaViewer
+                  solution={feaSolution}
+                  depthMm={siInputs.widthMm}
+                  viewMode={viewMode}
+                  strainKey="exx"
+                  bcType="simply-supported"
+                  unitSystem={unitSystem}
+                  dimLabels={[
+                    { label: 'span', value: siInputs.distMm },
+                    { label: 'w', value: siInputs.widthMm },
+                    { label: 't', value: siInputs.thicknessMm },
+                  ]}
+                />
+              </Suspense>
+              <p className="fea-note">2D plane-stress CST · linear elastic</p>
             </>
           ) : (
             <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateBinobeamStrainExplicit } from '../domain/binobeam'
 import { solveBinobeamFea, type BinobeamFeaResult } from '../domain/fea/binobeamSolver'
-import BinobeamFeaViewer from './BinobeamFeaViewer'
-import BinocularSketch2D from './BinocularSketch2D'
+import BinobeamFeaViewer, { type BinobeamFeaViewMode } from './BinobeamFeaViewer'
 import { BinocularModelPreview } from './BinocularModelPreview'
+import { BinocularSketch2D } from './BinocularSketch2D'
 import { BinocularStrainProfile } from './diagrams/BinocularStrainProfile'
 
 const parseInput = (raw: string): number => {
@@ -37,6 +37,9 @@ type BinocularBeamWorkspaceProps = {
 export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHelpTokensChange }: BinocularBeamWorkspaceProps) {
   const [analysisPath, setAnalysisPath] = useState<'closed-form' | 'fea'>('closed-form')
   const [activeFrame, setActiveFrame] = useState<'design' | 'compensation' | 'trim'>('design')
+  const [viewerMode, setViewerMode] = useState<'geometry' | 'sketch' | BinobeamFeaViewMode>('geometry')
+  const [showFeaNodes, setShowFeaNodes] = useState(false)
+  const [showFeaEdges, setShowFeaEdges] = useState(true)
   const [appliedForce, setAppliedForce] = useState(unitSystem === 'US' ? 100 : 500)
   const [distanceBetweenHoles, setDistanceBetweenHoles] = useState(unitSystem === 'US' ? 2.5 : 60)
   const [radius, setRadius] = useState(unitSystem === 'US' ? 0.5 : 12)
@@ -59,6 +62,15 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
   })
 
   const distanceLoadHole = 0
+  const viewerParams = {
+    beamWidth,
+    beamHeight,
+    distHoles: distanceBetweenHoles,
+    radius,
+    minThick: minimumThickness,
+    gageLen: gageLength,
+    load: appliedForce,
+  }
 
   const forceUnit = unitSystem === 'US' ? 'lbf' : 'N'
   const lengthUnit = unitSystem === 'US' ? 'in' : 'mm'
@@ -106,6 +118,8 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
       return {
         error: `${bad[1]} must be a positive value.`,
         avgStrain: Number.NaN,
+        minStrain: Number.NaN,
+        maxStrain: Number.NaN,
         gradient: Number.NaN,
         fullSpanSensitivity: Number.NaN,
         zOffset: Number.NaN,
@@ -139,6 +153,8 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
       return {
         error: err instanceof Error ? err.message : 'Unable to solve binocular beam.',
         avgStrain: Number.NaN,
+        minStrain: Number.NaN,
+        maxStrain: Number.NaN,
         gradient: Number.NaN,
         fullSpanSensitivity: Number.NaN,
         zOffset: Number.NaN,
@@ -181,7 +197,16 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
       }
     }, 180)
     return () => window.clearTimeout(timer)
-  }, [analysisPath, unitSystem, appliedForce, distanceBetweenGageCls, radius, beamWidth, beamHeight, minimumThickness, modulus, gageLength, gageFactor])
+  }, [analysisPath, unitSystem, appliedForce, distanceBetweenHoles, radius, beamWidth, beamHeight, minimumThickness, modulus, gageLength, gageFactor])
+
+  useEffect(() => {
+    if (analysisPath === 'closed-form' && ['mesh', 'contour', 'deformed', 'boundary'].includes(viewerMode)) {
+      setViewerMode('geometry')
+    }
+    if (analysisPath === 'fea' && viewerMode === 'sketch') {
+      setViewerMode('contour')
+    }
+  }, [analysisPath, viewerMode])
 
   useEffect(() => {
     if (!onHelpTokensChange) return
@@ -230,7 +255,7 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
   ])
 
   return (
-    <div cWorkflow Navigation Header */}
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-900">
       <header className="flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-700 shrink-0 shadow-sm z-10 transition-colors">
         <div className="flex items-center space-x-8">
           <h2 className="text-xl font-bold text-white tracking-tight mr-4">Transcalc</h2>
@@ -263,7 +288,10 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              onClick={() => setAnalysisPath('closed-form')}
+              onClick={() => {
+                setAnalysisPath('closed-form')
+                setViewerMode('geometry')
+              }}
             >
               Closed-form
             </button>
@@ -273,7 +301,10 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              onClick={() => setAnalysisPath('fea')}
+              onClick={() => {
+                setAnalysisPath('fea')
+                setViewerMode((prev) => (prev === 'geometry' || prev === 'sketch' ? 'contour' : prev))
+              }}
             >
               FEA Analysis
             </button>
@@ -336,15 +367,65 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
             ))}
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-700">
-             <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-700">
-               <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 text-center">Reference Profile</h4>
-               <img 
-                src="/legacy-help/bino.jpg" 
-                alt="Binocular beam geometry" 
-                className="max-w-full h-auto rounded-lg opacity-40 hover:opacity-100 transition-opacity grayscale invert" 
-              />
-             </div>
+          <div className="mt-8 pt-6 border-t border-slate-700 space-y-4">
+            <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-700">
+              <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 text-center">Viewer Modes</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {(analysisPath === 'closed-form'
+                  ? [
+                      { key: 'geometry', label: '3D Geometry' },
+                      { key: 'sketch', label: '2D Sketch' },
+                    ]
+                  : [
+                      { key: 'contour', label: 'Results' },
+                      { key: 'mesh', label: 'Mesh' },
+                      { key: 'deformed', label: 'Deformed' },
+                      { key: 'boundary', label: 'Boundary' },
+                    ]).map((mode) => (
+                  <button
+                    key={mode.key}
+                    onClick={() => setViewerMode(mode.key as typeof viewerMode)}
+                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
+                      viewerMode === mode.key
+                        ? 'bg-blue-600 text-white border-blue-400'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {analysisPath === 'fea' && (
+              <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-700">
+                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 text-center">FEA Overlays</h4>
+                <div className="flex flex-col gap-2 text-[11px] text-slate-300">
+                  <label className="flex items-center justify-between gap-3">
+                    <span>Show element edges</span>
+                    <input type="checkbox" checked={showFeaEdges} onChange={(e) => setShowFeaEdges(e.target.checked)} />
+                  </label>
+                  <label className="flex items-center justify-between gap-3">
+                    <span>Show nodes</span>
+                    <input type="checkbox" checked={showFeaNodes} onChange={(e) => setShowFeaNodes(e.target.checked)} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-700">
+              <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 text-center">Status</h4>
+              <div className="space-y-2 text-[11px] text-slate-300">
+                <div className="flex justify-between"><span>Viewer</span><span className="font-mono text-slate-100">{viewerMode}</span></div>
+                <div className="flex justify-between"><span>Analysis</span><span className="font-mono text-slate-100">{analysisPath}</span></div>
+                {analysisPath === 'fea' && (
+                  <>
+                    <div className="flex justify-between"><span>Nodes</span><span className="font-mono text-slate-100">{feaState.result?.nodes ?? '—'}</span></div>
+                    <div className="flex justify-between"><span>Elements</span><span className="font-mono text-slate-100">{feaState.result?.elements ?? '—'}</span></div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -370,31 +451,66 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
 
           {/* Visualization Layout */}
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-20">
-            {/* Left: 3D Model */}
+            {/* Left: Primary Viewer */}
             <div className="xl:col-span-3 bg-slate-800 rounded-3xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col relative">
               <div className="p-4 border-b border-slate-700 bg-slate-800/50 backdrop-blur-md flex justify-between items-center z-10">
-                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Geometric Preview (3D)</h3>
+                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+                  {viewerMode === 'geometry'
+                    ? 'Geometry Viewer'
+                    : viewerMode === 'sketch'
+                      ? 'Engineering Sketch'
+                      : viewerMode === 'mesh'
+                        ? 'FEA Mesh'
+                        : viewerMode === 'deformed'
+                          ? 'Deformed Result'
+                          : viewerMode === 'boundary'
+                            ? 'Boundary Conditions'
+                            : 'FEA Results'}
+                </h3>
                 <div className="flex items-center gap-4">
                   <div className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-600 text-[9px] font-bold text-slate-400">
                     CL: {show(result.gageCenterline, 4)}
                   </div>
                 </div>
               </div>
-              <div className="h-[450px] relative bg-slate-900">
-                <BinocularModelPreview 
-                  params={{
-                    beamWidth,
-                    beamHeight,
-                    distHoles: distanceBetweenHoles,
-                    radius,
-                    minThick: minimumThickness,
-                    load: appliedForce
-                  }}
-                  us={unitSystem === 'US'}
-                />
+              <div className="min-h-[450px] relative bg-slate-900">
+                {viewerMode === 'geometry' && (
+                  <BinocularModelPreview params={viewerParams} us={unitSystem === 'US'} />
+                )}
+                {viewerMode === 'sketch' && (
+                  <div className="p-4 bg-slate-100">
+                    <BinocularSketch2D params={viewerParams} us={unitSystem === 'US'} />
+                  </div>
+                )}
+                {viewerMode !== 'geometry' && viewerMode !== 'sketch' && (
+                  feaState.result ? (
+                    <div className="p-4">
+                      <BinobeamFeaViewer
+                        result={feaState.result}
+                        widthMeters={unitSystem === 'US' ? beamWidth * 0.0254 : beamWidth * 0.001}
+                        unitSystem={unitSystem}
+                        distanceBetweenGageCls={distanceBetweenHoles}
+                        radius={radius}
+                        beamHeight={beamHeight}
+                        minimumThickness={minimumThickness}
+                        beamWidth={beamWidth}
+                        viewMode={viewerMode}
+                        showNodes={showFeaNodes}
+                        showEdges={showFeaEdges}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-[450px] flex items-center justify-center text-slate-300 font-mono text-sm">
+                      {feaState.isSolving ? 'Solving binocular FEA...' : feaState.error || 'FEA result unavailable'}
+                    </div>
+                  )
+                )}
               </div>
               <div className="p-3 bg-slate-900/50 border-t border-slate-700 flex justify-center gap-10">
                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Calculated Z-Offset: <span className="font-mono text-white ml-2">{show(result.zOffset, 4)} {lengthUnit}</span></div>
+                 {feaState.result && (
+                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">FEA span: <span className="font-mono text-white ml-2">{show(feaState.result.spanMvV, 4)} mV/V</span></div>
+                 )}
               </div>
             </div>
 
@@ -420,31 +536,55 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
                 color="#10b981"
               />
 
-              {/* FEA Overlay Toggle if in FEA mode */}
-              {analysisPath === 'fea' && (
-                 <div className="flex-1 bg-slate-900 rounded-3xl border border-slate-800 p-4 shadow-2xl relative min-h-[250px] overflow-hidden">
-                    <div className="absolute top-4 left-4 z-10 flex items-center space-x-2">
-                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                       <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Live FEA Result</span>
+              <div className="flex-1 bg-slate-900 rounded-3xl border border-slate-800 p-4 shadow-2xl relative min-h-[250px] overflow-hidden">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Analysis Summary</span>
+                  <span className="text-[10px] font-mono text-slate-400">{analysisPath === 'fea' ? 'FEA active' : 'Closed-form active'}</span>
+                </div>
+                {analysisPath === 'fea' && feaState.result ? (
+                  <div className="space-y-3 text-[11px] text-slate-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+                        <div className="text-slate-400 uppercase tracking-widest text-[9px] mb-1">Mesh</div>
+                        <div className="font-mono">{feaState.result.nodes} nodes</div>
+                        <div className="font-mono">{feaState.result.elements} elements</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+                        <div className="text-slate-400 uppercase tracking-widest text-[9px] mb-1">Result</div>
+                        <div className="font-mono">{show(feaState.result.gaugeNominalStrainMicrostrain, 1)} με</div>
+                        <div className="font-mono">{show(feaState.result.gaugeVariationPercent, 2)} % var.</div>
+                      </div>
                     </div>
-                    {feaState.result ? (
-                       <BinobeamFeaViewer
-                          result={feaState.result}
-                          widthMeters={unitSystem === 'US' ? beamWidth * 0.0254 : beamWidth * 0.001}
-                          unitSystem={unitSystem}
-                          distanceBetweenGageCls={distanceBetweenHoles}
-                          radius={radius}
-                          beamHeight={beamHeight}
-                          minimumThickness={minimumThickness}
-                          beamWidth={beamWidth}
-                       />
-                    ) : (
-                       <div className="h-full flex items-center justify-center text-slate-600 font-mono text-xs italic">
-                          {feaState.isSolving ? 'Solving Mesh...' : 'FEA Error'}
-                       </div>
-                    )}
-                 </div>
-              )}
+                    <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+                      <div className="text-slate-400 uppercase tracking-widest text-[9px] mb-2">Closed-form vs FEA</div>
+                      <div className="flex justify-between"><span>Span sensitivity</span><span className="font-mono">{show(result.fullSpanSensitivity, 4)} / {show(feaState.result.spanMvV, 4)} mV/V</span></div>
+                      <div className="flex justify-between"><span>Nominal strain</span><span className="font-mono">{show(result.avgStrain, 1)} / {show(feaState.result.gaugeNominalStrainMicrostrain, 1)} με</span></div>
+                      <div className="flex justify-between"><span>Variation</span><span className="font-mono">{show(result.gradient, 2)} / {show(feaState.result.gaugeVariationPercent, 2)} %</span></div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+                      <div className="text-slate-400 uppercase tracking-widest text-[9px] mb-2">Solver Notes</div>
+                      {feaState.result.warnings.map((warning, index) => (
+                        <p key={index} className="text-slate-300 leading-relaxed">{warning}</p>
+                      ))}
+                    </div>
+                  </div>
+                ) : analysisPath === 'fea' ? (
+                  <div className="h-full flex items-center justify-center text-slate-400 font-mono text-xs italic">
+                    {feaState.isSolving ? 'Preparing binocular mesh...' : feaState.error || 'No FEA result yet'}
+                  </div>
+                ) : (
+                  <div className="space-y-3 text-[11px] text-slate-200">
+                    <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+                      <div className="text-slate-400 uppercase tracking-widest text-[9px] mb-2">Geometry Workflow</div>
+                      <p className="text-slate-300 leading-relaxed">Use the 3D geometry view to review load path and gage placement, then switch to the engineering sketch for dimensional review.</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+                      <div className="text-slate-400 uppercase tracking-widest text-[9px] mb-2">Next Step</div>
+                      <p className="text-slate-300 leading-relaxed">Enable FEA Analysis to inspect the generated mesh, deformed shape, and strain contour on the same binocular geometry.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </main>
@@ -461,19 +601,6 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
            Build 2026.04.06-A
         </div>
       </footer>
-    </div>
-  )
-}
-l Insights</h4>
-                  <p className="text-slate-500 text-sm leading-relaxed">
-                    Toggle to <strong>FEA Analysis</strong> to interactive 3D deformation plots and local strain distribution maps for the current geometry.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
     </div>
   )
 }

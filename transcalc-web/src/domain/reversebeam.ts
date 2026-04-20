@@ -23,6 +23,45 @@
  * @module reversebeam
  */
 
+// ── Bridge configuration ──────────────────────────────────────────────────────
+
+export type BridgeConfig =
+  | 'halfBridgeTop'      // A + C  (top surface, half bridge)
+  | 'halfBridgeBottom'   // B + D  (bottom surface, half bridge)
+  | 'halfBridgeTopBot'   // A + B  (top & bottom, same side)
+  | 'fullBridgeTop'      // A + C axial + Poisson transverse legs
+  | 'fullBridgeTopBot'   // A + B + C + D  (standard full bridge)
+
+export const BRIDGE_CONFIG_LABELS: Record<BridgeConfig, string> = {
+  halfBridgeTop:    'Half Bridge — Top',
+  halfBridgeBottom: 'Half Bridge — Bottom',
+  halfBridgeTopBot: 'Half Bridge — Top & Bottom',
+  fullBridgeTop:    'Full Bridge — Top',
+  fullBridgeTopBot: 'Full Bridge — Top & Bottom',
+}
+
+export type ActiveGage = 'A' | 'B' | 'C' | 'D'
+
+export function getActiveGages(config: BridgeConfig): ActiveGage[] {
+  switch (config) {
+    case 'halfBridgeTop':    return ['A', 'C']
+    case 'halfBridgeBottom': return ['B', 'D']
+    case 'halfBridgeTopBot': return ['A', 'B']
+    case 'fullBridgeTop':    return ['A', 'C']
+    case 'fullBridgeTopBot': return ['A', 'B', 'C', 'D']
+  }
+}
+
+function bridgeMultiplier(config: BridgeConfig, poisson: number): number {
+  switch (config) {
+    case 'halfBridgeTop':
+    case 'halfBridgeBottom':
+    case 'halfBridgeTopBot': return 0.5
+    case 'fullBridgeTop':    return (1 + poisson) / 2
+    case 'fullBridgeTopBot': return 1.0
+  }
+}
+
 /**
  * Input parameters for reverse bending beam calculation
  */
@@ -33,8 +72,14 @@ export interface ReversebeamInput {
   beamWidth: number;
   /** Beam thickness (m or in) */
   thickness: number;
-  /** Distance between gage centers (m or in) */
+  /** Distance between gage center-lines (m or in) — both gage pairs symmetric about midspan */
   distanceBetweenGages: number;
+  /** Overall beam length wall-to-wall (m or in); must exceed distanceBetweenGages */
+  beamLength?: number;
+  /** Bridge wiring configuration (default: fullBridgeTopBot) */
+  bridgeConfig?: BridgeConfig;
+  /** Poisson's ratio — only used for Full Bridge Top configuration (default: 0.3) */
+  poissonRatio?: number;
   /** Young's Modulus (Pa or PSI) */
   modulus: number;
   /** Gage length - measurement span (m or in) */
@@ -95,6 +140,13 @@ function validateReversebeamGeometry(params: ReversebeamInput): void {
       `Gage length ${gageLength} should not exceed distance between gages ${distanceBetweenGages}`
     );
   }
+
+  // Check: beam length must exceed gage spacing if provided
+  if (params.beamLength !== undefined && params.beamLength <= distanceBetweenGages) {
+    throw new Error(
+      `Beam length must exceed distance between gages`
+    );
+  }
 }
 
 /**
@@ -121,6 +173,7 @@ function normalizeToSI(params: ReversebeamInput): ReversebeamInput {
     beamWidth: params.beamWidth * dimensionMultiplier,
     thickness: params.thickness * dimensionMultiplier,
     distanceBetweenGages: params.distanceBetweenGages * dimensionMultiplier,
+    beamLength: params.beamLength !== undefined ? params.beamLength * dimensionMultiplier : undefined,
     modulus: modulusInPa,
     gageLength: params.gageLength * dimensionMultiplier,
     gageFactor: params.gageFactor,
@@ -171,7 +224,9 @@ export function calculateReversebeamStrain(params: ReversebeamInput): Reversebea
 
   // Calculate gradient and sensitivity
   const gradient = maxStrain !== 0 ? ((maxStrain - minStrain) / maxStrain) * 100 : 0;
-  const fullSpanSensitivity = avgStrain * GF * 1e-3;
+  const config  = params.bridgeConfig ?? 'fullBridgeTopBot'
+  const poisson = params.poissonRatio ?? 0.3
+  const fullSpanSensitivity = avgStrain * GF * 1e-3 * bridgeMultiplier(config, poisson);
 
   return {
     minStrain,
@@ -182,4 +237,3 @@ export function calculateReversebeamStrain(params: ReversebeamInput): Reversebea
   };
 }
 
-export { ReversebeamInput, ReversebeamOutput };

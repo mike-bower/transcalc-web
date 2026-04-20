@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSbeamStrain } from '../../domain/sbeam'
+import SBeamModelPreview from '../SBeamModelPreview'
+import SBeamDiagram from '../diagrams/SBeamDiagram'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -101,8 +103,32 @@ export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       </div>
 
-      <div className="bino-illustration">
-        <img src="/legacy-help/SBBeam.jpg" alt="S-beam geometry" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <div className="calc-preview-pair">
+        <div className="calc-diagram-2d">
+          <SBeamDiagram
+            load={unitSystem === 'SI' ? load : load * N_PER_LBF}
+            holeRadius={unitSystem === 'SI' ? holeRadius : holeRadius * MM_PER_IN}
+            width={unitSystem === 'SI' ? width : width * MM_PER_IN}
+            thickness={unitSystem === 'SI' ? thickness : thickness * MM_PER_IN}
+            distBetweenGages={unitSystem === 'SI' ? distBetweenGages : distBetweenGages * MM_PER_IN}
+            unitSystem={unitSystem}
+          />
+        </div>
+        <div className="calc-model-3d">
+          <SBeamModelPreview
+            params={{
+              load:   unitSystem === 'SI' ? load : load * N_PER_LBF,
+              holeRadius:   (unitSystem === 'SI' ? holeRadius  : holeRadius  * MM_PER_IN),
+              width:  (unitSystem === 'SI' ? width       : width       * MM_PER_IN),
+              thickness:    (unitSystem === 'SI' ? thickness   : thickness   * MM_PER_IN),
+              distBetweenGages: (unitSystem === 'SI' ? distBetweenGages : distBetweenGages * MM_PER_IN),
+              gageLen: (unitSystem === 'SI' ? gageLength  : gageLength  * MM_PER_IN),
+              modulus: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+              gageFactor,
+            }}
+            us={unitSystem === 'US'}
+          />
+        </div>
       </div>
 
       <div className="bino-grid">

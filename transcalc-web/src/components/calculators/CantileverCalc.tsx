@@ -5,10 +5,13 @@ import {
   calculateCantileverGradient,
   calculateCantileverMaxStrain,
   calculateCantileverMinStrain,
+  calculateCantileverNaturalFrequency,
 } from '../../domain/beams'
 import { runCantileverFeaScaffold } from '../../domain/fea/cantilever'
 import { generateCantileverMeshStep } from '../../domain/fea/stepExport'
 import StrainFieldViewer from '../StrainFieldViewer'
+import CantileverDiagram from '../diagrams/CantileverDiagram'
+import CantileverModelPreview from '../CantileverModelPreview'
 
 const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
 
@@ -97,6 +100,9 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
       const max = calculateCantileverMaxStrain(norm.loadN, norm.momentArmMm, norm.gageLengthMm, norm.modulusGPa, norm.widthMm, norm.thicknessMm)
       const avg = calculateCantileverAvgStrain(norm.loadN, norm.momentArmMm, norm.modulusGPa, norm.widthMm, norm.thicknessMm)
       const stressMPa = computeCantileverStress(norm.loadN, norm.widthMm, norm.thicknessMm, norm.momentArmMm)
+      const naturalFreqHz = calculateCantileverNaturalFrequency(
+        norm.modulusGPa * 1e9, norm.widthMm, norm.thicknessMm, norm.momentArmMm, norm.loadN,
+      )
       return {
         minStrain: min,
         maxStrain: max,
@@ -104,6 +110,7 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         gradient: calculateCantileverGradient(max, min),
         spanMvV: avg * gageFactor * 1e-3,
         stressMPa,
+        naturalFreqHz,
       }
     } catch {
       return null
@@ -158,8 +165,31 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         <button className="export-btn" onClick={exportStep} disabled={!!inputError}>Export STEP</button>
       </div>
 
-      <div className="bino-illustration">
-        <img src="/legacy-help/BBCant.jpg" alt="Cantilever beam geometry" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <div className="calc-preview-pair">
+        <div className="calc-diagram-2d">
+          <CantileverDiagram
+            load={norm.loadN}
+            width={norm.widthMm}
+            thickness={norm.thicknessMm}
+            momentArm={norm.momentArmMm}
+            gageLength={norm.gageLengthMm}
+            unitSystem={unitSystem}
+          />
+        </div>
+        <div className="calc-model-3d">
+          <CantileverModelPreview
+            params={{
+              load: norm.loadN,
+              width: norm.widthMm,
+              thickness: norm.thicknessMm,
+              momentArm: norm.momentArmMm,
+              gageLength: norm.gageLengthMm,
+              modulus: norm.modulusGPa,
+              gageFactor,
+            }}
+            us={unitSystem === 'US'}
+          />
+        </div>
       </div>
 
       <div className="bino-grid">
@@ -181,6 +211,7 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
           <tr><td>Strain Variation:</td><td>{show(activeResult?.gradient ?? NaN, 2)}</td><td>%</td></tr>
           <tr><td>Span at Applied Force:</td><td>{show(activeResult?.spanMvV ?? NaN, 4)}</td><td>mV/V</td></tr>
           <tr><td>Bending Stress:</td><td>{show(stressDisplay, 3)}</td><td>{stressUnit}</td></tr>
+          <tr><td>Natural Frequency:</td><td>{show(result?.naturalFreqHz ?? NaN, 1)}</td><td>Hz</td></tr>
         </tbody>
       </table>
 

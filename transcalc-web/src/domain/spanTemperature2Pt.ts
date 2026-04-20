@@ -6,7 +6,6 @@
  * @module spanTemperature2Pt
  */
 
-import { detectUnits } from './core';
 
 export interface WireType {
   name: string;

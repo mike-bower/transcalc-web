@@ -398,6 +398,60 @@ select:focus {
   gap: 8px;
 }
 
+.model-preview-container {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.model-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-toolbar-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.model-chip {
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.model-chip.active {
+  background: #2563eb;
+  border-color: #60a5fa;
+  color: #fff;
+}
+
+.model-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-footer span {
+  font-size: 0.78rem;
+  color: #dbeafe;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
 .fea-dimensions {
   border: 1px solid #d5e0ea;
   border-radius: 10px;
@@ -478,6 +532,29 @@ select:focus {
   max-width: 100%;
   height: auto;
   image-rendering: crisp-edges;
+}
+
+/* Stacked 2D + 3D preview section above inputs */
+.calc-preview-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.calc-diagram-2d {
+  border: 1px solid #d5e0ea;
+  border-radius: 12px;
+  background: #f6fbff;
+  padding: 10px 8px 6px;
+}
+
+.calc-model-3d {
+  border: 1px solid #d5e0ea;
+  border-radius: 12px;
+  background: #f4f8fc;
+  overflow: hidden;
+  height: 340px;
 }
 
 .bino-grid {
@@ -754,7 +831,7 @@ select:focus {
 
 .design-frame-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(280px, 420px);
+  grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.4fr);
   gap: 14px;
 }
 
@@ -990,37 +1067,53 @@ select:focus {
 
 .wizard-type-selection {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 16px;
+  align-items: baseline;
 }
 
 .category-group {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .category-header {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   color: var(--ink-soft);
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 4px;
+  white-space: nowrap;
+  padding-right: 2px;
 }
 
 .wizard-type-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .wizard-type-grid .tool-card {
   flex: 0 0 auto;
-  padding: 7px 14px;
-  font-size: 0.82rem;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  line-height: 1.5;
+}
+
+.wizard-type-grid .tool-card.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 .wizard-wire-row {
@@ -1088,4 +1181,132 @@ select:focus {
 
 .wizard-back:hover {
   background: var(--bg);
+}
+
+/* ── Error boundary ────────────────────────────────────────────────────────── */
+
+.error-boundary {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1.5px solid #f7b8a2;
+  border-radius: 12px;
+  background: #fff8f5;
+  color: #7a2a10;
+  display: grid;
+  gap: 8px;
+}
+
+.error-boundary-message {
+  margin: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+  color: #9a3a1a;
+}
+
+/* ── FEA accuracy disclaimer ───────────────────────────────────────────────── */
+
+.fea-accuracy-warn {
+  margin: 6px 0 2px;
+  padding: 6px 10px;
+  border-left: 3px solid #d97706;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.83rem;
+  border-radius: 0 8px 8px 0;
+}
+
+/* ── Print / export ────────────────────────────────────────────────────────── */
+
+@media print {
+  /* Hide interactive chrome */
+  .topbar,
+  .wizard-steps,
+  .workspace-controls,
+  .analysis-toggle,
+  .export-btn,
+  .help-overlay,
+  .project-panel,
+  .design-frame-preview,
+  .transducer-3d-wrap,
+  .transducer-svg-wrap,
+  .step-viewer,
+  .strain-field-wrap {
+    display: none !important;
+  }
+
+  /* Reset layout for single-column print */
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 11pt;
+  }
+
+  .app-shell {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .layout,
+  .layout-single {
+    display: block;
+  }
+
+  /* Print header */
+  .topbar::before {
+    content: 'Transcalc Engineering Report';
+    display: block;
+    font-size: 14pt;
+    font-weight: 700;
+    margin-bottom: 8pt;
+  }
+
+  /* Tables and result blocks */
+  .bino-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #999;
+    break-inside: avoid;
+  }
+
+  .bino-table th {
+    background: #eee !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .bino-table td,
+  .bino-table th {
+    border: 1px solid #aaa;
+    padding: 5px 8px;
+  }
+
+  .result-card {
+    background: #e8f0fb !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    break-inside: avoid;
+  }
+
+  .bino-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .bino-grid label input {
+    border: 1px solid #aaa;
+    background: #fff;
+  }
+
+  /* Pagination */
+  .bino-wrap {
+    break-inside: avoid;
+  }
+
+  .wizard-section {
+    break-inside: avoid;
+  }
 }

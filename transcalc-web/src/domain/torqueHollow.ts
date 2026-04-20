@@ -1,4 +1,4 @@
-import { UnitSystem } from './projectSchema';
+type UnitSystem = 'SI' | 'US'
 
 export interface TorqueHollowParams {
   torque: number;      // N-m or in-lb

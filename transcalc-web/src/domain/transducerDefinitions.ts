@@ -25,7 +25,6 @@ export const TRANSDUCER_DEFINITIONS: TransducerDefinition[] = [
   // Shear & Torque
   { type: 'squareShear', label: 'Square Shear Beam', category: 'Shear', description: 'Square section transverse shear beam.' },
   { type: 'roundShear', label: 'Round Shear Beam', category: 'Shear', description: 'Round section transverse shear beam.' },
-  { type: 'roundHollowShear', label: 'Round Hollow Shear', category: 'Shear', description: 'Hollow round section transverse shear beam.' },
   { type: 'roundSBeamShear', label: 'S-Beam Shear', category: 'Shear', description: 'Shear-based S-beam transducer.' },
   { type: 'squareTorque', label: 'Square Torque', category: 'Shear', description: 'Torsional strain in square shaft.' },
   { type: 'roundSolidTorque', label: 'Round Solid Torque', category: 'Shear', description: 'Torsional strain in solid round shaft.' },

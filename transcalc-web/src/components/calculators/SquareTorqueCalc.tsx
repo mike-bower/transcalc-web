@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSqTorque } from '../../domain/sqtorque'
+import SquareTorqueModelPreview from '../SquareTorqueModelPreview'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -70,9 +71,10 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
       </div>
-      <div className="bino-illustration">
-        <img src="/legacy-help/SqrTor.jpg" alt="Square torque shaft" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-      </div>
+      <SquareTorqueModelPreview
+        params={{ torque, width, gageLength, modulus: modulusGPa }}
+        us={unitSystem === 'US'}
+      />
       <div className="bino-grid">
         <label>Applied torque ({torqueUnit})<input type="number" value={Number.isFinite(torque) ? torque : ''} onChange={e => setTorque(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
         <label>Shaft width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>

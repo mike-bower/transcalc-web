@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSquareShearSpan } from '../../domain/shearBeams'
+import { solveShearWebFea } from '../../domain/fea/shearWebSolver'
+import SquareShearModelPreview from '../SquareShearModelPreview'
+import SquareShearDiagram from '../diagrams/SquareShearDiagram'
+import type { CstFeaViewMode } from '../CstFeaViewer'
+
+const CstFeaViewer = lazy(() => import('../CstFeaViewer'))
 
 type UnitSystem = 'SI' | 'US'
+type AnalysisMode = 'closed-form' | 'fea'
 
 const N_PER_LBF = 4.4482216152605
 const MM_PER_IN = 25.4
@@ -16,11 +23,14 @@ export default function SquareShearCalc({ unitSystem, onUnitChange }: Props) {
   const [load, setLoad] = useState(1000)
   const [width, setWidth] = useState(20)
   const [height, setHeight] = useState(30)
-  const [diameter, setDiameter] = useState(20)    // hole/web diameter
-  const [thickness, setThickness] = useState(3)   // web thickness
+  const [diameter, setDiameter] = useState(20)
+  const [thickness, setThickness] = useState(3)
   const [modulusGPa, setModulusGPa] = useState(200)
   const [poisson, setPoisson] = useState(0.3)
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
+  const [viewMode, setViewMode] = useState<CstFeaViewMode>('contour')
+  const [bendingNull, setBendingNull] = useState(false)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -43,13 +53,23 @@ export default function SquareShearCalc({ unitSystem, onUnitChange }: Props) {
     }
   }, [unitSystem])
 
-  // shearBeams domain uses: N, mm, Pa
+  const siInputs = useMemo(() => {
+    const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+    return {
+      loadN: unitSystem === 'SI' ? load : load * N_PER_LBF,
+      widthMm: width * mm,
+      heightMm: height * mm,
+      diameterMm: diameter * mm,
+      thicknessMm: thickness * mm,
+      modulusGPa: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+    }
+  }, [unitSystem, load, width, height, diameter, thickness, modulusGPa])
+
   const result = useMemo(() => {
     const loadN = unitSystem === 'SI' ? load : load * N_PER_LBF
     const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
     const w = width * mm, h = height * mm, d = diameter * mm, t = thickness * mm
     const modPa = (unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI) * 1e9
-
     const checks: [number, string][] = [
       [loadN, 'Applied load'], [w, 'Width'], [h, 'Height'], [d, 'Diameter'], [t, 'Thickness'],
       [modPa, 'Modulus'], [gageFactor, 'Gage factor'],
@@ -62,6 +82,25 @@ export default function SquareShearCalc({ unitSystem, onUnitChange }: Props) {
     } catch (e) { return { error: e instanceof Error ? e.message : 'Calculation error', span: NaN } }
   }, [unitSystem, load, width, height, diameter, thickness, modulusGPa, poisson, gageFactor])
 
+  const feaSolution = useMemo(() => {
+    if (analysisMode !== 'fea') return null
+    const { loadN, widthMm, heightMm, diameterMm, thicknessMm, modulusGPa: modGPa } = siInputs
+    if ([loadN, widthMm, heightMm, diameterMm, thicknessMm, modGPa].some(v => !Number.isFinite(v) || v <= 0)) return null
+    if (!Number.isFinite(poisson) || poisson <= 0 || poisson >= 0.5) return null
+    if (diameterMm >= heightMm) return null
+    try {
+      return solveShearWebFea({
+        appliedForceN: loadN,
+        widthMm,
+        heightMm,
+        diameterMm,
+        thicknessMm,
+        modulusGPa: modGPa,
+        poissonRatio: poisson,
+      })
+    } catch { return null }
+  }, [analysisMode, siInputs, poisson])
+
   const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
   const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
   const modUnit = unitSystem === 'SI' ? 'GPa' : 'Mpsi'
@@ -73,9 +112,39 @@ export default function SquareShearCalc({ unitSystem, onUnitChange }: Props) {
           <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
+        <div className="analysis-toggle">
+          <button className={analysisMode === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisMode('closed-form')}>Closed-form</button>
+          <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
+        </div>
+        <div className="analysis-toggle">
+          <button className={!bendingNull ? 'active' : ''} onClick={() => setBendingNull(false)}>Parallel gages</button>
+          <button className={bendingNull ? 'active' : ''} onClick={() => setBendingNull(true)}>Bending-null (Fig C)</button>
+        </div>
       </div>
-      <div className="bino-illustration">
-        <img src="/legacy-help/ShrSqr.jpg" alt="Square shear beam" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <div className="calc-preview-pair">
+        <div className="calc-diagram-2d">
+          <SquareShearDiagram
+            load={siInputs.loadN}
+            width={siInputs.widthMm}
+            height={siInputs.heightMm}
+            diameter={siInputs.diameterMm}
+            thickness={siInputs.thicknessMm}
+            unitSystem={unitSystem}
+          />
+        </div>
+        <div className="calc-model-3d">
+          <SquareShearModelPreview
+            params={{
+              load: siInputs.loadN,
+              width: siInputs.widthMm,
+              height: siInputs.heightMm,
+              diameter: siInputs.diameterMm,
+              thickness: siInputs.thicknessMm,
+              bendingNull: bendingNull ? 1 : 0,
+            }}
+            us={unitSystem === 'US'}
+          />
+        </div>
       </div>
       <div className="bino-grid">
         <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
@@ -94,6 +163,42 @@ export default function SquareShearCalc({ unitSystem, onUnitChange }: Props) {
           <tr><td>Full Bridge Span:</td><td>{show(result.span, 4)}</td><td>mV/V</td></tr>
         </tbody>
       </table>
+
+      {analysisMode === 'fea' && (
+        <div className="fea-analysis-section">
+          {feaSolution ? (
+            <>
+              <div className="analysis-toggle" style={{ marginBottom: 8 }}>
+                {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
+                  <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
+                ))}
+              </div>
+              <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
+                <CstFeaViewer
+                  solution={feaSolution}
+                  depthMm={siInputs.thicknessMm}
+                  viewMode={viewMode}
+                  strainKey="exy"
+                  bcType="shear-web"
+                  unitSystem={unitSystem}
+                  dimLabels={[
+                    { label: 'h', value: siInputs.heightMm },
+                    { label: '⌀', value: siInputs.diameterMm },
+                    { label: 't', value: siInputs.thicknessMm },
+                  ]}
+                />
+              </Suspense>
+              <p className="fea-accuracy-warn">FEA accuracy: ±20% vs. closed-form for typical shear-web geometries.</p>
+              <p className="fea-note">2D plane-stress CST · web panel only · shear strain (ε_xy) — 45° gages sense max principal = |ε_xy|</p>
+            </>
+          ) : (
+            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+          )}
+        </div>
+      )}
+      {bendingNull && (
+        <p className="fea-note">Bending-null (Fig C, VMM-26): back-face gage grids are rotated 90° relative to front-face grids and wired into opposite bridge arms — bending strains cancel, improving immunity to off-axis loading.</p>
+      )}
     </div>
   )
 }
