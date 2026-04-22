@@ -13,6 +13,9 @@ import SquareTorqueCalc from './calculators/SquareTorqueCalc'
 import RoundSolidTorqueCalc from './calculators/RoundSolidTorqueCalc'
 import RoundHollowTorqueCalc from './calculators/RoundHollowTorqueCalc'
 import PressureCalc from './calculators/PressureCalc'
+import SixAxisFTCalc from './calculators/SixAxisFTCalc'
+import JointTorqueCalc from './calculators/JointTorqueCalc'
+import HexapodFTCalc from './calculators/HexapodFTCalc'
 import ZeroVsTempCalc from './compensation/ZeroVsTempCalc'
 import ZeroBalanceCalc from './compensation/ZeroBalanceCalc'
 import SpanTemp2PtCalc from './compensation/SpanTemp2PtCalc'
@@ -68,6 +71,11 @@ export default function WorkspaceRouter({ calcKey, unitSystem, onUnitChange, onH
     case 'optshunt': return <ShuntOptimCalc {...sharedProps} />
     case 'spanset':  return <SpanSetCalc {...sharedProps} />
     case 'simspan':  return <SimSpanCalc {...sharedProps} />
+
+    // Multi-Axis (Robotics)
+    case 'sixaxisft': return <SixAxisFTCalc {...sharedProps} />
+    case 'jts':       return <JointTorqueCalc {...sharedProps} />
+    case 'hexapod':   return <HexapodFTCalc {...sharedProps} />
 
     // Trim Network Visualizer
     case 'trimvis': return <TrimVisualizer {...sharedProps} />

@@ -78,6 +78,9 @@ export type TransducerType =
   | 'roundSolidTorque'
   | 'roundHollowTorque'
   | 'pressure'
+  | 'sixAxisFTCrossBeam'
+  | 'jointTorqueSensor'
+  | 'hexapodFT'
 
 export type BridgeConfig = 
   | 'quarter'

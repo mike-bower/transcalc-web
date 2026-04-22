@@ -15,6 +15,26 @@ import CantileverModelPreview from '../CantileverModelPreview'
 
 const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
 
+function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', padding: '6px 2px 2px',
+        cursor: 'pointer', width: '100%', textAlign: 'left',
+        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontFamily: 'inherit',
+      }}
+      aria-expanded={open}
+    >
+      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+      {label}
+    </button>
+  )
+}
+
 type UnitSystem = 'SI' | 'US'
 
 const N_PER_LBF = 4.4482216152605
@@ -44,6 +64,11 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
   const [gageLength, setGageLength] = useState(5)   // mm or in
   const [gageFactor, setGageFactor] = useState(2.0)
   const [analysisPath, setAnalysisPath] = useState<'closed-form' | 'fea'>('closed-form')
+  const [show2D, setShow2D]         = useState(true)
+  const [show3D, setShow3D]         = useState(true)
+  const [showInputs, setShowInputs] = useState(true)
+  const [showResults, setShowResults] = useState(true)
+  const [showFea, setShowFea]       = useState(true)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -165,7 +190,8 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         <button className="export-btn" onClick={exportStep} disabled={!!inputError}>Export STEP</button>
       </div>
 
-      <div className="calc-preview-pair">
+      <SectionToggle label="2D Diagram" open={show2D} onToggle={() => setShow2D(v => !v)} />
+      {show2D && (
         <div className="calc-diagram-2d">
           <CantileverDiagram
             load={norm.loadN}
@@ -176,6 +202,10 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
             unitSystem={unitSystem}
           />
         </div>
+      )}
+
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
         <div className="calc-model-3d">
           <CantileverModelPreview
             params={{
@@ -190,50 +220,61 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
             us={unitSystem === 'US'}
           />
         </div>
-      </div>
+      )}
 
-      <div className="bino-grid">
-        <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Load point to gage CL, L ({lenUnit})<input type="number" value={Number.isFinite(momentArm) ? momentArm : ''} onChange={e => setMomentArm(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-      </div>
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid">
+            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Load point to gage CL, L ({lenUnit})<input type="number" value={Number.isFinite(momentArm) ? momentArm : ''} onChange={e => setMomentArm(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+          </div>
+          {inputError && <p className="workspace-note">{inputError}</p>}
+        </>
+      )}
 
-      {inputError && <p className="workspace-note">{inputError}</p>}
-
-      <table className="bino-table">
-        <tbody>
-          <tr><th colSpan={3}>Calculated Values</th></tr>
-          <tr><td>Nominal Gage Strain:</td><td>{show(activeResult?.avgStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Strain Variation:</td><td>{show(activeResult?.gradient ?? NaN, 2)}</td><td>%</td></tr>
-          <tr><td>Span at Applied Force:</td><td>{show(activeResult?.spanMvV ?? NaN, 4)}</td><td>mV/V</td></tr>
-          <tr><td>Bending Stress:</td><td>{show(stressDisplay, 3)}</td><td>{stressUnit}</td></tr>
-          <tr><td>Natural Frequency:</td><td>{show(result?.naturalFreqHz ?? NaN, 1)}</td><td>Hz</td></tr>
-        </tbody>
-      </table>
+      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
+      {showResults && (
+        <table className="bino-table">
+          <tbody>
+            <tr><th colSpan={3}>Calculated Values</th></tr>
+            <tr><td>Nominal Gage Strain:</td><td>{show(activeResult?.avgStrain ?? NaN, 1)}</td><td>µε</td></tr>
+            <tr><td>Strain Variation:</td><td>{show(activeResult?.gradient ?? NaN, 2)}</td><td>%</td></tr>
+            <tr><td>Span at Applied Force:</td><td>{show(activeResult?.spanMvV ?? NaN, 4)}</td><td>mV/V</td></tr>
+            <tr><td>Bending Stress:</td><td>{show(stressDisplay, 3)}</td><td>{stressUnit}</td></tr>
+            <tr><td>Natural Frequency:</td><td>{show(result?.naturalFreqHz ?? NaN, 1)}</td><td>Hz</td></tr>
+          </tbody>
+        </table>
+      )}
 
       {analysisPath === 'fea' && (
-        <div className="viewer-block">
-          <h3>FEA Mesh Viewer</h3>
-          {!inputError && feaSolution ? (
-            <>
-              <StrainFieldViewer
-                solution={feaSolution.solution}
-                strainKey="exx"
-                gageMarkersMm={[0, norm.gageLengthMm]}
-                label="ε_xx field — fixed end at left · dashed lines bound gage region"
-              />
-              <Suspense fallback={<div className="step-viewer loading">Loading 3D viewer…</div>}>
-                <StepMeshViewer input={feaInput} solution={feaSolution.solution} meshOptions={MESH_OPTIONS} />
-              </Suspense>
-            </>
-          ) : (
-            <div className="step-viewer loading">{inputError || 'Unable to solve FEA for current inputs.'}</div>
+        <>
+          <SectionToggle label="FEA Viewer" open={showFea} onToggle={() => setShowFea(v => !v)} />
+          {showFea && (
+            <div className="viewer-block">
+              {!inputError && feaSolution ? (
+                <>
+                  <StrainFieldViewer
+                    solution={feaSolution.solution}
+                    strainKey="exx"
+                    gageMarkersMm={[0, norm.gageLengthMm]}
+                    label="ε_xx field — fixed end at left · dashed lines bound gage region"
+                  />
+                  <Suspense fallback={<div className="step-viewer loading">Loading 3D viewer…</div>}>
+                    <StepMeshViewer input={feaInput} solution={feaSolution.solution} meshOptions={MESH_OPTIONS} />
+                  </Suspense>
+                </>
+              ) : (
+                <div className="step-viewer loading">{inputError || 'Unable to solve FEA for current inputs.'}</div>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   )

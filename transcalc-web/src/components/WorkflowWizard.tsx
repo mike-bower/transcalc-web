@@ -1203,7 +1203,7 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
 
           {/* Type picker grouped by category */}
           <div className="wizard-type-selection">
-            {TRANSDUCER_CATEGORIES.map(category => {
+            {TRANSDUCER_CATEGORIES.filter(c => c !== 'Multi-Axis').map(category => {
               const typesInCat = TRANSDUCER_DEFINITIONS.filter(d => d.category === category);
               if (typesInCat.length === 0) return null;
               
@@ -1231,8 +1231,8 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
               {/* Target Driven Configuration */}
               {selectedInverseMeta.length > 0 && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="space-y-1 flex-1 min-w-[180px]">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Design Mode</label>
                       <select
                         className="w-full bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
@@ -1244,35 +1244,33 @@ export default function WorkflowWizard({ unitSystem, onUnitChange, initialStep }
                       </select>
                     </div>
 
-                    {designMode === 'targetDriven' && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Target (mV/V)</label>
-                          <input
-                            type="number"
-                            className="w-full bg-white border border-slate-300 text-blue-700 font-mono font-bold text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
-                            value={Number.isFinite(targetSpanMvV) ? targetSpanMvV : ''}
-                            step={0.01}
-                            min={0}
-                            onChange={e => setTargetSpanMvV(Number(e.target.value))}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Solve For</label>
-                          <select
-                            className="w-full bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
-                            value={selectedUnknownKey ?? ''}
-                            onChange={e =>
-                              setInverseUnknownByType(prev => ({ ...prev, [designType]: e.target.value }))
-                            }
-                          >
-                            {selectedInverseMeta.map(m => (
-                              <option key={m.key} value={m.key}>{m.label}</option>
-                            ))}
-                          </select>
-                        </div>
+                    {designMode === 'targetDriven' && (<>
+                      <div className="space-y-1 w-28">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Target (mV/V)</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white border border-slate-300 text-blue-700 font-mono font-bold text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                          value={Number.isFinite(targetSpanMvV) ? targetSpanMvV : ''}
+                          step={0.01}
+                          min={0}
+                          onChange={e => setTargetSpanMvV(Number(e.target.value))}
+                        />
                       </div>
-                    )}
+                      <div className="space-y-1 flex-1 min-w-[140px]">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Solve For</label>
+                        <select
+                          className="w-full bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                          value={selectedUnknownKey ?? ''}
+                          onChange={e =>
+                            setInverseUnknownByType(prev => ({ ...prev, [designType]: e.target.value }))
+                          }
+                        >
+                          {selectedInverseMeta.map(m => (
+                            <option key={m.key} value={m.key}>{m.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>)}
                   </div>
                 </div>
               )}

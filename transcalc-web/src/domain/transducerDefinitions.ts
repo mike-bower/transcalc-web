@@ -32,6 +32,11 @@ export const TRANSDUCER_DEFINITIONS: TransducerDefinition[] = [
 
   // Pressure
   { type: 'pressure', label: 'Pressure Diaphragm', category: 'Pressure', description: 'Flat circular diaphragm for pressure sensing.' },
+
+  // Multi-Axis
+  { type: 'sixAxisFTCrossBeam', label: '6-DOF F/T Cross-Beam', category: 'Multi-Axis', description: 'Maltese-cross flexure for simultaneous Fx/Fy/Fz/Mx/My/Mz sensing. Used in robot wrists and ankles.' },
+  { type: 'jointTorqueSensor',  label: 'Joint Torque Sensor',  category: 'Multi-Axis', description: 'Spoke-flexure disk for torsional stiffness and torque sensing in compliant actuators and SEA drives.' },
+  { type: 'hexapodFT',          label: 'Hexapod F/T Sensor',   category: 'Multi-Axis', description: '6-strut Stewart platform (ATI/JR3 topology) for 6-DOF force/torque sensing with axial-only strut loading.' },
 ];
 
 export const TRANSDUCER_CATEGORIES: TransducerCategory[] = ['Bending', 'Column', 'Shear', 'Pressure', 'Multi-Axis'];

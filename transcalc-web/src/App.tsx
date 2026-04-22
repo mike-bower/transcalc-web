@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import ProjectPanel from './components/ProjectPanel'
-import WorkflowWizard from './components/WorkflowWizard'
+import TransducerGallery from './components/TransducerGallery'
+import WorkspaceRouter from './components/WorkspaceRouter'
 import { newProject, type ProjectState } from './domain/projectSchema'
 import { initWasm, isWasmLoaded } from './domain/wasmBridge'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -15,91 +16,103 @@ type CalculatorTopic = {
 }
 
 const CALCULATORS: CalculatorTopic[] = [
-  { key: 'bbcant', title: 'Bending Beam Cantilever', category: 'Beams', file: 'BBCant.htm' },
-  { key: 'bino', title: 'Binocular Beam', category: 'Beams', file: 'Bino.htm' },
-  { key: 'dualbb', title: 'Dual Beam', category: 'Beams', file: 'DualBB.htm' },
-  { key: 'revbb', title: 'Reverse Bending Beam', category: 'Beams', file: 'RevBB.htm' },
-  { key: 'sbbeam', title: 'S-Beam', category: 'Beams', file: 'SBBeam.htm' },
-  { key: 'sqrcol', title: 'Square Column', category: 'Compression', file: 'SqrCol.htm' },
-  { key: 'rndsldc', title: 'Round Solid Column', category: 'Compression', file: 'RndSld.htm' },
-  { key: 'rndhlwc', title: 'Round Hollow Column', category: 'Compression', file: 'RndHlw.htm' },
-  { key: 'shrsqr', title: 'Shear Square Web', category: 'Shear', file: 'ShrSqr.htm' },
-  { key: 'shrrnd', title: 'Shear Round Web', category: 'Shear', file: 'ShrRnd.htm' },
-  { key: 'shrrnd1', title: 'Shear Round S-Beam', category: 'Shear', file: 'ShrRsb.htm' },
-  { key: 'sqrtor', title: 'Square Torque', category: 'Torsion', file: 'SqrTor.htm' },
-  { key: 'rndsld', title: 'Round Solid Torque', category: 'Torsion', file: 'RndSld.htm' },
-  { key: 'rndhlw', title: 'Round Hollow Torque', category: 'Torsion', file: 'RndHlw.htm' },
-  { key: 'pressure', title: 'Pressure Diaphragm', category: 'Pressure', file: 'Pressure.htm' },
-  { key: 'zvstemp', title: 'Zero vs Temperature', category: 'Calibration', file: 'ZvsTemp.htm' },
-  { key: 'zerobal', title: 'Zero Balance', category: 'Calibration', file: 'ZeroBal.htm' },
-  { key: 'span2pt', title: 'Span 2-Point', category: 'Span', file: 'Span2pt.htm' },
-  { key: 'span3pt', title: 'Span 3-Point', category: 'Span', file: 'Span3pt.htm' },
-  { key: 'optshunt', title: 'Shunt Optimization', category: 'Span', file: 'OptShnt.htm' },
-  { key: 'spanset', title: 'Span Set', category: 'Span', file: 'SpanSet.htm' },
-  { key: 'simspan', title: 'Simulated Span', category: 'Span', file: 'SimSpan.htm' },
-  { key: 'trimvis', title: 'Trim Visualizer', category: 'Trim', file: 'TrimVis.htm' },
+  { key: 'bbcant',    title: 'Bending Beam Cantilever',  category: 'Beams',        file: 'BBCant.htm' },
+  { key: 'bino',      title: 'Binocular Beam',           category: 'Beams',        file: 'Bino.htm' },
+  { key: 'dualbb',    title: 'Dual Beam',                category: 'Beams',        file: 'DualBB.htm' },
+  { key: 'revbb',     title: 'Reverse Bending Beam',     category: 'Beams',        file: 'RevBB.htm' },
+  { key: 'sbbeam',    title: 'S-Beam',                   category: 'Beams',        file: 'SBBeam.htm' },
+  { key: 'sqrcol',    title: 'Square Column',            category: 'Compression',  file: 'SqrCol.htm' },
+  { key: 'rndsldc',   title: 'Round Solid Column',       category: 'Compression',  file: 'RndSld.htm' },
+  { key: 'rndhlwc',   title: 'Round Hollow Column',      category: 'Compression',  file: 'RndHlw.htm' },
+  { key: 'shrsqr',    title: 'Shear Square Web',         category: 'Shear',        file: 'ShrSqr.htm' },
+  { key: 'shrrnd',    title: 'Shear Round Web',          category: 'Shear',        file: 'ShrRnd.htm' },
+  { key: 'shrrnd1',   title: 'Shear Round S-Beam',       category: 'Shear',        file: 'ShrRsb.htm' },
+  { key: 'sqrtor',    title: 'Square Torque',            category: 'Torsion',      file: 'SqrTor.htm' },
+  { key: 'rndsld',    title: 'Round Solid Torque',       category: 'Torsion',      file: 'RndSld.htm' },
+  { key: 'rndhlw',    title: 'Round Hollow Torque',      category: 'Torsion',      file: 'RndHlw.htm' },
+  { key: 'pressure',  title: 'Pressure Diaphragm',       category: 'Pressure',     file: 'Pressure.htm' },
+  { key: 'zvstemp',   title: 'Zero vs Temperature',      category: 'Calibration',  file: 'ZvsTemp.htm' },
+  { key: 'zerobal',   title: 'Zero Balance',             category: 'Calibration',  file: 'ZeroBal.htm' },
+  { key: 'span2pt',   title: 'Span 2-Point',             category: 'Span',         file: 'Span2pt.htm' },
+  { key: 'span3pt',   title: 'Span 3-Point',             category: 'Span',         file: 'Span3pt.htm' },
+  { key: 'optshunt',  title: 'Shunt Optimization',       category: 'Span',         file: 'OptShnt.htm' },
+  { key: 'spanset',   title: 'Span Set',                 category: 'Span',         file: 'SpanSet.htm' },
+  { key: 'simspan',   title: 'Simulated Span',           category: 'Span',         file: 'SimSpan.htm' },
+  { key: 'trimvis',   title: 'Trim Visualizer',          category: 'Trim',         file: 'TrimVis.htm' },
+  { key: 'sixaxisft', title: '6-DOF F/T Cross-Beam',    category: 'Multi-Axis',   file: '' },
+  { key: 'jts',       title: 'Joint Torque Sensor',     category: 'Multi-Axis',   file: '' },
 ]
 
-export default function App() {
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('SI')
-  const [selectedFrame, setSelectedFrame] = useState<1 | 2 | 3>(1)
-  const [selectedHelpKey, setSelectedHelpKey] = useState('bbcant')
-  const [helpSearch, setHelpSearch] = useState('')
-  const [helpHtml, setHelpHtml] = useState<string>('')
-  const [helpOpen, setHelpOpen] = useState(false)
-  const [wasmReady, setWasmReady] = useState(false)
+const CALC_TITLES: Record<string, string> = Object.fromEntries(CALCULATORS.map(c => [c.key, c.title]))
 
-  // Attempt WASM load on mount — silently falls back to JS if not built
+export default function App() {
+  const [unitSystem, setUnitSystem]         = useState<UnitSystem>('SI')
+  const [selectedCalcKey, setSelectedCalcKey] = useState<string | null>(null)
+  const [helpSearch, setHelpSearch]         = useState('')
+  const [helpHtml, setHelpHtml]             = useState<string>('')
+  const [helpOpen, setHelpOpen]             = useState(false)
+  const [helpTopicKey, setHelpTopicKey]     = useState('bbcant')
+  const [wasmReady, setWasmReady]           = useState(false)
+
   useEffect(() => {
-    initWasm().then((loaded) => {
-      if (loaded) setWasmReady(true)
-    })
+    initWasm().then(loaded => { if (loaded) setWasmReady(true) })
   }, [])
 
+  // Project save/load
   const handleGetState = (): ProjectState => ({
     ...newProject(),
     unitSystem,
-    selectedCalcKey: selectedHelpKey,
+    selectedCalcKey: selectedCalcKey ?? '',
     inputs: {},
   })
 
   const handleLoadState = (state: ProjectState) => {
-    if (state.unitSystem === 'SI' || state.unitSystem === 'US') {
+    if (state.unitSystem === 'SI' || state.unitSystem === 'US')
       setUnitSystem(state.unitSystem as UnitSystem)
-    }
-    if (state.selectedCalcKey && CALCULATORS.some(c => c.key === state.selectedCalcKey)) {
-      setSelectedHelpKey(state.selectedCalcKey)
-    }
+    if (state.selectedCalcKey && CALCULATORS.some(c => c.key === state.selectedCalcKey))
+      setSelectedCalcKey(state.selectedCalcKey)
   }
 
-  const selectedTopic = CALCULATORS.find(t => t.key === selectedHelpKey) ?? CALCULATORS[0]
-
+  // Help modal
+  const selectedHelpTopic = CALCULATORS.find(t => t.key === helpTopicKey) ?? CALCULATORS[0]
   const filteredTopics = useMemo(() => {
     const q = helpSearch.trim().toLowerCase()
-    if (!q) return CALCULATORS
-    return CALCULATORS.filter(t => `${t.title} ${t.category}`.toLowerCase().includes(q))
+    return q ? CALCULATORS.filter(t => `${t.title} ${t.category}`.toLowerCase().includes(q)) : CALCULATORS
   }, [helpSearch])
 
   useEffect(() => {
+    if (!selectedHelpTopic.file) return
     let canceled = false
-    fetch(`/legacy-help/${selectedTopic.file}`)
+    fetch(`/legacy-help/${selectedHelpTopic.file}`)
       .then(r => r.text())
       .then(html => { if (!canceled) setHelpHtml(html) })
-      .catch(() => {
-        if (!canceled) setHelpHtml('<html><body><p>Unable to load help content.</p></body></html>')
-      })
+      .catch(() => { if (!canceled) setHelpHtml('<p>Unable to load help content.</p>') })
     return () => { canceled = true }
-  }, [selectedTopic.file])
+  }, [selectedHelpTopic.file])
+
+  const calcTitle = selectedCalcKey ? (CALC_TITLES[selectedCalcKey] ?? selectedCalcKey) : ''
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">TC</span>
-          <div>
-            <h1>Transcalc Workflow</h1>
-            <p className="text-xs text-slate-400">Integrated Load Cell Design Environment</p>
-          </div>
+          <img src="/mm-logo.webp" alt="Micro-Measurements" className="mm-logo" />
+          <div className="brand-divider" />
+          {selectedCalcKey ? (
+            <button
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 8 }}
+              onClick={() => setSelectedCalcKey(null)}
+              aria-label="Back to gallery"
+            >
+              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '1.1rem' }}>←</span>
+              <span className="brand-app-name">{calcTitle}</span>
+            </button>
+          ) : (
+            <div>
+              <div className="brand-app-name">Transcalc</div>
+              <div className="brand-app-sub">Transducer Design Environment</div>
+            </div>
+          )}
         </div>
 
         <div className="topbar-right">
@@ -116,16 +129,18 @@ export default function App() {
         </div>
       </header>
 
-      <main className="layout layout-single p-0 bg-slate-900">
-        <section className="h-full">
-          <ErrorBoundary label="Workflow">
-            <WorkflowWizard
+      <main className="layout layout-single p-0" style={{ height: 'calc(100vh - 67px)', overflowY: 'auto', padding: '20px 24px' }}>
+        <ErrorBoundary label="Main">
+          {selectedCalcKey ? (
+            <WorkspaceRouter
+              calcKey={selectedCalcKey}
               unitSystem={unitSystem}
               onUnitChange={setUnitSystem}
-              initialStep={selectedFrame}
             />
-          </ErrorBoundary>
-        </section>
+          ) : (
+            <TransducerGallery onSelect={setSelectedCalcKey} />
+          )}
+        </ErrorBoundary>
       </main>
 
       {helpOpen && (
@@ -148,8 +163,8 @@ export default function App() {
                 {filteredTopics.map(topic => (
                   <button
                     key={topic.key}
-                    className={topic.key === selectedTopic.key ? 'topic-item active' : 'topic-item'}
-                    onClick={() => setSelectedHelpKey(topic.key)}
+                    className={topic.key === selectedHelpTopic.key ? 'topic-item active' : 'topic-item'}
+                    onClick={() => setHelpTopicKey(topic.key)}
                   >
                     <span>{topic.title}</span>
                     <small>{topic.category}</small>
@@ -158,10 +173,10 @@ export default function App() {
               </div>
               <div className="preview">
                 <div className="preview-meta">
-                  <strong>{selectedTopic.title}</strong>
-                  <span>{selectedTopic.file}</span>
+                  <strong>{selectedHelpTopic.title}</strong>
+                  <span>{selectedHelpTopic.file}</span>
                 </div>
-                <iframe title={selectedTopic.title} srcDoc={helpHtml} className="help-frame" />
+                <iframe title={selectedHelpTopic.title} srcDoc={helpHtml} className="help-frame" />
               </div>
             </div>
           </section>
