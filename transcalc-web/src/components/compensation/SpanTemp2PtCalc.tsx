@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import { spanWireTypes, WireType, calculateSpanTemperature2Pt } from '../../domain/spanTemperature2Pt'
 
 type UnitSystem = 'SI' | 'US'
@@ -8,13 +8,27 @@ export default function SpanTemp2PtCalc({ unitSystem, onUnitChange }: Props) {
   const [wireTypeIdx, setWireTypeIdx] = useState(0)
   const [resistorTCR, setResistorTCR] = useState(0.25)
   const [bridgeResistance, setBridgeResistance] = useState(350)
-  const [lowTemp, setLowTemp] = useState(32)
+  const [lowTemp, setLowTemp] = useState(() => unitSystem === 'US' ? 32 : 0)
   const [lowOutput, setLowOutput] = useState(1.0)
-  const [highTemp, setHighTemp] = useState(212)
+  const [highTemp, setHighTemp] = useState(() => unitSystem === 'US' ? 212 : 100)
   const [highOutput, setHighOutput] = useState(10.0)
 
   const wireType: WireType = spanWireTypes[wireTypeIdx]
   const tempUnit = unitSystem === 'SI' ? '°C' : '°F'
+  const tcrUnit  = unitSystem === 'SI' ? '%/°C' : '%/°F'
+
+  const prevUnit = useRef<UnitSystem>(unitSystem)
+  useEffect(() => {
+    if (prevUnit.current === unitSystem) return
+    prevUnit.current = unitSystem
+    if (unitSystem === 'SI') {
+      setLowTemp(v  => Math.round(((v  - 32) * 5 / 9) * 10) / 10)
+      setHighTemp(v => Math.round(((v - 32) * 5 / 9) * 10) / 10)
+    } else {
+      setLowTemp(v  => Math.round((v  * 9 / 5 + 32) * 10) / 10)
+      setHighTemp(v => Math.round((v * 9 / 5 + 32) * 10) / 10)
+    }
+  }, [unitSystem])
 
   const result = useMemo(() => {
     try {
@@ -51,7 +65,7 @@ export default function SpanTemp2PtCalc({ unitSystem, onUnitChange }: Props) {
             {spanWireTypes.map((w, i) => <option key={i} value={i}>{w.name}</option>)}
           </select>
         </label>
-        <label>Resistor TCR (%/unit)
+        <label>Resistor TCR ({tcrUnit})
           <input type="number" step="0.01" value={resistorTCR} onChange={e => setResistorTCR(+e.target.value)} />
         </label>
         <label>Bridge Resistance (Ω)

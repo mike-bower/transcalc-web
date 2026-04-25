@@ -76,7 +76,7 @@ export default function ZeroBalanceCalc({ unitSystem, onUnitChange }: Props) {
             </tr>
             <tr>
               <td>Wire TCR</td>
-              <td>{result.value.compensationTCR.toFixed(4)} %/°C</td>
+              <td>{result.value.compensationTCR.toFixed(4)} {unitSystem === 'SI' ? '%/°C' : '%/°F'}</td>
             </tr>
           </tbody>
         </table>

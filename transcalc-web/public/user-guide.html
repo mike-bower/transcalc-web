@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcalc — User Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #1e293b;
+    background: #f8fafc;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #1e3a5f;
+    color: #fff;
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .topbar h1 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; }
+  .topbar .sub { font-size: 0.8rem; opacity: 0.65; margin-left: 4px; }
+
+  .layout {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+  }
+
+  /* Sidebar TOC */
+  nav.toc {
+    flex: 0 0 210px;
+    position: sticky;
+    top: 60px;
+    font-size: 0.8rem;
+    border-left: 2px solid #e2e8f0;
+    padding-left: 16px;
+  }
+  nav.toc .toc-title { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; font-size: 0.7rem; margin-bottom: 8px; }
+  nav.toc a { display: block; color: #475569; text-decoration: none; padding: 2px 0; line-height: 1.4; }
+  nav.toc a:hover { color: #1e3a5f; }
+  nav.toc .toc-section { margin-top: 10px; font-weight: 600; color: #334155; }
+  nav.toc .toc-sub { padding-left: 12px; color: #64748b; }
+
+  /* Main content */
+  main { flex: 1 1 0; min-width: 0; }
+
+  h1 { font-size: 1.8rem; font-weight: 700; color: #0f172a; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+  h2 { font-size: 1.25rem; font-weight: 700; color: #1e3a5f; margin-top: 2.5rem; padding-top: 0.5rem; border-top: 1px solid #e2e8f0; }
+  h3 { font-size: 1.05rem; font-weight: 700; color: #334155; margin-top: 1.8rem; }
+  h4 { font-size: 0.95rem; font-weight: 700; color: #475569; margin-top: 1.4rem; }
+
+  p { margin: 0.6rem 0 0.9rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem; }
+  th { background: #f1f5f9; text-align: left; padding: 7px 10px; font-weight: 600; color: #334155; border: 1px solid #e2e8f0; }
+  td { padding: 6px 10px; border: 1px solid #e2e8f0; color: #374151; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 5px; font-family: 'Cascadia Code', 'Fira Mono', Consolas, monospace; font-size: 0.85em; }
+
+  blockquote {
+    margin: 1rem 0;
+    padding: 10px 16px;
+    background: #f0f9ff;
+    border-left: 3px solid #38bdf8;
+    border-radius: 0 6px 6px 0;
+    color: #0369a1;
+    font-size: 0.9rem;
+  }
+  blockquote p { margin: 0; }
+
+  ul, ol { padding-left: 1.5rem; margin: 0.5rem 0 0.8rem; }
+  li { margin: 0.25rem 0; }
+
+  .badge {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  .workflow-steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+  }
+  .workflow-steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    margin: 10px 0;
+    align-items: flex-start;
+  }
+  .workflow-steps li::before {
+    content: counter(step);
+    flex: 0 0 26px;
+    height: 26px;
+    background: #1e3a5f;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 2rem 0; }
+
+  @media print {
+    nav.toc { display: none; }
+    .topbar { position: static; }
+    .layout { padding: 20px; }
+  }
+  @media (max-width: 700px) {
+    nav.toc { display: none; }
+    .layout { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Transcalc <span class="sub">— User Guide</span></h1>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar TOC -->
+  <nav class="toc">
+    <div class="toc-title">Contents</div>
+    <a class="toc-section" href="#getting-started">Getting Started</a>
+    <a class="toc-section" href="#gallery">Calculator Gallery</a>
+    <a class="toc-section" href="#inside-a-calc">Inside a Calculator</a>
+    <a class="toc-section" href="#units">Unit System</a>
+    <a class="toc-section" href="#design">Design Calculators</a>
+    <a class="toc-sub" href="#bending">Bending Beams</a>
+    <a class="toc-sub" href="#column">Columns</a>
+    <a class="toc-sub" href="#shear">Shear</a>
+    <a class="toc-sub" href="#torque">Torque</a>
+    <a class="toc-sub" href="#pressure">Pressure</a>
+    <a class="toc-sub" href="#multiaxis">Multi-Axis F/T</a>
+    <a class="toc-section" href="#compensation">Compensation</a>
+    <a class="toc-section" href="#trim">Trim Visualizer</a>
+    <a class="toc-section" href="#project">Project Save &amp; Load</a>
+    <a class="toc-section" href="#print">Printing</a>
+    <a class="toc-section" href="#help">Help System</a>
+    <a class="toc-section" href="#quickref">Quick Reference</a>
+    <a class="toc-section" href="#workflow">Typical Workflow</a>
+  </nav>
+
+  <main>
+
+    <h1>Transcalc User Guide</h1>
+    <p>Transcalc is a browser-based engineering environment for designing and compensating strain-gage transducers. It replaces the legacy Delphi Xcalc application with a modern, interactive interface.</p>
+
+    <hr>
+
+    <h2 id="getting-started">Getting Started</h2>
+    <p>Open Transcalc in any modern browser. The home screen shows the <strong>Calculator Gallery</strong> — a grid of all available transducer types organized by category. Click any card to open that calculator.</p>
+    <p>To return to the gallery from inside a calculator, click the <strong>← back arrow</strong> in the top-left corner next to the calculator name.</p>
+
+    <hr>
+
+    <h2 id="gallery">The Calculator Gallery</h2>
+    <p>The gallery groups calculators into eight categories:</p>
+    <table>
+      <tr><th>Category</th><th>Calculators</th></tr>
+      <tr><td><strong>Bending</strong></td><td>Cantilever Beam, Binocular Beam, Dual Bending Beam, Reverse Bending Beam, S-Beam</td></tr>
+      <tr><td><strong>Column</strong></td><td>Square Column, Round Solid Column, Round Hollow Column</td></tr>
+      <tr><td><strong>Shear</strong></td><td>Square Shear Beam, Round Shear Beam, S-Beam Shear</td></tr>
+      <tr><td><strong>Torque</strong></td><td>Square Torque, Round Solid Torque, Round Hollow Torque</td></tr>
+      <tr><td><strong>Pressure</strong></td><td>Pressure Diaphragm</td></tr>
+      <tr><td><strong>Multi-Axis</strong></td><td>6-DOF F/T Cross-Beam, Joint Torque Sensor, Hexapod F/T Sensor, 3-Arm F/T Cross-Beam</td></tr>
+      <tr><td><strong>Compensation</strong></td><td>Zero vs Temperature, Zero Balance, Span Temp 2-Point, Span Temp 3-Point, Shunt Optimization, Span Set, Simulated Span</td></tr>
+      <tr><td><strong>Trim</strong></td><td>Trim Visualizer</td></tr>
+    </table>
+    <p>Each card shows a miniature diagram of the transducer geometry and a one-line description.</p>
+
+    <hr>
+
+    <h2 id="inside-a-calc">Inside a Calculator</h2>
+    <p>Every design calculator follows the same layout:</p>
+
+    <h3>3D Model</h3>
+    <p>An interactive 3D preview of the transducer geometry. The model updates as you change input parameters. Orbit, zoom, and pan with the mouse. Click <strong>3D Model</strong> to collapse or expand this section.</p>
+
+    <h3>Inputs</h3>
+    <p>A grid of labeled numeric fields. All inputs accept direct typing. Results update immediately — there is no Compute button. Fields that are out of engineering range may be highlighted.</p>
+
+    <h3>Results</h3>
+    <p>A table of calculated values that updates live as you change any input.</p>
+
+    <h3>2D Sketch <span class="badge">Binocular Beam</span></h3>
+    <p>The Binocular Beam calculator includes a full 2D engineering sketch (side view + top view) with dimensions, centerlines, gage locations, and load arrows, all driven by the input parameters.</p>
+
+    <h3>FEA <span class="badge">Selected Calculators</span></h3>
+    <p>Some calculators include a finite-element analysis viewer showing mesh, strain contours, deformed shape, and boundary conditions. Switch between modes using the buttons in the viewer.</p>
+
+    <hr>
+
+    <h2 id="units">Unit System</h2>
+    <p>The <strong>SI / US</strong> toggle in the top-right corner switches the entire application between metric and US customary units. Values convert automatically — you do not need to re-enter numbers.</p>
+    <table>
+      <tr><th>Quantity</th><th>SI</th><th>US</th></tr>
+      <tr><td>Length</td><td>mm</td><td>in</td></tr>
+      <tr><td>Force</td><td>N</td><td>lbf</td></tr>
+      <tr><td>Torque</td><td>N·mm</td><td>in·lb</td></tr>
+      <tr><td>Pressure</td><td>kPa</td><td>PSI</td></tr>
+      <tr><td>Modulus</td><td>GPa</td><td>Mpsi</td></tr>
+      <tr><td>Strain</td><td>µε</td><td>µε (unchanged)</td></tr>
+      <tr><td>Sensitivity</td><td>mV/V</td><td>mV/V (unchanged)</td></tr>
+    </table>
+    <p>The toggle is also available inside each calculator next to the input section.</p>
+
+    <hr>
+
+    <h2 id="design">Design Calculators</h2>
+    <p>Design calculators compute gage strain, sensitivity (mV/V full-span), and related design parameters for a given transducer geometry and loading. Common outputs shared by all design calculators:</p>
+    <ul>
+      <li><strong>Average gage strain</strong> (µε) — expected signal strain at the gage location</li>
+      <li><strong>Min / Max gage strain</strong> (µε) — strain range across the gage length (indicates gradient error)</li>
+      <li><strong>Full-span sensitivity</strong> (mV/V) — bridge output at rated load given the gage factor</li>
+      <li><strong>Natural frequency</strong> (Hz) — first resonant mode of the loaded transducer</li>
+    </ul>
+
+    <h2 id="bending">Bending Beams</h2>
+
+    <h3>Cantilever Beam</h3>
+    <p>A beam fixed at one end with a transverse load at the free end. Gages are bonded to the top and bottom surfaces near the fixed support where bending stress is highest.</p>
+    <table>
+      <tr><th>Key Inputs</th><th>Key Outputs</th></tr>
+      <tr>
+        <td>Beam length, cross-section width &amp; height, applied force, modulus, Poisson's ratio, gage factor, gage length, gage offset from wall</td>
+        <td>Min/Max/Average strain, strain gradient, natural frequency, full-span sensitivity</td>
+      </tr>
+    </table>
+
+    <h3>Binocular Beam</h3>
+    <p>A rectangular beam with two circular holes aligned along the beam centerline, connected by a narrow slot. The geometry concentrates bending stress in the thin wall above and below the holes, producing high sensitivity for a compact size. Common in precision load cells.</p>
+    <table>
+      <tr><th>Key Inputs</th><th>Key Outputs</th></tr>
+      <tr>
+        <td>Total beam length, beam height, beam width (depth), hole radius, hole spacing, minimum wall thickness, applied force, gage length, modulus, gage factor</td>
+        <td>Gage strain, full-span sensitivity, natural frequency</td>
+      </tr>
+    </table>
+    <p><strong>Additional features:</strong> Full 2D engineering sketch with dimensions, 3D model, FEA mode with strain contour maps.</p>
+    <p>The <strong>minimum wall thickness</strong> (t) is the distance from the top of each hole to the reference bending plane. Decreasing t increases sensitivity but reduces stiffness and may cause yielding at lower loads.</p>
+    <blockquote><p><strong>Geometry constraint:</strong> The slot half-height must be less than the hole radius for a valid binocular shape. If the beam height is too large relative to hole radius and wall thickness, the slot walls cannot connect to the holes.</p></blockquote>
+
+    <h3>Dual Bending Beam</h3>
+    <p>Two parallel beams connected at both ends, loaded at the midpoint. Insensitive to off-center loading; common in platform-style load cells.</p>
+
+    <h3>Reverse Bending Beam</h3>
+    <p>A simply-supported beam (supported at both ends) with a center load. Gages are placed near the supports where bending stress is highest. Bending sign is opposite to a cantilever, hence "reverse."</p>
+
+    <h3>S-Beam</h3>
+    <p>An S-shaped flexure element for tension/compression load cells. The S-shape creates bending in two sections simultaneously, allowing all four arms of a full bridge to be active.</p>
+
+    <hr>
+
+    <h2 id="column">Column (Axial) Transducers</h2>
+    <p>Column transducers carry axial (compressive or tensile) loads. Gages at 0° are active (along the load axis); gages at 90° are passive (Poisson compensation).</p>
+
+    <h3>Square Column</h3>
+    <p>Solid square cross-section axial pillar. Inputs: cross-section width, active length, applied force, modulus, Poisson's ratio, gage factor. Outputs: axial strain, transverse strain, full-span sensitivity.</p>
+
+    <h3>Round Solid Column</h3>
+    <p>Solid circular cross-section axial pillar. Same inputs/outputs as Square Column with a diameter instead of width.</p>
+
+    <h3>Round Hollow Column</h3>
+    <p>Hollow annular cross-section axial pillar. The bore reduces weight and increases surface strain for a given load. Inputs add inner diameter (bore).</p>
+
+    <hr>
+
+    <h2 id="shear">Shear Transducers</h2>
+    <p>Shear transducers measure transverse shear force. Gages at ±45° to the beam axis see the principal strains from shear at their maximum.</p>
+
+    <h3>Square Shear Beam</h3>
+    <p>Rectangular section shear web. Inputs include beam length, cross-section, applied shear force, gage location, and material properties.</p>
+
+    <h3>Round Shear Beam</h3>
+    <p>Circular section in transverse shear. Accounts for the non-uniform shear stress distribution across a circular section.</p>
+
+    <h3>S-Beam Shear</h3>
+    <p>An S-beam used in shear mode. Gage orientation is ±45°.</p>
+
+    <hr>
+
+    <h2 id="torque">Torque Transducers</h2>
+    <p>Torque transducers measure torsional moment. Gages at ±45° to the shaft axis see the equal and opposite principal strains from shear stress.</p>
+    <p>All torque calculators report: shear strain (µε), normal strain (µε), and full-span bridge output (mV/V) for a four-gage ±45° full bridge.</p>
+
+    <h3>Square Torque</h3>
+    <p>Solid square shaft. The stress distribution in a square section is non-uniform — highest at the midpoint of each side. The calculator applies the appropriate shape correction. Additional outputs include min/max strain and gradient (%) to show variation across the gage length.</p>
+    <p>Inputs add <strong>gage length</strong> for gradient computation.</p>
+
+    <h3>Round Solid Torque</h3>
+    <p>Solid circular shaft. Stress is proportional to radius and uniform around the circumference — the simplest torque case.</p>
+
+    <h3>Round Hollow Torque</h3>
+    <p>Hollow circular shaft. The bore removes low-stress material from the center, increasing outer surface strain for a given torque.</p>
+
+    <hr>
+
+    <h2 id="pressure">Pressure Diaphragm</h2>
+    <p>A flat circular diaphragm clamped at its perimeter, loaded by uniform differential pressure. Gages bonded near the center measure tangential strain; gages near the rim measure radial strain.</p>
+    <table>
+      <tr><th>Key Inputs</th><th>Key Outputs</th></tr>
+      <tr>
+        <td>Applied pressure, diaphragm diameter, diaphragm thickness, modulus, Poisson's ratio</td>
+        <td>Radial strain (µε), tangential strain (µε)</td>
+      </tr>
+    </table>
+    <p>A common full-bridge configuration uses radial gages near the clamped edge and tangential gages near the center to maximize output and reject common-mode effects.</p>
+
+    <hr>
+
+    <h2 id="multiaxis">Multi-Axis Force/Torque Sensors</h2>
+    <p>Multi-axis sensors measure multiple components of force and moment simultaneously. They output a sensitivity matrix rather than a single sensitivity value.</p>
+
+    <h3>6-DOF F/T Cross-Beam</h3>
+    <p>A Maltese-cross flexure with four arms, each instrumented with bending and shear gages. Standard topology for robot wrist and ankle force/torque sensors.</p>
+    <p><strong>Measures:</strong> Fx, Fy, Fz, Mx, My, Mz.</p>
+    <table>
+      <tr><th>Key Inputs</th><th>Key Outputs</th></tr>
+      <tr>
+        <td>Outer ring radius, inner hub radius, arm width, arm thickness, arm length, material properties</td>
+        <td>Full 6×6 sensitivity matrix, natural frequencies (Fz/Fx/Fy/Mz modes), working bandwidth</td>
+      </tr>
+    </table>
+
+    <h3>Joint Torque Sensor (JTS)</h3>
+    <p>A spoke-flexure disk used in series-elastic actuators and compliant robot joints. Radial spokes carry torsional load by bending.</p>
+    <p><strong>Measures:</strong> Primarily torque; Fx/Fy lateral forces appear as crosstalk.</p>
+    <table>
+      <tr><th>Key Inputs</th><th>Key Outputs</th></tr>
+      <tr>
+        <td>Number of spokes, outer/inner radius, spoke width, spoke thickness, material properties</td>
+        <td>Torque sensitivity (mV/V per N·mm), lateral force sensitivity, natural frequencies</td>
+      </tr>
+    </table>
+
+    <h3>Hexapod F/T Sensor</h3>
+    <p>A Stewart-platform geometry with six struts in three co-planar pairs. Each strut carries only axial load. The 6×6 Jacobian maps strut forces to the six-component wrench.</p>
+    <p><strong>Measures:</strong> All six DOFs.</p>
+    <table>
+      <tr><th>Key Inputs</th><th>Key Outputs</th></tr>
+      <tr>
+        <td>Top ring radius, bottom ring radius, strut angle, material properties</td>
+        <td>6×6 Jacobian, Jacobian inverse (calibration matrix), per-DOF sensitivity, isotropy index</td>
+      </tr>
+    </table>
+
+    <h3>3-Arm F/T Cross-Beam</h3>
+    <p>A three-arm flexure with arms at 120° spacing. More compact than the 4-arm cross-beam; uses six gages (two per arm: one bending, one shear). Decodes all six DOFs via a 6×6 sensitivity matrix.</p>
+    <p><strong>Measures:</strong> Fx, Fy, Fz, Mx, My, Mz.</p>
+
+    <hr>
+
+    <h2 id="compensation">Compensation Calculators</h2>
+    <p>After designing a transducer, compensation calculates resistor values to correct for bridge unbalance, temperature drift of zero output, and temperature variation of span (sensitivity).</p>
+
+    <h3>Zero vs Temperature</h3>
+    <p>Determines the resistance of a temperature-sensitive wire (e.g., Balco or Nickel) to cancel zero-shift as temperature changes.</p>
+    <p><em>Inputs:</em> Zero output at two or three temperatures, bridge resistance, wire material TC.<br>
+    <em>Outputs:</em> Required compensation wire resistance and length.</p>
+
+    <h3>Zero Balance</h3>
+    <p>Computes a shunt or series resistor to null a fixed bridge unbalance (zero offset at room temperature).</p>
+    <p><em>Inputs:</em> Bridge unbalance (mV/V or µε equivalent), bridge resistance.<br>
+    <em>Outputs:</em> Null resistor value.</p>
+
+    <h3>Span Temp 2-Point</h3>
+    <p>Linear temperature correction for span using measurements at two temperatures.</p>
+    <p><em>Inputs:</em> Span at two temperatures, material modulus–temperature relationship.<br>
+    <em>Outputs:</em> Compensation element value.</p>
+
+    <h3>Span Temp 3-Point</h3>
+    <p>Quadratic temperature correction for span using measurements at three temperatures.</p>
+    <p><em>Inputs:</em> Span at three temperatures.<br>
+    <em>Outputs:</em> Polynomial correction coefficients, compensation element value.</p>
+
+    <h3>Shunt Optimization</h3>
+    <p>Finds the optimal shunt resistor to realize a target span shift for a trim network ladder.</p>
+    <p><em>Inputs:</em> Bridge resistance, target span shift (%), available shunt range.<br>
+    <em>Outputs:</em> Optimal shunt value, achieved span, trim topology recommendation.</p>
+
+    <h3>Span Set</h3>
+    <p>Calculates a series or shunt resistor to scale output to a target full-span value after calibration.</p>
+    <p><em>Inputs:</em> Measured span, target span, bridge resistance.<br>
+    <em>Outputs:</em> Span-set resistor value.</p>
+
+    <h3>Simulated Span</h3>
+    <p>Computes a simulation circuit for verifying calibration without applying mechanical load. A precision resistor in one bridge arm simulates a known strain.</p>
+    <p><em>Inputs:</em> Bridge resistance, target simulated output.<br>
+    <em>Outputs:</em> Simulation resistor value.</p>
+
+    <hr>
+
+    <h2 id="trim">Trim Visualizer</h2>
+    <p>The Trim Visualizer displays a ladder resistor network used for fine-tuning (trimming) compensation resistors. Ladder networks have a series of parallel "rungs" that can be cut or left intact to achieve a target resistance.</p>
+    <p>The visualizer shows:</p>
+    <ul>
+      <li>The ladder topology (series rails with parallel rungs)</li>
+      <li>Which rungs are cut (open) vs. intact (closed)</li>
+      <li>The resulting equivalent resistance</li>
+    </ul>
+    <p>Use this alongside the compensation calculators to translate a target resistance value into a specific rung-cut pattern for the physical trim network.</p>
+
+    <hr>
+
+    <h2 id="project">Project Save and Load</h2>
+    <p>Transcalc saves your work to a <code>.tcalc.json</code> file and reloads it later. No account or server connection is required.</p>
+
+    <h3>Saving</h3>
+    <p>Click <strong>Project</strong> in the top bar. A panel opens showing current metadata. Click <strong>Save</strong> to download a <code>.tcalc.json</code> file.</p>
+    <p>The saved file stores: the currently selected calculator, the unit system (SI or US), and input values for each calculator you have visited during the session.</p>
+
+    <h3>Loading</h3>
+    <p>Click <strong>Project → Load</strong>, then select a <code>.tcalc.json</code> file from disk. The app restores the unit system, navigates to the saved calculator, and restores all inputs.</p>
+
+    <hr>
+
+    <h2 id="print">Printing a Report</h2>
+    <p>Click <strong>Print Report</strong> in the top bar. The browser's print dialog opens. The page is formatted to include the 3D model, inputs, and results table, suitable for an engineering work record.</p>
+    <p>For best results, use landscape orientation and set margins to minimum.</p>
+
+    <hr>
+
+    <h2 id="help">Help System</h2>
+    <p>Click <strong>Help</strong> in the top bar to open the help panel. The panel shows a two-column view:</p>
+    <ul>
+      <li><strong>Left:</strong> A searchable list of all calculator topics</li>
+      <li><strong>Right:</strong> The detailed help page for the selected topic (ported from the original Delphi CHM help system)</li>
+    </ul>
+    <p>Type in the search box to filter topics by name or category. Each help page includes formula descriptions, variable definitions, application notes, and wiring diagrams.</p>
+    <blockquote><p>The Multi-Axis calculators (6-DOF F/T, Hexapod, JTS, 3-Arm) do not yet have legacy help pages. Refer to this guide for those calculators.</p></blockquote>
+
+    <hr>
+
+    <h2 id="quickref">Quick Reference</h2>
+
+    <h3>Gage Color Coding</h3>
+    <p>All 2D sketches and 3D previews use a consistent color scheme for strain gage locations:</p>
+    <table>
+      <tr><th>Color</th><th>Role</th></tr>
+      <tr><td>Orange</td><td>Active gage — positive strain (+ε)</td></tr>
+      <tr><td>Blue</td><td>Active gage — negative strain (−ε)</td></tr>
+      <tr><td>Gray</td><td>Passive (dummy) gage — temperature compensation only, no signal strain</td></tr>
+    </table>
+    <p>In a full Wheatstone bridge, two orange and two blue gages (or orange + gray) are wired in opposing arms to maximize output and reject temperature effects.</p>
+
+    <h3>Common Inputs</h3>
+    <table>
+      <tr><th>Input</th><th>Meaning</th></tr>
+      <tr><td>Applied force / torque / pressure</td><td>Rated full-scale mechanical input</td></tr>
+      <tr><td>Modulus (E)</td><td>Young's modulus of the spring element material</td></tr>
+      <tr><td>Poisson's ratio (ν)</td><td>Lateral strain ratio; typically 0.28–0.33 for steel, 0.33 for aluminum</td></tr>
+      <tr><td>Gage factor (GF)</td><td>Resistance sensitivity of the strain gage; typically 2.0–2.15 for foil gages</td></tr>
+      <tr><td>Gage length</td><td>Physical length of the gage grid along the strain axis</td></tr>
+      <tr><td>Gage offset</td><td>Distance from a reference point (fixed wall, support) to the gage center</td></tr>
+    </table>
+
+    <hr>
+
+    <h2 id="workflow">Typical Workflow</h2>
+    <ol class="workflow-steps">
+      <li><strong>Select a transducer type</strong> from the gallery based on how the sensor will be loaded (bending, axial, shear, torque, pressure, or multi-axis).</li>
+      <li><strong>Enter geometry and material parameters.</strong> Start with approximate dimensions. Use the 3D model to visually confirm the geometry.</li>
+      <li><strong>Review the results.</strong> Check that gage strain is in an appropriate range (typically 500–2000 µε at full scale for foil gages). Check that full-span sensitivity is acceptable (typically 1–3 mV/V at 5–10 V excitation).</li>
+      <li><strong>Iterate dimensions</strong> to optimize sensitivity, stiffness, natural frequency, or safety factor against yield.</li>
+      <li><strong>Run a compensation calculator</strong> if temperature compensation is required. Start with Zero vs Temperature to correct zero drift, then apply a Span Temperature correction if span variation is significant.</li>
+      <li><strong>Use the Trim Visualizer</strong> to convert the compensation resistor value into a specific ladder-network rung-cut pattern.</li>
+      <li><strong>Save the project</strong> as a <code>.tcalc.json</code> file for records.</li>
+      <li><strong>Print a report</strong> for documentation.</li>
+    </ol>
+
+  </main>
+</div>
+
+</body>
+</html>

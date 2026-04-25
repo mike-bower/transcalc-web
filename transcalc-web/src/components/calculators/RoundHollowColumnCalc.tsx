@@ -3,6 +3,7 @@ import { calculateRoundHollowColumnStrain } from '../../domain/rndhlwc'
 import { solveRoundHollowColumnFea } from '../../domain/fea/roundHollowColumnSolver'
 import RoundHollowColumnModelPreview from '../RoundHollowColumnModelPreview'
 import RoundHollowColumnDiagram from '../diagrams/RoundHollowColumnDiagram'
+import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
 import type { CstFeaViewMode } from '../CstFeaViewer'
 
 const CstFeaViewer = lazy(() => import('../CstFeaViewer'))
@@ -19,6 +20,26 @@ const show = (v: number, d: number): string => (Number.isFinite(v) ? v.toFixed(d
 
 type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void }
 
+function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', padding: '6px 2px 2px',
+        cursor: 'pointer', width: '100%', textAlign: 'left',
+        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontFamily: 'inherit',
+      }}
+      aria-expanded={open}
+    >
+      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+      {label}
+    </button>
+  )
+}
+
 export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Props) {
   const [load, setLoad] = useState(5000)
   const [outerDia, setOuterDia] = useState(30)
@@ -29,6 +50,11 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
   const [gageFactor, setGageFactor] = useState(2.1)
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
   const [viewMode, setViewMode] = useState<CstFeaViewMode>('contour')
+  const [show2D, setShow2D] = useState(true)
+  const [show3D, setShow3D] = useState(true)
+  const [showInputs, setShowInputs] = useState(true)
+  const [showResults, setShowResults] = useState(true)
+  const [showFea, setShowFea] = useState(true)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -134,16 +160,26 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
           <button className={analysisMode === 'fea' ? 'active' : ''} onClick={() => setAnalysisMode('fea')}>FEA</button>
         </div>
       </div>
-      <div className="calc-preview-pair">
-        <div className="calc-diagram-2d">
-          <RoundHollowColumnDiagram
-            load={siInputs.loadN}
-            outerDiameter={siInputs.outerDiaMm}
-            innerDiameter={siInputs.innerDiaMm}
-            length={siInputs.lengthMm}
-            unitSystem={unitSystem}
-          />
+      <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />
+      {show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <RoundHollowColumnDiagram
+              load={siInputs.loadN}
+              outerDiameter={siInputs.outerDiaMm}
+              innerDiameter={siInputs.innerDiaMm}
+              length={siInputs.lengthMm}
+              unitSystem={unitSystem}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <WheatstoneBridgeDiagram config="column" />
+          </div>
         </div>
+      )}
+
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
         <div className="calc-model-3d">
           <RoundHollowColumnModelPreview
             params={{
@@ -158,57 +194,74 @@ export default function RoundHollowColumnCalc({ unitSystem, onUnitChange }: Prop
             us={unitSystem === 'US'}
           />
         </div>
-      </div>
-      <div className="bino-grid">
-        <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Outer diameter ({lenUnit})<input type="number" value={Number.isFinite(outerDia) ? outerDia : ''} onChange={e => setOuterDia(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Inner diameter ({lenUnit})<input type="number" value={Number.isFinite(innerDia) ? innerDia : ''} onChange={e => setInnerDia(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Column length ({lenUnit})<input type="number" value={Number.isFinite(columnLength) ? columnLength : ''} onChange={e => setColumnLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-      </div>
-      {result.error && <p className="workspace-note">{result.error}</p>}
-      {columnLengthWarning && <p className="fea-accuracy-warn">{columnLengthWarning}</p>}
-      <table className="bino-table">
-        <tbody>
-          <tr><th colSpan={3}>Calculated Values</th></tr>
-          <tr><td>Axial Strain:</td><td>{show(result.data?.axialStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Transverse Strain:</td><td>{show(result.data?.transverseStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpanOutput ?? NaN, 4)}</td><td>mV/V</td></tr>
-          <tr><td>Natural Frequency:</td><td>{show(naturalFreqHz, 1)}</td><td>Hz</td></tr>
-        </tbody>
-      </table>
+      )}
+
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid">
+            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Outer diameter ({lenUnit})<input type="number" value={Number.isFinite(outerDia) ? outerDia : ''} onChange={e => setOuterDia(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Inner diameter ({lenUnit})<input type="number" value={Number.isFinite(innerDia) ? innerDia : ''} onChange={e => setInnerDia(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Column length ({lenUnit})<input type="number" value={Number.isFinite(columnLength) ? columnLength : ''} onChange={e => setColumnLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+          </div>
+          {result.error && <p className="workspace-note">{result.error}</p>}
+        </>
+      )}
+
+      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
+      {showResults && (
+        <>
+          {columnLengthWarning && <p className="fea-accuracy-warn">{columnLengthWarning}</p>}
+          <table className="bino-table">
+            <tbody>
+              <tr><th colSpan={3}>Calculated Values</th></tr>
+              <tr><td>Axial Strain:</td><td>{show(result.data?.axialStrain ?? NaN, 0)}</td><td>µε</td></tr>
+              <tr><td>Transverse Strain:</td><td>{show(result.data?.transverseStrain ?? NaN, 0)}</td><td>µε</td></tr>
+              <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpanOutput ?? NaN, 4)}</td><td>mV/V</td></tr>
+              <tr><td>Natural Frequency:</td><td>{show(naturalFreqHz, 1)}</td><td>Hz</td></tr>
+            </tbody>
+          </table>
+        </>
+      )}
 
       {analysisMode === 'fea' && (
-        <div className="fea-analysis-section">
-          {feaSolution ? (
-            <>
-              <div className="analysis-toggle" style={{ marginBottom: 8 }}>
-                {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
-                  <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
-                ))}
-              </div>
-              <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
-                <CstFeaViewer
-                  solution={feaSolution}
-                  depthMm={siInputs.outerDiaMm}
-                  viewMode={viewMode}
-                  strainKey="exx"
-                  bcType="axial"
-                  unitSystem={unitSystem}
-                  dimLabels={[
-                    { label: '⌀o', value: siInputs.outerDiaMm },
-                    { label: '⌀i', value: siInputs.innerDiaMm },
-                  ]}
-                />
-              </Suspense>
-              <p className="fea-note">2D plane-stress CST · equivalent rectangular section (area = π·(Ro²−Ri²))</p>
-            </>
-          ) : (
-            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+        <>
+          <SectionToggle label="FEA Viewer" open={showFea} onToggle={() => setShowFea(v => !v)} />
+          {showFea && (
+            <div className="fea-analysis-section">
+              {feaSolution ? (
+                <>
+                  <div className="analysis-toggle" style={{ marginBottom: 8 }}>
+                    {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
+                      <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
+                    ))}
+                  </div>
+                  <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
+                    <CstFeaViewer
+                      solution={feaSolution}
+                      depthMm={siInputs.outerDiaMm}
+                      viewMode={viewMode}
+                      strainKey="exx"
+                      bcType="axial"
+                      unitSystem={unitSystem}
+                      dimLabels={[
+                        { label: '⌀o', value: siInputs.outerDiaMm },
+                        { label: '⌀i', value: siInputs.innerDiaMm },
+                      ]}
+                    />
+                  </Suspense>
+                  <p className="fea-note">2D plane-stress CST · equivalent rectangular section (area = π·(Ro²−Ri²))</p>
+                </>
+              ) : (
+                <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   )

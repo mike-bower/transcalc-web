@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { createAxesGizmo } from './sceneHelpers'
 
 /**
  * 3D parametric model viewer for the Dual Bending Beam transducer.
  *
- * Geometry: simply-supported rectangular beam, centre load, two gage pairs
- * symmetrically placed at ±gageOffset from the midspan.
- *   A – top face, left position   (tension)
- *   B – bottom face, left         (compression)
- *   C – top face, right position  (tension)
- *   D – bottom face, right        (compression)
+ * Geometry: two parallel cantilever beams fixed in a left block, with a
+ * right load block that carries the applied downward force P.
  *
- * Key dimension: distBetweenGages (D) = centre-to-centre span between gage pairs.
- * Beam total length is extended to 1.25×D to show the support overhang.
+ * Gage positions (matching the 2D diagram and domain formula):
+ *   A – top of upper beam, left (tension, orange)
+ *   B – bottom of lower beam, left (compression, blue)
+ *   C – top of upper beam, right (compression, blue)
+ *   D – bottom of lower beam, right (tension, orange)
  */
 
 type Props = {
@@ -56,165 +56,175 @@ function addDimensionLine(
   to: THREE.Vector3,
   text: string,
   normal: THREE.Vector3,
-  showTicks = true
 ) {
   const mat = new THREE.LineBasicMaterial({ color: 0x3e5a73, transparent: true, opacity: 0.8 })
   group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([from, to]), mat))
-
-  if (showTicks) {
-    const n = normal.clone().normalize().multiplyScalar(0.03)
-    group.add(
-      new THREE.Line(new THREE.BufferGeometry().setFromPoints([from.clone().sub(n), from.clone().add(n)]), mat),
-      new THREE.Line(new THREE.BufferGeometry().setFromPoints([to.clone().sub(n), to.clone().add(n)]), mat)
-    )
-  }
-
+  const n = normal.clone().normalize().multiplyScalar(0.03)
+  group.add(
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints([from.clone().sub(n), from.clone().add(n)]), mat),
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints([to.clone().sub(n), to.clone().add(n)]), mat)
+  )
   const label = makeTextSprite(text)
-  label.position.copy(from.clone().add(to).multiplyScalar(0.5).add(normal.clone().normalize().multiplyScalar(0.08)))
+  label.position.copy(from.clone().add(to).multiplyScalar(0.5).add(normal.clone().normalize().multiplyScalar(0.10)))
   group.add(label)
 }
 
 function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
-  const rootRef = useRef<THREE.Group | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [showForces, setShowForces] = useState(true)
 
   const model = useMemo(() => {
     const g = new THREE.Group()
     const mmToScene = 1 / 90
 
-    const loadN = p(params, 'load', 100)
+    const loadN      = p(params, 'load', 100)
     const thicknessMm = p(params, 'thickness', 3)
-    const widthMm = p(params, 'width', 25)
-    const distMm = p(params, 'distBetweenGages', 60)       // D — gage pair separation
-    const gageLenMm = p(params, 'gageLen', 5)
-    const distLoadMm = params['distLoadToCL'] ?? 0         // usually 0
+    const widthMm    = p(params, 'width', 25)
+    const spanMm     = p(params, 'distBetweenGages', 60)   // block-face to block-face
+    const gageLenMm  = p(params, 'gageLen', 5)
 
     const fmt = (v: number) => us ? (v / 25.4).toFixed(3) : v.toFixed(1)
-    const uLabel = us ? 'in' : 'mm'
+    const uLabel  = us ? 'in' : 'mm'
     const forceStr = us ? `${(loadN / 4.44822).toFixed(1)} lbf` : `${loadN.toFixed(0)} N`
 
-    // Total beam length = 1.25 × D (gives visible overhang past supports)
-    const beamLengthMm = distMm * 1.25
-
     // Scene-space dimensions
-    const L = clamp(beamLengthMm * mmToScene, 0.6, 4.5)
-    const T = clamp(thicknessMm * mmToScene, 0.05, 0.45)
-    const W = clamp(widthMm * mmToScene, 0.12, 1.2)
-    const GL = clamp(gageLenMm * mmToScene, 0.04, 0.25)
+    const L   = clamp(spanMm * mmToScene, 0.5, 3.5)          // beam span
+    const T   = clamp(thicknessMm * mmToScene, 0.04, 0.35)   // beam thickness
+    const W   = clamp(widthMm * mmToScene, 0.10, 1.0)         // beam depth (Z)
+    const GL  = clamp(gageLenMm * mmToScene, 0.03, 0.22)      // gage length
 
-    // The two supports sit at ±D/2 × scale from centre of beam
-    const supportHalfSpan = clamp((distMm / 2) * mmToScene, 0.1, L * 0.48)
-    // Load application offset from beam centre (usually 0)
-    const loadOffsetX = clamp(distLoadMm * mmToScene, -L * 0.45, L * 0.45)
+    // Block dimensions
+    const blockW = clamp(spanMm * 0.12 * mmToScene, 0.08, 0.25)
+    const beamSep = Math.max(T * 3.5, 0.28)                   // center-to-center beam separation
+    const blockPad = T * 1.0
+    const blockHalfH = beamSep / 2 + T / 2 + blockPad
 
-    // Beam: centred at origin along X
-    const beamMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1 })
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(L, T, W), beamMat)))
+    // Materials
+    const beamMat      = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.4, metalness: 0.1 })
+    const fixedMat     = new THREE.MeshStandardMaterial({ color: 0x3a4a6b, roughness: 0.7 })
+    const loadBlockMat = new THREE.MeshStandardMaterial({ color: 0x8090a8, roughness: 0.55 })
 
-    // Support triangles (pin left, roller right)
-    const supMat = new THREE.MeshStandardMaterial({ color: 0x5a6a7a, roughness: 0.5 })
-    const supGeom = new THREE.ConeGeometry(0.10, 0.18, 4)
-    supGeom.rotateY(Math.PI / 4)
-    const supL = new THREE.Mesh(supGeom, supMat)
-    supL.position.set(-supportHalfSpan, -T / 2 - 0.09, 0)
-    g.add(supL)
-    const supR = new THREE.Mesh(supGeom, supMat)
-    supR.position.set(supportHalfSpan, -T / 2 - 0.09, 0)
-    g.add(supR)
+    // ── Upper beam ──
+    const upperBeam = new THREE.Mesh(new THREE.BoxGeometry(L, T, W), beamMat)
+    upperBeam.position.set(0, beamSep / 2, 0)
+    g.add(upperBeam)
 
-    // Roller disc underneath right support (distinguishes roller from pin)
-    const rollerGeom = new THREE.CylinderGeometry(0.07, 0.07, W * 0.55, 16)
-    rollerGeom.rotateX(Math.PI / 2)
-    const roller = new THREE.Mesh(rollerGeom, supMat)
-    roller.position.set(supportHalfSpan, -T / 2 - 0.19, 0)
-    g.add(roller)
+    // ── Lower beam ──
+    const lowerBeam = new THREE.Mesh(new THREE.BoxGeometry(L, T, W), beamMat)
+    lowerBeam.position.set(0, -beamSep / 2, 0)
+    g.add(lowerBeam)
 
-    // Gage pad geometry
-    const padT = Math.max(0.008, T * 0.08)
-    const gageGeom = new THREE.BoxGeometry(GL, padT, GL * 0.65)
-    const gageMats = {
-      topTension: new THREE.MeshStandardMaterial({ color: 0xf0a451, roughness: 0.5, metalness: 0.06 }),      // orange
-      botCompression: new THREE.MeshStandardMaterial({ color: 0x51a4f0, roughness: 0.5, metalness: 0.06 }),  // blue
+    // ── Left fixed block ──
+    const leftBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(blockW * 2, blockHalfH * 2, W * 1.15),
+      fixedMat
+    )
+    leftBlock.position.set(-L / 2 - blockW, 0, 0)
+    g.add(leftBlock)
+
+    // Diagonal hatch lines on left face to indicate fixed wall
+    const hatchMat = new THREE.LineBasicMaterial({ color: 0x1e2d3d, opacity: 0.6, transparent: true })
+    const lx = -L / 2 - blockW * 2
+    const hatchCount = 6
+    for (let i = 0; i <= hatchCount; i++) {
+      const frac = i / hatchCount
+      const y0 = -blockHalfH + frac * blockHalfH * 2
+      const pts = [
+        new THREE.Vector3(lx, y0, -W * 0.57),
+        new THREE.Vector3(lx, y0 - blockHalfH * 0.35, W * 0.57),
+      ]
+      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), hatchMat))
     }
 
-    // Gage half-separation in scene units
-    const gOff = clamp((distMm / 2) * mmToScene, GL * 0.8, L * 0.4)
+    // ── Right load block ──
+    const rightBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(blockW * 2, blockHalfH * 2, W * 1.15),
+      loadBlockMat
+    )
+    rightBlock.position.set(L / 2 + blockW, 0, 0)
+    g.add(rightBlock)
 
-    // A: top-left, B: bottom-left, C: top-right, D: bottom-right
-    const gages: Array<[number, boolean, THREE.MeshStandardMaterial, string]> = [
-      [-gOff, true, gageMats.topTension, 'A'],
-      [-gOff, false, gageMats.botCompression, 'B'],
-      [gOff, true, gageMats.topTension, 'C'],
-      [gOff, false, gageMats.botCompression, 'D'],
+    // ── Gage pads ──
+    const padT = Math.max(0.007, T * 0.09)
+    const gageGeom = new THREE.BoxGeometry(GL, padT, GL * 0.7)
+    // Gage inset from block face: GL/2 + 10% of span
+    const gageXInset = GL / 2 + L * 0.10
+    const gageXL = -L / 2 + gageXInset   // left gage X
+    const gageXR =  L / 2 - gageXInset   // right gage X
+
+    const tensionMat     = new THREE.MeshStandardMaterial({ color: 0xf0a451, roughness: 0.5, metalness: 0.06 })
+    const compressionMat = new THREE.MeshStandardMaterial({ color: 0x51a4f0, roughness: 0.5, metalness: 0.06 })
+
+    const gageDefs: Array<[number, number, THREE.MeshStandardMaterial, string]> = [
+      // [x, y (beam center + offset to surface), material, label]
+      [gageXL,  beamSep / 2 + T / 2 + padT / 2, tensionMat,     'A'],  // top upper, left
+      [gageXL, -beamSep / 2 - T / 2 - padT / 2, compressionMat, 'B'],  // bot lower, left
+      [gageXR,  beamSep / 2 + T / 2 + padT / 2, compressionMat, 'C'],  // top upper, right
+      [gageXR, -beamSep / 2 - T / 2 - padT / 2, tensionMat,     'D'],  // bot lower, right
     ]
-    for (const [xPos, top, mat, label] of gages) {
+    for (const [x, y, mat, label] of gageDefs) {
       const gage = new THREE.Mesh(gageGeom, mat)
-      gage.position.set(xPos, top ? T / 2 + padT / 2 : -T / 2 - padT / 2, 0)
+      gage.position.set(x, y, 0)
       g.add(gage)
       const lbl = makeTextSprite(label)
-      lbl.position.set(xPos, top ? T / 2 + padT + 0.12 : -T / 2 - padT - 0.12, W * 0.6)
+      const lblY = y > 0 ? y + padT + 0.11 : y - padT - 0.11
+      lbl.position.set(x, lblY, W * 0.62)
       lbl.scale.set(0.22, 0.10, 1)
       g.add(lbl)
     }
 
-    // Load arrow at centre (+ optional offset)
-    const arrowLen = clamp(0.20 + Math.log10(Math.max(loadN, 1)) * 0.1, 0.22, 0.55)
-    g.add(new THREE.ArrowHelper(
-      new THREE.Vector3(0, -1, 0),
-      new THREE.Vector3(loadOffsetX, T / 2 + arrowLen, 0),
-      arrowLen,
-      0x1f2f3f,
-      Math.min(0.15, arrowLen * 0.3),
-      Math.min(0.10, arrowLen * 0.22)
-    ))
+    // ── Load arrow — points DOWN onto top of right block ──
+    if (showForces) {
+      const arrowLen = clamp(0.22 + Math.log10(Math.max(loadN, 1)) * 0.08, 0.22, 0.50)
+      const topOfBlock = blockHalfH
+      g.add(new THREE.ArrowHelper(
+        new THREE.Vector3(0, -1, 0),
+        new THREE.Vector3(L / 2 + blockW, topOfBlock + arrowLen, 0),
+        arrowLen,
+        0xe05530,
+        Math.min(0.13, arrowLen * 0.28),
+        Math.min(0.09, arrowLen * 0.20)
+      ))
+      const fLabel = makeTextSprite(forceStr)
+      fLabel.position.set(L / 2 + blockW + 0.25, topOfBlock + arrowLen + 0.10, 0)
+      fLabel.scale.set(0.55, 0.14, 1)
+      g.add(fLabel)
+    }
 
-    // Dimension lines
+    // ── Dimension lines ──
     const dim = new THREE.Group()
-    const yUnder = -T * 0.95
-    const zFront = W * 0.78
+    const zFront = W * 0.8
+    const yUnder = -blockHalfH - 0.10
 
-    // Total beam length (below)
+    // Span D (block-face to block-face)
     addDimensionLine(dim,
-      new THREE.Vector3(-L / 2, yUnder - 0.15, zFront),
-      new THREE.Vector3(L / 2, yUnder - 0.15, zFront),
-      `L=${fmt(beamLengthMm)} ${uLabel}`,
+      new THREE.Vector3(-L / 2, yUnder, zFront),
+      new THREE.Vector3( L / 2, yUnder, zFront),
+      `D=${fmt(spanMm)} ${uLabel}`,
       new THREE.Vector3(0, -1, 0)
     )
 
-    // Gage pair span D
+    // Beam thickness t
     addDimensionLine(dim,
-      new THREE.Vector3(-gOff, yUnder, zFront),
-      new THREE.Vector3(gOff, yUnder, zFront),
-      `D=${fmt(distMm)} ${uLabel}`,
-      new THREE.Vector3(0, -1, 0)
-    )
-
-    // Thickness
-    addDimensionLine(dim,
-      new THREE.Vector3(L / 2 + 0.12, -T / 2, 0),
-      new THREE.Vector3(L / 2 + 0.12, T / 2, 0),
+      new THREE.Vector3(L / 2 + blockW * 2 + 0.10, beamSep / 2 - T / 2, 0),
+      new THREE.Vector3(L / 2 + blockW * 2 + 0.10, beamSep / 2 + T / 2, 0),
       `t=${fmt(thicknessMm)} ${uLabel}`,
       new THREE.Vector3(1, 0, 0)
     )
 
-    // Width
+    // Beam width w
     addDimensionLine(dim,
-      new THREE.Vector3(L * 0.5, T * 0.6, -W / 2),
-      new THREE.Vector3(L * 0.5, T * 0.6, W / 2),
+      new THREE.Vector3(0, blockHalfH + 0.12, -W / 2),
+      new THREE.Vector3(0, blockHalfH + 0.12,  W / 2),
       `w=${fmt(widthMm)} ${uLabel}`,
       new THREE.Vector3(0, 1, 0)
     )
 
-    // Load label
-    const fLabel = makeTextSprite(forceStr)
-    fLabel.position.set(loadOffsetX, T / 2 + arrowLen + 0.14, 0)
-    dim.add(fLabel)
-
     dim.visible = showDimensions
     g.add(dim)
     return g
-  }, [params, showDimensions, us])
+  }, [params, showDimensions, showForces, us])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -223,7 +233,7 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
     scene.background = new THREE.Color(0xffffff)
 
     const camera = new THREE.PerspectiveCamera(45, host.clientWidth / Math.max(1, host.clientHeight), 0.1, 100)
-    camera.position.set(2.2, 1.6, 2.4)
+    camera.position.set(2.5, 1.4, 2.8)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -235,6 +245,7 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
     controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0)
     controls.update()
+    const gizmo = createAxesGizmo(renderer, host)
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
     const d = new THREE.DirectionalLight(0xffffff, 1.0)
@@ -243,7 +254,6 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
     scene.add(new THREE.GridHelper(6, 14, 0xcccccc, 0xeeeeee))
 
     const root = new THREE.Group()
-    rootRef.current = root
     scene.add(root)
     root.add(model)
 
@@ -252,6 +262,7 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
       raf = requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
+      gizmo.render(camera)
     }
     animate()
 
@@ -270,6 +281,7 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
       ro.disconnect()
       controls.dispose()
       renderer.dispose()
+      gizmo.dispose()
       if (host.contains(renderer.domElement)) host.removeChild(renderer.domElement)
     }
   }, [model])
@@ -283,12 +295,26 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
         fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px',
         border: '1px solid rgba(71,85,105,0.5)', color: '#f8fafc', pointerEvents: 'auto'
       }}>
-        <input
-          type="checkbox" id="dualbeam-dims"
-          checked={showDimensions} onChange={e => setShowDimensions(e.target.checked)}
-          style={{ margin: 0 }}
-        />
-        <label htmlFor="dualbeam-dims" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>Dimensions</label>
+        <button
+          onClick={() => setShowDimensions(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showDimensions ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showDimensions ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Dimensions</button>
+        <button
+          onClick={() => setShowForces(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showForces ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showForces ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Forces</button>
       </div>
     </div>
   )

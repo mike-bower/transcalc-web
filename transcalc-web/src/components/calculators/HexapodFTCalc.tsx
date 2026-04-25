@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { designHexapodFT, generateHexapodCalibrationProcedure, type HexapodFTParams } from '../../domain/hexapodFT'
 import { MATERIALS, DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
 import HexapodSketch2D from '../diagrams/HexapodSketch2D'
+import HexapodModelPreview from '../HexapodModelPreview'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -79,6 +80,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
   const [ratedMoment, setRatedMoment] = useState(us ? +(5 / NM_PER_INLB).toFixed(2) : 5)
 
   const [showSketch,  setShowSketch]  = useState(true)
+  const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
   const [showRated,   setShowRated]   = useState(true)
@@ -149,7 +151,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
       </div>
 
       {/* 2D Sketch */}
-      <SectionToggle label="2D Geometry Preview" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
+      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
       {showSketch && (
         <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
           {result.isValid ? (
@@ -157,6 +159,22 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
           ) : (
             <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
           )}
+        </div>
+      )}
+
+      {/* 3D Model */}
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          <HexapodModelPreview
+            topRingRadiusMm={params.topRingRadiusMm}
+            bottomRingRadiusMm={params.bottomRingRadiusMm}
+            platformHeightMm={params.platformHeightMm}
+            strutDiameterMm={params.strutDiameterMm}
+            strutSpreadDeg={params.strutSpreadDeg}
+            topAnglesOffsetDeg={params.topAnglesOffsetDeg}
+            us={us}
+          />
         </div>
       )}
 
@@ -283,7 +301,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
             <tr><th colSpan={3}>Strain &amp; Safety</th></tr>
             <tr>
               <td>Max Strut Strain</td>
-              <td>{result.maxStrutStrainMicrostrain.toFixed(1)}</td>
+              <td>{result.maxStrutStrainMicrostrain.toFixed(0)}</td>
               <td>µε at rated load</td>
             </tr>
             <tr>

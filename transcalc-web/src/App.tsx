@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ProjectPanel from './components/ProjectPanel'
 import TransducerGallery from './components/TransducerGallery'
 import WorkspaceRouter from './components/WorkspaceRouter'
+import CalcSidebar from './components/CalcSidebar'
 import { newProject, type ProjectState } from './domain/projectSchema'
 import { initWasm, isWasmLoaded } from './domain/wasmBridge'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -41,9 +42,9 @@ const CALCULATORS: CalculatorTopic[] = [
   { key: 'trimvis',   title: 'Trim Visualizer',          category: 'Trim',         file: 'TrimVis.htm' },
   { key: 'sixaxisft', title: '6-DOF F/T Cross-Beam',    category: 'Multi-Axis',   file: '' },
   { key: 'jts',       title: 'Joint Torque Sensor',     category: 'Multi-Axis',   file: '' },
+  { key: 'hexapod',   title: 'Hexapod F/T Sensor',      category: 'Multi-Axis',   file: '' },
+  { key: 'triaxisft', title: '3-Arm F/T Cross-Beam',   category: 'Multi-Axis',   file: '' },
 ]
-
-const CALC_TITLES: Record<string, string> = Object.fromEntries(CALCULATORS.map(c => [c.key, c.title]))
 
 export default function App() {
   const [unitSystem, setUnitSystem]         = useState<UnitSystem>('SI')
@@ -90,29 +91,16 @@ export default function App() {
     return () => { canceled = true }
   }, [selectedHelpTopic.file])
 
-  const calcTitle = selectedCalcKey ? (CALC_TITLES[selectedCalcKey] ?? selectedCalcKey) : ''
-
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
           <img src="/mm-logo.webp" alt="Micro-Measurements" className="mm-logo" />
           <div className="brand-divider" />
-          {selectedCalcKey ? (
-            <button
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 8 }}
-              onClick={() => setSelectedCalcKey(null)}
-              aria-label="Back to gallery"
-            >
-              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '1.1rem' }}>←</span>
-              <span className="brand-app-name">{calcTitle}</span>
-            </button>
-          ) : (
-            <div>
-              <div className="brand-app-name">Transcalc</div>
-              <div className="brand-app-sub">Transducer Design Environment</div>
-            </div>
-          )}
+          <div>
+            <div className="brand-app-name">Transcalc</div>
+            <div className="brand-app-sub">Transducer Design Environment</div>
+          </div>
         </div>
 
         <div className="topbar-right">
@@ -125,23 +113,27 @@ export default function App() {
             <span className="status-pill" title="Rust/WASM solver active">WASM</span>
           )}
           <button className="export-btn" onClick={() => window.print()} aria-label="Print engineering report">Print Report</button>
+          <a className="export-btn" href="/user-guide.html" target="_blank" rel="noopener noreferrer">User Guide</a>
           <button className="export-btn" onClick={() => setHelpOpen(true)}>Help</button>
         </div>
       </header>
 
-      <main className="layout layout-single p-0" style={{ height: 'calc(100vh - 67px)', overflowY: 'auto', padding: '20px 24px' }}>
-        <ErrorBoundary label="Main">
-          {selectedCalcKey ? (
-            <WorkspaceRouter
-              calcKey={selectedCalcKey}
-              unitSystem={unitSystem}
-              onUnitChange={setUnitSystem}
-            />
-          ) : (
-            <TransducerGallery onSelect={setSelectedCalcKey} />
-          )}
-        </ErrorBoundary>
-      </main>
+      <div className="app-body">
+        <CalcSidebar selectedKey={selectedCalcKey} onSelect={setSelectedCalcKey} />
+        <main className="main-content">
+          <ErrorBoundary label="Main">
+            {selectedCalcKey ? (
+              <WorkspaceRouter
+                calcKey={selectedCalcKey}
+                unitSystem={unitSystem}
+                onUnitChange={setUnitSystem}
+              />
+            ) : (
+              <TransducerGallery onSelect={setSelectedCalcKey} />
+            )}
+          </ErrorBoundary>
+        </main>
+      </div>
 
       {helpOpen && (
         <div className="help-overlay" onClick={() => setHelpOpen(false)}>

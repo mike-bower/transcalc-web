@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSqTorque } from '../../domain/sqtorque'
 import SquareTorqueModelPreview from '../SquareTorqueModelPreview'
+import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -11,6 +12,26 @@ const GPA_PER_MPSI = 6.8947572932
 const round = (v: number, d = 4): number => Math.round(v * Math.pow(10, d)) / Math.pow(10, d)
 const show = (v: number, d: number): string => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
+function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', padding: '6px 2px 2px',
+        cursor: 'pointer', width: '100%', textAlign: 'left',
+        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontFamily: 'inherit',
+      }}
+      aria-expanded={open}
+    >
+      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+      {label}
+    </button>
+  )
+}
+
 type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void }
 
 export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
@@ -20,6 +41,10 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
   const [poisson, setPoisson] = useState(0.3)
   const [gageLength, setGageLength] = useState(5)   // mm or in
   const [gageFactor, setGageFactor] = useState(2.1)
+  const [showDiagrams, setShowDiagrams] = useState(true)
+  const [show3D, setShow3D] = useState(true)
+  const [showInputs, setShowInputs] = useState(true)
+  const [showResults, setShowResults] = useState(true)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -71,28 +96,51 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
       </div>
-      <SquareTorqueModelPreview
-        params={{ torque, width, gageLength, modulus: modulusGPa }}
-        us={unitSystem === 'US'}
-      />
-      <div className="bino-grid">
-        <label>Applied torque ({torqueUnit})<input type="number" value={Number.isFinite(torque) ? torque : ''} onChange={e => setTorque(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Shaft width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-      </div>
-      {result.error && <p className="workspace-note">{result.error}</p>}
-      <table className="bino-table">
-        <tbody>
-          <tr><th colSpan={3}>Calculated Values</th></tr>
-          <tr><td>Nominal Gage Strain:</td><td>{show(result.data?.avgStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Min / Max Strain:</td><td>{show(result.data?.minStrain ?? NaN, 1)} / {show(result.data?.maxStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Strain Variation:</td><td>{show(result.data?.gradient ?? NaN, 2)}</td><td>%</td></tr>
-          <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpan ?? NaN, 4)}</td><td>mV/V</td></tr>
-        </tbody>
-      </table>
+
+      <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />
+      {showDiagrams && (
+        <div className="calc-diagram-2d">
+          <WheatstoneBridgeDiagram config="torque" />
+        </div>
+      )}
+
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          <SquareTorqueModelPreview
+            params={{ torque, width, gageLength, modulus: modulusGPa }}
+            us={unitSystem === 'US'}
+          />
+        </div>
+      )}
+
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid">
+            <label>Applied torque ({torqueUnit})<input type="number" value={Number.isFinite(torque) ? torque : ''} onChange={e => setTorque(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Shaft width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+          </div>
+          {result.error && <p className="workspace-note">{result.error}</p>}
+        </>
+      )}
+
+      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
+      {showResults && (
+        <table className="bino-table">
+          <tbody>
+            <tr><th colSpan={3}>Calculated Values</th></tr>
+            <tr><td>Nominal Gage Strain:</td><td>{show(result.data?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Min / Max Strain:</td><td>{show(result.data?.minStrain ?? NaN, 0)} / {show(result.data?.maxStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Strain Variation:</td><td>{show(result.data?.gradient ?? NaN, 2)}</td><td>%</td></tr>
+            <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpan ?? NaN, 4)}</td><td>mV/V</td></tr>
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

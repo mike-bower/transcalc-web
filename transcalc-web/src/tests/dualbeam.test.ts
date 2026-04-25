@@ -1,273 +1,139 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDualbeamStrain, DualbeamInput } from '../domain/dualbeam';
+import { calculateDualbeamStrain, type DualbeamInput } from '../domain/dualbeam';
+
+// All inputs follow the contract set by DualBeamCalc.tsx:
+//   appliedLoad in N, all lengths in mm, modulus in Pa, gageFactor unitless.
+// normalizeToSI() divides lengths by 1000 → meters; force and modulus pass through unchanged.
+
+const REF: DualbeamInput = {
+  appliedLoad: 1000,    // N
+  beamWidth: 20,        // mm
+  thickness: 3,         // mm
+  distanceBetweenGages: 30,  // mm (beam span, block-face to block-face)
+  distanceLoadToCL: 0,
+  modulus: 200e9,       // Pa (200 GPa — steel)
+  gageLength: 5,        // mm
+  gageFactor: 2.0,
+};
+
+// Hand-computed reference:
+//   firstTerm = F / (E·W) = 1000 / (200e9 · 0.020) = 2.5e-7
+//   thirdTermA = 3·(−L_d/2 + L_g/2) / T² = 3·(−0.0125) / 9e-6 = −4166.67
+//   strainA = firstTerm · (−thirdTermA) · 1e6 = 2.5e-7 · 4166.67 · 1e6 = 1041.67 µε
+const REF_STRAIN = 1041.667;   // µε
+const REF_SENS   = 2.08333;    // mV/V  (avgStrain · GF · 1e-3)
 
 describe('Dual Bending Beam Calculator', () => {
-  /**
-   * Test case 1: Nominal US geometry
-   */
-  it('should calculate strain for nominal US geometry', () => {
-    const input: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
-      distanceLoadToCL: 0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
 
-    const result = calculateDualbeamStrain(input);
-
-    // Verify that strain values are calculated
-    expect(result.strainA).toBeDefined();
-    expect(result.strainB).toBeDefined();
-    expect(result.strainC).toBeDefined();
-    expect(result.strainD).toBeDefined();
-    expect(result.avgStrain).toBeGreaterThan(0);
-
-    // Gradient should be positive percentage
-    expect(result.gradient).toBeGreaterThanOrEqual(0);
-    expect(result.gradient).toBeLessThanOrEqual(100);
-
-    // Sensitivity should be reasonable (mV/V)
-    expect(result.fullSpanSensitivity).toBeGreaterThan(0);
+  it('computes reference strain values to within 0.1%', () => {
+    const r = calculateDualbeamStrain(REF);
+    expect(r.strainA).toBeCloseTo(REF_STRAIN, 1);
+    expect(r.strainB).toBeCloseTo(-REF_STRAIN, 1);
+    expect(r.strainC).toBeCloseTo(-REF_STRAIN, 1);
+    expect(r.strainD).toBeCloseTo(REF_STRAIN, 1);
+    expect(r.avgStrain).toBeCloseTo(REF_STRAIN, 1);
+    expect(r.gradient).toBeCloseTo(0, 6);
+    expect(r.fullSpanSensitivity).toBeCloseTo(REF_SENS, 3);
   });
 
-  /**
-   * Test case 2: Metric (SI) units
-   */
-  it('should calculate strain for nominal SI geometry', () => {
-    const input: DualbeamInput = {
-      appliedLoad: 22241, // N
-      beamWidth: 25.4, // mm
-      thickness: 6.35, // mm
-      distanceBetweenGages: 50.8, // mm
-      distanceLoadToCL: 0, // mm
-      modulus: 206.8e9, // Pa
-      gageLength: 12.7, // mm
-      gageFactor: 2.0,
-    };
-
-    const result = calculateDualbeamStrain(input);
-
-    expect(result.strainA).toBeDefined();
-    expect(result.strainB).toBeDefined();
-    expect(result.strainC).toBeDefined();
-    expect(result.strainD).toBeDefined();
-    expect(result.avgStrain).toBeGreaterThan(0);
-    expect(result.gradient).toBeGreaterThanOrEqual(0);
-    expect(result.fullSpanSensitivity).toBeGreaterThan(0);
+  it('strain scales linearly with applied load', () => {
+    const r1 = calculateDualbeamStrain(REF);
+    const r2 = calculateDualbeamStrain({ ...REF, appliedLoad: 2000 });
+    expect(r2.strainA / r1.strainA).toBeCloseTo(2.0, 6);
+    expect(r2.avgStrain / r1.avgStrain).toBeCloseTo(2.0, 6);
+    expect(r2.fullSpanSensitivity / r1.fullSpanSensitivity).toBeCloseTo(2.0, 6);
   });
 
-  /**
-   * Test case 3: High load scenario
-   */
-  it('should produce higher strain under increased load', () => {
-    const baseInput: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
+  it('strain scales as 1/T² with beam thickness', () => {
+    // Halving T should quadruple strain (T appears squared in denominator)
+    const r1 = calculateDualbeamStrain(REF);
+    const r2 = calculateDualbeamStrain({ ...REF, thickness: 1.5 });
+    expect(r2.strainA / r1.strainA).toBeCloseTo(4.0, 5);
+    expect(r2.avgStrain).toBeCloseTo(REF_STRAIN * 4, 1);
+  });
+
+  it('strain scales as 1/W with beam width', () => {
+    const r1 = calculateDualbeamStrain(REF);
+    const r2 = calculateDualbeamStrain({ ...REF, beamWidth: 40 });
+    expect(r2.strainA / r1.strainA).toBeCloseTo(0.5, 6);
+  });
+
+  it('strain scales as 1/E with modulus', () => {
+    const r1 = calculateDualbeamStrain(REF);
+    const r2 = calculateDualbeamStrain({ ...REF, modulus: 400e9 });
+    expect(r2.strainA / r1.strainA).toBeCloseTo(0.5, 6);
+  });
+
+  it('sensitivity scales linearly with gage factor', () => {
+    const r1 = calculateDualbeamStrain(REF);
+    const r2 = calculateDualbeamStrain({ ...REF, gageFactor: 3.0 });
+    expect(r2.fullSpanSensitivity / r1.fullSpanSensitivity).toBeCloseTo(3.0 / 2.0, 6);
+    // Strain values should not change with GF
+    expect(r2.strainA).toBeCloseTo(r1.strainA, 6);
+  });
+
+  it('longer gage length reduces strain (gage center moves toward beam midpoint)', () => {
+    const r1 = calculateDualbeamStrain(REF);                          // L_g = 5 mm
+    const r2 = calculateDualbeamStrain({ ...REF, gageLength: 10 });   // L_g = 10 mm
+    expect(r2.avgStrain).toBeLessThan(r1.avgStrain);
+  });
+
+  it('sign pattern: A and D tension (+), B and C compression (−)', () => {
+    const r = calculateDualbeamStrain(REF);
+    expect(r.strainA).toBeGreaterThan(0);
+    expect(r.strainD).toBeGreaterThan(0);
+    expect(r.strainB).toBeLessThan(0);
+    expect(r.strainC).toBeLessThan(0);
+  });
+
+  it('opposite-arm symmetry: strainA = −strainC and strainB = −strainD', () => {
+    const r = calculateDualbeamStrain(REF);
+    expect(r.strainA + r.strainC).toBeCloseTo(0, 6);
+    expect(r.strainB + r.strainD).toBeCloseTo(0, 6);
+  });
+
+  it('gradient is bounded between 0 and 100', () => {
+    const r = calculateDualbeamStrain(REF);
+    expect(r.gradient).toBeGreaterThanOrEqual(0);
+    expect(r.gradient).toBeLessThanOrEqual(100);
+    expect(Number.isFinite(r.gradient)).toBe(true);
+  });
+
+  it('realistic transducer case — 500 N on 15 mm × 2 mm beam', () => {
+    const r = calculateDualbeamStrain({
+      appliedLoad: 500,
+      beamWidth: 15,
+      thickness: 2,
+      distanceBetweenGages: 25,
       distanceLoadToCL: 0,
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const highLoadInput: DualbeamInput = {
-      ...baseInput,
-      appliedLoad: 10000, // doubled load
-    };
-
-    const baseResult = calculateDualbeamStrain(baseInput);
-    const highLoadResult = calculateDualbeamStrain(highLoadInput);
-
-    // Doubling load should approximately double strain
-    expect(Math.abs(highLoadResult.strainA)).toBeGreaterThan(Math.abs(baseResult.strainA));
-    expect(highLoadResult.avgStrain).toBeGreaterThan(baseResult.avgStrain);
-    expect(highLoadResult.fullSpanSensitivity).toBeGreaterThan(baseResult.fullSpanSensitivity);
-  });
-
-  /**
-   * Test case 4: Thin beam geometry
-   */
-  it('should handle thinner beam with higher strain', () => {
-    const baseInput: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
-      distanceLoadToCL: 0,
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const thinInput: DualbeamInput = {
-      ...baseInput,
-      thickness: 0.15, // thinner (1/6")
-    };
-
-    const baseResult = calculateDualbeamStrain(baseInput);
-    const thinResult = calculateDualbeamStrain(thinInput);
-
-    // Thinner beam should have higher strain (more sensitive)
-    expect(thinResult.avgStrain).toBeGreaterThan(baseResult.avgStrain);
-  });
-
-  /**
-   * Test case 5: Higher gage factor
-   * Sensitivity should scale with gage factor
-   */
-  it('should scale sensitivity with gage factor', () => {
-    const baseInput: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
-      distanceLoadToCL: 0,
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const highGFInput: DualbeamInput = {
-      ...baseInput,
-      gageFactor: 3.0,
-    };
-
-    const baseResult = calculateDualbeamStrain(baseInput);
-    const highGFResult = calculateDualbeamStrain(highGFInput);
-
-    // GF is linearly proportional to sensitivity
-    expect(highGFResult.fullSpanSensitivity).toBeGreaterThan(baseResult.fullSpanSensitivity);
-    expect(highGFResult.fullSpanSensitivity / baseResult.fullSpanSensitivity).toBeCloseTo(
-      3.0 / 2.0,
-      1
-    );
-  });
-
-  /**
-   * Test case 6: Four gage positions symmetry
-   */
-  it('should produce symmetric behavior across four gage positions', () => {
-    const input: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
-      distanceLoadToCL: 0,
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const result = calculateDualbeamStrain(input);
-
-    // Due to dual beam symmetry with equal spacing, strains can be equal
-    // Each gage is calculated directly from geometry
-    const strainValues = [
-      Math.abs(result.strainA),
-      Math.abs(result.strainB),
-      Math.abs(result.strainC),
-      Math.abs(result.strainD),
-    ];
-
-    // All strains should be non-empty and finite
-    strainValues.forEach((s) => {
-      expect(Number.isFinite(s)).toBe(true);
+      modulus: 200e9,
+      gageLength: 4,
+      gageFactor: 2.1,
     });
-
-    // Average should be within range of individual strains
-    expect(result.avgStrain).toBeGreaterThanOrEqual(Math.min(...strainValues));
-    expect(result.avgStrain).toBeLessThanOrEqual(Math.max(...strainValues));
+    // firstTerm = 500 / (200e9 · 0.015) = 1.6667e-7
+    // thirdTermA = 3·(−0.025/2 + 0.004/2) / 0.002² = 3·(−0.0105) / 4e-6 = −7875
+    // strainA = 1.6667e-7 · 7875 · 1e6 = 1312.5 µε
+    expect(r.strainA).toBeCloseTo(1312.5, 1);
+    expect(r.strainB).toBeCloseTo(-1312.5, 1);
+    expect(r.avgStrain).toBeCloseTo(1312.5, 1);
+    expect(r.fullSpanSensitivity).toBeCloseTo(1312.5 * 2.1 * 1e-3, 3);
   });
 
-  /**
-   * Test case 7: Symmetry check - opposite gages
-   */
-  it('should show symmetry in opposite gage positions', () => {
-    const input: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
-      distanceLoadToCL: 0,
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const result = calculateDualbeamStrain(input);
-
-    // A and C should be negatives of each other
-    expect(Math.abs(result.strainA + result.strainC)).toBeLessThan(
-      Math.max(Math.abs(result.strainA), Math.abs(result.strainC)) * 0.01 + 1e-6
-    );
-
-    // B and D should be negatives of each other
-    expect(Math.abs(result.strainB + result.strainD)).toBeLessThan(
-      Math.max(Math.abs(result.strainB), Math.abs(result.strainD)) * 0.01 + 1e-6
-    );
+  it('rejects negative beam thickness', () => {
+    expect(() => calculateDualbeamStrain({ ...REF, thickness: -1 })).toThrow();
   });
 
-  /**
-   * Test case 8: Validation errors
-   */
-  it('should reject invalid geometry', () => {
-    const invalidInput: DualbeamInput = {
-      appliedLoad: 5000,
-      beamWidth: 1.0,
-      thickness: -0.1, // negative thickness
-      distanceBetweenGages: 2.0,
-      distanceLoadToCL: 0,
-      modulus: 30000,
-      gageLength: 0.5,
-      gageFactor: 2.0,
-    };
-
-    expect(() => calculateDualbeamStrain(invalidInput)).toThrow();
+  it('rejects zero gage length', () => {
+    expect(() => calculateDualbeamStrain({ ...REF, gageLength: 0 })).toThrow();
   });
 
-  /**
-   * Test case 9: Unit auto-detection
-   */
-  it('should auto-detect SI units', () => {
-    const siInput: DualbeamInput = {
-      appliedLoad: 22241, // N (> 4000)
-      beamWidth: 25, // mm (> 10)
-      thickness: 6, // mm
-      distanceBetweenGages: 50, // mm
-      distanceLoadToCL: 0,
-      modulus: 200e9, // Pa (> 10^7)
-      gageLength: 12, // mm
-      gageFactor: 2.0,
-    };
-
-    expect(() => calculateDualbeamStrain(siInput)).not.toThrow();
+  it('rejects zero beam width', () => {
+    expect(() => calculateDualbeamStrain({ ...REF, beamWidth: 0 })).toThrow();
   });
 
-  /**
-   * Test case 10: Gradient consistency
-   */
-  it('should calculate consistent gradient', () => {
-    const input: DualbeamInput = {
-      appliedLoad: 5000, // lbf
-      beamWidth: 1.0, // inches
-      thickness: 0.25, // inches
-      distanceBetweenGages: 2.0, // inches
-      distanceLoadToCL: 0,
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const result = calculateDualbeamStrain(input);
-
-    // Gradient should be well-defined
-    expect(result.gradient).toBeGreaterThanOrEqual(0);
-    expect(result.gradient).toBeLessThanOrEqual(100);
-    expect(Number.isFinite(result.gradient)).toBe(true);
+  it('avgStrain equals arithmetic mean of |strainA|…|strainD|', () => {
+    const r = calculateDualbeamStrain(REF);
+    const expected = (Math.abs(r.strainA) + Math.abs(r.strainB) + Math.abs(r.strainC) + Math.abs(r.strainD)) / 4;
+    expect(r.avgStrain).toBeCloseTo(expected, 8);
   });
 });

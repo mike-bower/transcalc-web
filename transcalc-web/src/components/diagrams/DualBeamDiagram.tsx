@@ -10,60 +10,55 @@ type Props = {
   unitSystem: 'SI' | 'US'
 }
 
-function PinSupport({ x, y }: { x: number; y: number }) {
-  const hw = 12, h = 13
-  return (
-    <g>
-      <polygon points={`${x},${y} ${x - hw},${y + h} ${x + hw},${y + h}`}
-        fill="#445566" stroke="#334455" strokeWidth={1} />
-      <line x1={x - hw - 4} y1={y + h + 3} x2={x + hw + 4} y2={y + h + 3}
-        stroke="#334455" strokeWidth={1.5} />
-      {[-10, -3, 4, 11].map(dx => (
-        <line key={dx} x1={x + dx} y1={y + h + 3} x2={x + dx - 6} y2={y + h + 9}
-          stroke="#556677" strokeWidth={0.8} />
-      ))}
-    </g>
-  )
-}
-
-function RollerSupport({ x, y }: { x: number; y: number }) {
-  const hw = 12, h = 13
-  return (
-    <g>
-      <polygon points={`${x},${y} ${x - hw},${y + h} ${x + hw},${y + h}`}
-        fill="#445566" stroke="#334455" strokeWidth={1} />
-      {[-8, 0, 8].map(dx => (
-        <circle key={dx} cx={x + dx} cy={y + h + 5} r={4}
-          fill="none" stroke="#334455" strokeWidth={1} />
-      ))}
-      <line x1={x - hw - 4} y1={y + h + 12} x2={x + hw + 4} y2={y + h + 12}
-        stroke="#334455" strokeWidth={1.5} />
-    </g>
-  )
-}
-
 export default function DualBeamDiagram({ load, width, thickness, distBetweenGages, gageLength, unitSystem }: Props) {
   const lu = unitSystem === 'SI' ? 'mm' : 'in'
   const fu = unitSystem === 'SI' ? 'N' : 'lbf'
 
-  const W = 500, H = 200
-  const supportX0 = 48
-  const supportX1 = 452
-  const spanPx = supportX1 - supportX0
-  const yMid = 88
+  const W = 520, H = 280
 
+  // End block geometry
+  const blockW = 38
+  const leftBlockX = 40
+  const rightBlockX = 418
+
+  // Beam extent between block faces
+  const beamLeft = leftBlockX + blockW
+  const beamRight = rightBlockX
+  const spanPx = beamRight - beamLeft  // 340 px
+
+  // Beam thickness in pixels
   const tRatio = (Number.isFinite(thickness) && Number.isFinite(distBetweenGages) && distBetweenGages > 0)
-    ? thickness / distBetweenGages : 0.02
-  const tPx = clamp(tRatio * spanPx * 1.6, 11, 50)
-  const beamTop = yMid - tPx
-  const beamBot = yMid
+    ? thickness / distBetweenGages : 0.05
+  const tPx = clamp(tRatio * spanPx * 0.7, 6, 32)
 
+  // Vertical positions: two beams separated by beamSep px (center to center)
+  const beamSep = Math.max(tPx * 3.2, 60)
+  const midY = 130
+  const upperCY = midY - beamSep / 2
+  const lowerCY = midY + beamSep / 2
+
+  const upperTop = upperCY - tPx / 2
+  const upperBot = upperCY + tPx / 2
+  const lowerTop = lowerCY - tPx / 2
+  const lowerBot = lowerCY + tPx / 2
+
+  // End blocks span both beams with padding
+  const blockPad = 10
+  const blockTop = upperTop - blockPad
+  const blockBot = lowerBot + blockPad
+  const blockH = blockBot - blockTop
+
+  // Gage size and positions (near each block face)
   const gRatio = (Number.isFinite(gageLength) && Number.isFinite(distBetweenGages) && distBetweenGages > 0)
-    ? gageLength / distBetweenGages : 0.05
-  const gagePx = clamp(gRatio * spanPx, 4, spanPx * 0.25)
+    ? gageLength / distBetweenGages : 0.08
+  const gPx = clamp(gRatio * spanPx * 0.75, 5, 56)
+  const gInset = spanPx * 0.12
+  const leftGageCX = beamLeft + gInset
+  const rightGageCX = beamRight - gInset
 
   const dc = '#44556a'
-  const gc = '#c03030'
+  const tCol = '#c03030'  // tension — red
+  const cCol = '#2070c0'  // compression — blue
 
   const HDim = ({ x1, x2, y, label }: { x1: number; x2: number; y: number; label: string }) => (
     <g>
@@ -83,64 +78,90 @@ export default function DualBeamDiagram({ load, width, thickness, distBetweenGag
     </g>
   )
 
-  const midX = (supportX0 + supportX1) / 2
+  const loadX = rightBlockX + blockW / 2
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }} aria-hidden="true">
+      <defs>
+        <pattern id="dbHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#8899aa" strokeWidth="1.5" />
+        </pattern>
+      </defs>
 
-      {/* Beam body */}
-      <rect x={supportX0} y={beamTop} width={spanPx} height={tPx}
+      {/* ── Left fixed block ── */}
+      <rect x={leftBlockX} y={blockTop} width={blockW} height={blockH}
+        fill="url(#dbHatch)" stroke="#3a4a6b" strokeWidth={1.5} rx={1} />
+      <text x={leftBlockX + blockW / 2} y={blockTop - 7}
+        textAnchor="middle" fontSize={9} fill={dc} fontWeight="600">Fixed</text>
+
+      {/* ── Right load block ── */}
+      <rect x={rightBlockX} y={blockTop} width={blockW} height={blockH}
         fill="#dce8f5" stroke="#3a4a6b" strokeWidth={1.5} rx={1} />
 
-      {/* Gage A — left end, top surface */}
-      <rect x={supportX0} y={beamTop - 4} width={gagePx} height={4} rx={1} fill={gc} opacity={0.85} />
-      <text x={supportX0 + gagePx / 2} y={beamTop - 7}
-        textAnchor="middle" fontSize={9} fill={gc} fontWeight="700">A</text>
+      {/* ── Upper beam ── */}
+      <rect x={beamLeft} y={upperTop} width={spanPx} height={tPx}
+        fill="#dce8f5" stroke="#3a4a6b" strokeWidth={1.5} rx={1} />
 
-      {/* Gage B — left end, bottom surface */}
-      <rect x={supportX0} y={beamBot} width={gagePx} height={4} rx={1} fill="#2070c0" opacity={0.85} />
-      <text x={supportX0 + gagePx / 2} y={beamBot + 13}
-        textAnchor="middle" fontSize={9} fill="#2070c0" fontWeight="700">B</text>
+      {/* ── Lower beam ── */}
+      <rect x={beamLeft} y={lowerTop} width={spanPx} height={tPx}
+        fill="#dce8f5" stroke="#3a4a6b" strokeWidth={1.5} rx={1} />
 
-      {/* Gage C — right end, top surface */}
-      <rect x={supportX1 - gagePx} y={beamTop - 4} width={gagePx} height={4} rx={1} fill={gc} opacity={0.85} />
-      <text x={supportX1 - gagePx / 2} y={beamTop - 7}
-        textAnchor="middle" fontSize={9} fill={gc} fontWeight="700">C</text>
+      {/* ── Gage A: top of upper beam, left — TENSION ── */}
+      <rect x={leftGageCX - gPx / 2} y={upperTop - 5} width={gPx} height={5}
+        rx={1} fill={tCol} opacity={0.85} />
+      <text x={leftGageCX} y={upperTop - 8}
+        textAnchor="middle" fontSize={9} fill={tCol} fontWeight="700">A</text>
 
-      {/* Gage D — right end, bottom surface */}
-      <rect x={supportX1 - gagePx} y={beamBot} width={gagePx} height={4} rx={1} fill="#2070c0" opacity={0.85} />
-      <text x={supportX1 - gagePx / 2} y={beamBot + 13}
-        textAnchor="middle" fontSize={9} fill="#2070c0" fontWeight="700">D</text>
+      {/* ── Gage B: bottom of lower beam, left — COMPRESSION ── */}
+      <rect x={leftGageCX - gPx / 2} y={lowerBot} width={gPx} height={5}
+        rx={1} fill={cCol} opacity={0.85} />
+      <text x={leftGageCX} y={lowerBot + 15}
+        textAnchor="middle" fontSize={9} fill={cCol} fontWeight="700">B</text>
 
-      {/* w label inside beam */}
-      {tPx >= 18 && (
-        <text x={midX} y={beamTop + tPx * 0.6 + 2}
-          textAnchor="middle" fontSize={9.5} fill="#5a6278" fontStyle="italic">
+      {/* ── Gage C: top of upper beam, right — COMPRESSION ── */}
+      <rect x={rightGageCX - gPx / 2} y={upperTop - 5} width={gPx} height={5}
+        rx={1} fill={cCol} opacity={0.85} />
+      <text x={rightGageCX} y={upperTop - 8}
+        textAnchor="middle" fontSize={9} fill={cCol} fontWeight="700">C</text>
+
+      {/* ── Gage D: bottom of lower beam, right — TENSION ── */}
+      <rect x={rightGageCX - gPx / 2} y={lowerBot} width={gPx} height={5}
+        rx={1} fill={tCol} opacity={0.85} />
+      <text x={rightGageCX} y={lowerBot + 15}
+        textAnchor="middle" fontSize={9} fill={tCol} fontWeight="700">D</text>
+
+      {/* ── Load arrow at top of right block, pointing down ── */}
+      <line x1={loadX} y1={blockTop - 38} x2={loadX} y2={blockTop - 2}
+        stroke="#dc2626" strokeWidth={2.5} />
+      <polygon
+        points={`${loadX},${blockTop} ${loadX - 6},${blockTop - 14} ${loadX + 6},${blockTop - 14}`}
+        fill="#dc2626" />
+      <text x={loadX} y={blockTop - 42}
+        textAnchor="middle" fontSize={11} fill="#dc2626" fontWeight="600">P</text>
+      <text x={loadX + 30} y={blockTop - 26}
+        fontSize={9} fill="#dc2626">{fv(load, 0)} {fu}</text>
+
+      {/* ── w label inside upper beam ── */}
+      {tPx >= 13 && (
+        <text x={(beamLeft + beamRight) / 2} y={upperCY + 4}
+          textAnchor="middle" fontSize={9} fill="#5a6278" fontStyle="italic">
           w = {fv(width, 1)} {lu}
         </text>
       )}
 
-      {/* Load arrow at centre */}
-      <line x1={midX} y1={beamTop - 36} x2={midX} y2={beamTop - 2} stroke={gc} strokeWidth={2.2} />
-      <polygon points={`${midX},${beamTop} ${midX - 5},${beamTop - 12} ${midX + 5},${beamTop - 12}`} fill={gc} />
-      <text x={midX + 9} y={beamTop - 20} fontSize={11} fill={gc} fontWeight="600">P</text>
-      <text x={midX + 9} y={beamTop - 6} fontSize={9} fill={gc}>{fv(load, 0)} {fu}</text>
-
-      {/* Supports */}
-      <PinSupport x={supportX0} y={beamBot} />
-      <RollerSupport x={supportX1} y={beamBot} />
-
-      {/* D dimension */}
-      <line x1={supportX0} y1={beamBot + 30} x2={supportX0} y2={beamBot + 45} stroke={dc} strokeWidth={0.8} />
-      <line x1={supportX1} y1={beamBot + 30} x2={supportX1} y2={beamBot + 45} stroke={dc} strokeWidth={0.8} />
-      <HDim x1={supportX0} x2={supportX1} y={beamBot + 42}
+      {/* ── D dimension: block face to block face ── */}
+      <line x1={beamLeft} y1={lowerBot + 18} x2={beamLeft} y2={lowerBot + 34} stroke={dc} strokeWidth={0.8} />
+      <line x1={beamRight} y1={lowerBot + 18} x2={beamRight} y2={lowerBot + 34} stroke={dc} strokeWidth={0.8} />
+      <HDim x1={beamLeft} x2={beamRight} y={lowerBot + 32}
         label={`D = ${fv(distBetweenGages, 1)} ${lu}`} />
 
-      {/* t dimension */}
-      <line x1={supportX1 + 4} y1={beamTop} x2={supportX1 + 36} y2={beamTop} stroke={dc} strokeWidth={0.8} />
-      <line x1={supportX1 + 4} y1={beamBot} x2={supportX1 + 36} y2={beamBot} stroke={dc} strokeWidth={0.8} />
-      <VDim x={supportX1 + 34} y1={beamTop} y2={beamBot} label={`t=${fv(thickness, 1)} ${lu}`} />
-
+      {/* ── t dimension: beam thickness ── */}
+      <line x1={rightBlockX + blockW + 4} y1={upperTop} x2={rightBlockX + blockW + 32} y2={upperTop}
+        stroke={dc} strokeWidth={0.8} />
+      <line x1={rightBlockX + blockW + 4} y1={upperBot} x2={rightBlockX + blockW + 32} y2={upperBot}
+        stroke={dc} strokeWidth={0.8} />
+      <VDim x={rightBlockX + blockW + 30} y1={upperTop} y2={upperBot}
+        label={`t=${fv(thickness, 1)} ${lu}`} />
     </svg>
   )
 }

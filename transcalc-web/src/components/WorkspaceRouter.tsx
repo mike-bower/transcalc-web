@@ -16,6 +16,7 @@ import PressureCalc from './calculators/PressureCalc'
 import SixAxisFTCalc from './calculators/SixAxisFTCalc'
 import JointTorqueCalc from './calculators/JointTorqueCalc'
 import HexapodFTCalc from './calculators/HexapodFTCalc'
+import ThreeBeamFTCalc from './calculators/ThreeBeamFTCalc'
 import ZeroVsTempCalc from './compensation/ZeroVsTempCalc'
 import ZeroBalanceCalc from './compensation/ZeroBalanceCalc'
 import SpanTemp2PtCalc from './compensation/SpanTemp2PtCalc'
@@ -76,6 +77,7 @@ export default function WorkspaceRouter({ calcKey, unitSystem, onUnitChange, onH
     case 'sixaxisft': return <SixAxisFTCalc {...sharedProps} />
     case 'jts':       return <JointTorqueCalc {...sharedProps} />
     case 'hexapod':   return <HexapodFTCalc {...sharedProps} />
+    case 'triaxisft': return <ThreeBeamFTCalc {...sharedProps} />
 
     // Trim Network Visualizer
     case 'trimvis': return <TrimVisualizer {...sharedProps} />

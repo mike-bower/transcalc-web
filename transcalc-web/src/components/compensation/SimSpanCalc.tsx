@@ -19,12 +19,18 @@ export default function SimSpanCalc({ unitSystem, onUnitChange }: Props) {
 
   const [desiredSpan, setDesiredSpan] = useState(0.0)
 
-  const result = useMemo(() => calculateSimultaneousSpan({
-    lowSpan, lowRBridge, lowRMod,
-    ambientSpan, ambientRBridge, ambientRMod,
-    highSpan, highRBridge, highRMod,
-    desiredSpan,
-  }), [
+  const result = useMemo(() => {
+    try {
+      return calculateSimultaneousSpan({
+        lowSpan, lowRBridge, lowRMod,
+        ambientSpan, ambientRBridge, ambientRMod,
+        highSpan, highRBridge, highRMod,
+        desiredSpan,
+      })
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Calculation error', rShunt: 0, rMod: 0, span: 0 }
+    }
+  }, [
     lowSpan, lowRBridge, lowRMod,
     ambientSpan, ambientRBridge, ambientRMod,
     highSpan, highRBridge, highRMod,

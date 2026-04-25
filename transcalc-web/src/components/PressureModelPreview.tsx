@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { createAxesGizmo } from './sceneHelpers'
 
 /**
  * 3D parametric model viewer for the Pressure Diaphragm load cell.
@@ -54,6 +55,7 @@ function addDimensionLine(
 function Pressure3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [showForces, setShowForces] = useState(true)
 
   const model = useMemo(() => {
     const g = new THREE.Group()
@@ -86,13 +88,15 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     bore.rotation.x = Math.PI / 2; bore.position.set(0, -T / 2 - flangeT, 0); g.add(bore)
 
     // Hatch marks on flange underside
-    const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
-    for (let i = -2; i <= 2; i++) {
-      const hx = i * flangeR * 0.35
-      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(hx - 0.04, -T / 2 - flangeT - 0.003, -flangeR * 0.6),
-        new THREE.Vector3(hx + 0.04, -T / 2 - flangeT - 0.003, flangeR * 0.6),
-      ]), hatchMat))
+    if (showForces) {
+      const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
+      for (let i = -2; i <= 2; i++) {
+        const hx = i * flangeR * 0.35
+        g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(hx - 0.04, -T / 2 - flangeT - 0.003, -flangeR * 0.6),
+          new THREE.Vector3(hx + 0.04, -T / 2 - flangeT - 0.003, flangeR * 0.6),
+        ]), hatchMat))
+      }
     }
 
     // ── Diaphragm disc ────────────────────────────────────────────────────
@@ -102,26 +106,28 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
 
     // ── Pressure arrows (pointing downward onto top face) ─────────────────
     const arrowLen = clamp(0.08 + Math.log10(Math.max(pressureKPa, 1)) * 0.04, 0.08, 0.28)
-    const arrowColor = 0x2244aa
-    const nArrows = 7
-    for (let i = 0; i < nArrows; i++) {
-      const angle = (i / nArrows) * Math.PI * 2
-      const ar = R * 0.55
-      const ax = Math.cos(angle) * ar, az = Math.sin(angle) * ar
+    const arrowColor = 0x3b82f6
+    if (showForces) {
+      const nArrows = 7
+      for (let i = 0; i < nArrows; i++) {
+        const angle = (i / nArrows) * Math.PI * 2
+        const ar = R * 0.55
+        const ax = Math.cos(angle) * ar, az = Math.sin(angle) * ar
+        g.add(new THREE.ArrowHelper(
+          new THREE.Vector3(0, -1, 0),
+          new THREE.Vector3(ax, T / 2 + arrowLen, az),
+          arrowLen, arrowColor,
+          Math.min(0.06, arrowLen * 0.35), Math.min(0.04, arrowLen * 0.25),
+        ))
+      }
+      // Centre arrow
       g.add(new THREE.ArrowHelper(
         new THREE.Vector3(0, -1, 0),
-        new THREE.Vector3(ax, T / 2 + arrowLen, az),
+        new THREE.Vector3(0, T / 2 + arrowLen, 0),
         arrowLen, arrowColor,
         Math.min(0.06, arrowLen * 0.35), Math.min(0.04, arrowLen * 0.25),
       ))
     }
-    // Centre arrow
-    g.add(new THREE.ArrowHelper(
-      new THREE.Vector3(0, -1, 0),
-      new THREE.Vector3(0, T / 2 + arrowLen, 0),
-      arrowLen, arrowColor,
-      Math.min(0.06, arrowLen * 0.35), Math.min(0.04, arrowLen * 0.25),
-    ))
 
     // ── Strain gage pads ──────────────────────────────────────────────────
     const padT = 0.006
@@ -165,7 +171,7 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     pLabel.position.set(0, T / 2 + arrowLen + 0.12, 0); dim.add(pLabel)
     dim.visible = showDimensions; g.add(dim)
     return g
-  }, [params, us, showDimensions])
+  }, [params, us, showDimensions, showForces])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -179,12 +185,13 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0); controls.update()
+    const gizmo = createAxesGizmo(renderer, host)
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
     const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(4, 5, 3); scene.add(dl)
     scene.add(new THREE.GridHelper(6, 14, 0xcccccc, 0xeeeeee))
     const root = new THREE.Group(); scene.add(root); root.add(model)
     let raf = 0
-    const animate = () => { raf = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera) }
+    const animate = () => { raf = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); gizmo.render(camera) }
     animate()
     const ro = new ResizeObserver(() => {
       const w = host.clientWidth, h = host.clientHeight
@@ -193,7 +200,7 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     })
     ro.observe(host)
     return () => {
-      cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose()
+      cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); gizmo.dispose()
       if (host.contains(renderer.domElement)) host.removeChild(renderer.domElement)
     }
   }, [model])
@@ -207,8 +214,26 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
         fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px',
         border: '1px solid rgba(71,85,105,0.5)', color: '#f8fafc', pointerEvents: 'auto',
       }}>
-        <input type="checkbox" id="press-dims" checked={showDimensions} onChange={e => setShowDimensions(e.target.checked)} style={{ margin: 0 }} />
-        <label htmlFor="press-dims" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>Dimensions</label>
+        <button
+          onClick={() => setShowDimensions(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showDimensions ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showDimensions ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Dimensions</button>
+        <button
+          onClick={() => setShowForces(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showForces ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showForces ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Forces & BCs</button>
       </div>
     </div>
   )

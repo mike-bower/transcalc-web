@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { createAxesGizmo } from './sceneHelpers'
 
 /**
  * 3D parametric model viewer for the Square Column load cell.
@@ -74,6 +75,7 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [showForces, setShowForces] = useState(true)
 
   const model = useMemo(() => {
     const g = new THREE.Group()
@@ -109,17 +111,19 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
     g.add(basePlate)
 
     // Hatch lines on base plate face (simplified: four thin bars)
-    const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
-    const hatchY = -H / 2 - plateH - 0.003
-    for (let i = -2; i <= 2; i++) {
-      const hx = (i * baseW * 0.18)
-      g.add(new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(hx - 0.04, hatchY, -baseD * 0.55),
-          new THREE.Vector3(hx + 0.04, hatchY, baseD * 0.55),
-        ]),
-        hatchMat
-      ))
+    if (showForces) {
+      const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
+      const hatchY = -H / 2 - plateH - 0.003
+      for (let i = -2; i <= 2; i++) {
+        const hx = (i * baseW * 0.18)
+        g.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(hx - 0.04, hatchY, -baseD * 0.55),
+            new THREE.Vector3(hx + 0.04, hatchY, baseD * 0.55),
+          ]),
+          hatchMat
+        ))
+      }
     }
 
     // ── Gage pads at mid-height ────────────────────────────────────────────────
@@ -173,12 +177,14 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
 
     // ── Load arrows (top ↓, reaction ↑ at base) ───────────────────────────────
     const arrowLen = clamp(0.18 + Math.log10(Math.max(loadN, 1)) * 0.09, 0.20, 0.50)
-    g.add(new THREE.ArrowHelper(
-      new THREE.Vector3(0, -1, 0),
-      new THREE.Vector3(0, H / 2 + arrowLen, 0),
-      arrowLen, 0x1f2f3f,
-      Math.min(0.13, arrowLen * 0.30), Math.min(0.09, arrowLen * 0.22)
-    ))
+    if (showForces) {
+      g.add(new THREE.ArrowHelper(
+        new THREE.Vector3(0, -1, 0),
+        new THREE.Vector3(0, H / 2 + arrowLen, 0),
+        arrowLen, 0xe05530,
+        Math.min(0.13, arrowLen * 0.30), Math.min(0.09, arrowLen * 0.22)
+      ))
+    }
 
     // ── Dimension lines ────────────────────────────────────────────────────────
     const dim = new THREE.Group()
@@ -216,7 +222,7 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
     dim.visible = showDimensions
     g.add(dim)
     return g
-  }, [params, showDimensions, us])
+  }, [params, showDimensions, showForces, us])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -237,6 +243,7 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
     controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0)
     controls.update()
+    const gizmo = createAxesGizmo(renderer, host)
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
     const d = new THREE.DirectionalLight(0xffffff, 1.0)
@@ -254,6 +261,7 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
       raf = requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
+      gizmo.render(camera)
     }
     animate()
 
@@ -272,6 +280,7 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
       ro.disconnect()
       controls.dispose()
       renderer.dispose()
+      gizmo.dispose()
       if (host.contains(renderer.domElement)) host.removeChild(renderer.domElement)
     }
   }, [model])
@@ -285,12 +294,26 @@ function SquareColumn3D({ params, us }: { params: Record<string, number>; us?: b
         fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px',
         border: '1px solid rgba(71,85,105,0.5)', color: '#f8fafc', pointerEvents: 'auto'
       }}>
-        <input
-          type="checkbox" id="sqrcol-dims"
-          checked={showDimensions} onChange={e => setShowDimensions(e.target.checked)}
-          style={{ margin: 0 }}
-        />
-        <label htmlFor="sqrcol-dims" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>Dimensions</label>
+        <button
+          onClick={() => setShowDimensions(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showDimensions ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showDimensions ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Dimensions</button>
+        <button
+          onClick={() => setShowForces(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showForces ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showForces ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Forces & BCs</button>
       </div>
     </div>
   )

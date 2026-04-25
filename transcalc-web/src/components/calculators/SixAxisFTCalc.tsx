@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { designCrossBeamFT, generateCalibrationProcedure, type CrossBeamFTParams } from '../../domain/sixAxisForceTorque'
 import { MATERIALS, DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
 import CrossBeamSketch2D from '../diagrams/CrossBeamSketch2D'
+import CrossBeamModelPreview from '../CrossBeamModelPreview'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -125,6 +126,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
 
   const [showInputs, setShowInputs]   = useState(true)
   const [showSketch, setShowSketch]   = useState(true)
+  const [show3D, setShow3D]           = useState(false)
   const [showMetrics, setShowMetrics] = useState(true)
   const [showChannels, setShowChannels] = useState(true)
   const [showGages, setShowGages]     = useState(true)
@@ -181,7 +183,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
       </div>
 
       {/* 2D Sketch */}
-      <SectionToggle label="2D Geometry Preview" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
+      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
       {showSketch && (
         <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
           {result.isValid ? (
@@ -196,6 +198,21 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
           ) : (
             <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
           )}
+        </div>
+      )}
+
+      {/* 3D Model */}
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          <CrossBeamModelPreview
+            outerRadiusMm={params.outerRadiusMm}
+            innerRadiusMm={params.innerRadiusMm}
+            beamWidthMm={params.beamWidthMm}
+            beamThicknessMm={params.beamThicknessMm}
+            gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
+            us={us}
+          />
         </div>
       )}
 
@@ -274,7 +291,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
               </td>
               <td>1500 µε limit / max strain</td>
             </tr>
-            <tr><td>Max Strain at Rated Load</td><td>{show(result.maxStrainMicrostrain, 1)}</td><td>µε</td></tr>
+            <tr><td>Max Strain at Rated Load</td><td>{show(result.maxStrainMicrostrain, 0)}</td><td>µε</td></tr>
             {result.yieldSafetyFactor !== undefined && (
               <tr>
                 <td>Yield Safety Factor</td>
@@ -381,7 +398,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
                   <td style={{ fontSize: '0.8rem', color: 'var(--ink-soft)' }}>{g.orientation}</td>
                   <td style={{ fontSize: '0.8rem' }}>{g.arms}</td>
                   <td style={{ fontFamily: 'IBM Plex Mono, monospace', textAlign: 'right', color, fontWeight: 600 }}>
-                    {val.toFixed(1)}
+                    {val.toFixed(0)}
                   </td>
                 </tr>
               )

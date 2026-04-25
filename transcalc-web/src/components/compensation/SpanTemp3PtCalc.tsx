@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import { calculateSpanTemperature3Pt } from '../../domain/spanTemperature3Pt'
 
 type UnitSystem = 'SI' | 'US'
@@ -7,14 +7,30 @@ type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void 
 export default function SpanTemp3PtCalc({ unitSystem, onUnitChange }: Props) {
   const [resistorTCR, setResistorTCR] = useState(0.25)
   const [bridgeResistance, setBridgeResistance] = useState(350)
-  const [lowTemp, setLowTemp] = useState(32)
+  const [lowTemp, setLowTemp] = useState(() => unitSystem === 'US' ? 32 : 0)
   const [lowOutput, setLowOutput] = useState(1.0)
-  const [midTemp, setMidTemp] = useState(122)
+  const [midTemp, setMidTemp] = useState(() => unitSystem === 'US' ? 122 : 50)
   const [midOutput, setMidOutput] = useState(5.5)
-  const [highTemp, setHighTemp] = useState(212)
+  const [highTemp, setHighTemp] = useState(() => unitSystem === 'US' ? 212 : 100)
   const [highOutput, setHighOutput] = useState(9.5)
 
   const tempUnit = unitSystem === 'SI' ? '°C' : '°F'
+  const tcrUnit  = unitSystem === 'SI' ? '%/°C' : '%/°F'
+
+  const prevUnit = useRef<UnitSystem>(unitSystem)
+  useEffect(() => {
+    if (prevUnit.current === unitSystem) return
+    prevUnit.current = unitSystem
+    if (unitSystem === 'SI') {
+      setLowTemp(v  => Math.round(((v  - 32) * 5 / 9) * 10) / 10)
+      setMidTemp(v  => Math.round(((v  - 32) * 5 / 9) * 10) / 10)
+      setHighTemp(v => Math.round(((v - 32) * 5 / 9) * 10) / 10)
+    } else {
+      setLowTemp(v  => Math.round((v  * 9 / 5 + 32) * 10) / 10)
+      setMidTemp(v  => Math.round((v  * 9 / 5 + 32) * 10) / 10)
+      setHighTemp(v => Math.round((v * 9 / 5 + 32) * 10) / 10)
+    }
+  }, [unitSystem])
 
   const result = useMemo(() => {
     try {
@@ -44,7 +60,7 @@ export default function SpanTemp3PtCalc({ unitSystem, onUnitChange }: Props) {
       </div>
 
       <div className="bino-grid">
-        <label>Resistor TCR (%/unit)
+        <label>Resistor TCR ({tcrUnit})
           <input type="number" step="0.01" value={resistorTCR} onChange={e => setResistorTCR(+e.target.value)} />
         </label>
         <label>Bridge Resistance (Ω)

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { BridgeConfig } from '../domain/orchestrator'
+import { createAxesGizmo } from './sceneHelpers'
 
 type Props = {
   params: Record<string, number>
@@ -24,7 +25,7 @@ function makeTextSprite(text: string): THREE.Sprite {
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = '#1f3f5c'
+    ctx.fillStyle = '#90c8f0'
     ctx.font = 'bold 32px Barlow, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -45,7 +46,7 @@ function addDimensionLine(
   normal: THREE.Vector3,
   showTicks: boolean = true
 ) {
-  const mat = new THREE.LineBasicMaterial({ color: 0x3e5a73, transparent: true, opacity: 0.8 })
+  const mat = new THREE.LineBasicMaterial({ color: 0x5898c8, transparent: true, opacity: 0.9 })
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([from, to]),
     mat
@@ -110,6 +111,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [showForces, setShowForces] = useState(true)
 
   const model = useMemo(() => {
     const g = new THREE.Group()
@@ -399,15 +401,17 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
         break
     }
 
-    const force = new THREE.ArrowHelper(
-      new THREE.Vector3(0, -1, 0),
-      new THREE.Vector3(L - 0.03, T * 0.95 + loadArrowLength, 0),
-      loadArrowLength,
-      0x1f2f3f,
-      Math.min(0.18, loadArrowLength * 0.36),
-      Math.min(0.11, loadArrowLength * 0.24)
-    )
-    g.add(force)
+    if (showForces) {
+      const force = new THREE.ArrowHelper(
+        new THREE.Vector3(0, -1, 0),
+        new THREE.Vector3(L - 0.03, T * 0.95 + loadArrowLength, 0),
+        loadArrowLength,
+        0xe05530,
+        Math.min(0.18, loadArrowLength * 0.36),
+        Math.min(0.11, loadArrowLength * 0.24)
+      )
+      g.add(force)
+    }
 
     // Dimension lines based on active input values.
     const dimGroup = new THREE.Group()
@@ -482,13 +486,13 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     g.add(dimGroup)
 
     return g
-  }, [params, showDimensions, us])
+  }, [params, showDimensions, showForces, us])
 
   useEffect(() => {
     if (!hostRef.current) return
     const host = hostRef.current
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0xffffff) // Set to white
+    scene.background = new THREE.Color(0x000000)
     const camera = new THREE.PerspectiveCamera(45, host.clientWidth / Math.max(1, host.clientHeight), 0.1, 100)
     camera.position.set(2.5, 1.8, 2.2)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -503,12 +507,13 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     controls.dampingFactor = 0.08
     controls.target.set(0.6, 0, 0)
     controls.update()
+    const gizmo = createAxesGizmo(renderer, host)
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
     const d = new THREE.DirectionalLight(0xffffff, 1.0)
     d.position.set(4, 5, 3)
     scene.add(d)
-    scene.add(new THREE.GridHelper(6, 14, 0xcccccc, 0xeeeeee)) // Lighter grid for white background
+    scene.add(new THREE.GridHelper(6, 14, 0x333333, 0x1a1a1a))
 
     const root = new THREE.Group()
     rootRef.current = root
@@ -520,6 +525,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
       raf = window.requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
+      gizmo.render(camera)
     }
     animate()
 
@@ -538,6 +544,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
       ro.disconnect()
       controls.dispose()
       renderer.dispose()
+      gizmo.dispose()
       if (host.contains(renderer.domElement)) {
         host.removeChild(renderer.domElement)
       }
@@ -563,14 +570,26 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
         color: '#f8fafc',
         pointerEvents: 'auto'
       }}>
-        <input
-          type="checkbox"
-          id="toggle-dims"
-          checked={showDimensions}
-          onChange={(e) => setShowDimensions(e.target.checked)}
-          style={{ margin: 0 }}
-        />
-        <label htmlFor="toggle-dims" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>Dimensions</label>
+        <button
+          onClick={() => setShowDimensions(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showDimensions ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showDimensions ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Dimensions</button>
+        <button
+          onClick={() => setShowForces(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showForces ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showForces ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Forces & BCs</button>
       </div>
     </div>
   )

@@ -98,32 +98,19 @@ function validateDualbeamGeometry(params: DualbeamInput): void {
 }
 
 /**
- * Converts input values to SI units (m, Pa, N) based on magnitude detection
- *
- * @param params - Input parameters (may be in US or SI units)
- * @returns Parameters normalized to SI units
+ * Converts dimensions from mm to m. Expects appliedLoad in N, modulus in Pa,
+ * all length inputs in mm. The caller (DualBeamCalc) performs force/modulus
+ * conversion before calling this function.
  */
 function normalizeToSI(params: DualbeamInput): DualbeamInput {
-  // Detect if modulus is in PSI or Pa
-  const modulusIsSI = params.modulus > 1e7; // > 10 MPa indicates Pa
-  const modulusInPa = modulusIsSI ? params.modulus : params.modulus * 6894.75; // PSI to Pa
-
-  // Detect if load is in lbf or N
-  const loadIsSI = params.appliedLoad > 4000; // > 4 kN indicates N
-  const loadInN = loadIsSI ? params.appliedLoad : params.appliedLoad * 4.448222;
-
-  // Dimensions: if > 10, likely mm; if < 10, likely inches
-  const dimensionsAreMM = params.beamWidth > 10;
-  const dimensionMultiplier = dimensionsAreMM ? 0.001 : 0.0254; // mm to m or in to m
-
   return {
-    appliedLoad: loadInN,
-    beamWidth: params.beamWidth * dimensionMultiplier,
-    thickness: params.thickness * dimensionMultiplier,
-    distanceBetweenGages: params.distanceBetweenGages * dimensionMultiplier,
-    distanceLoadToCL: params.distanceLoadToCL * dimensionMultiplier,
-    modulus: modulusInPa,
-    gageLength: params.gageLength * dimensionMultiplier,
+    appliedLoad: params.appliedLoad,
+    beamWidth: params.beamWidth / 1000,
+    thickness: params.thickness / 1000,
+    distanceBetweenGages: params.distanceBetweenGages / 1000,
+    distanceLoadToCL: params.distanceLoadToCL / 1000,
+    modulus: params.modulus,
+    gageLength: params.gageLength / 1000,
     gageFactor: params.gageFactor,
   };
 }

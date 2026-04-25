@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { designJTS, type JTSParams } from '../../domain/jointTorqueSensor'
 import JTSSketch2D from '../diagrams/JTSSketch2D'
+import JTSModelPreview from '../JTSModelPreview'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -55,6 +56,7 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
   const [showYield,     setShowYield]     = useState(false)
 
   const [showSketch,  setShowSketch]  = useState(true)
+  const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showResults, setShowResults] = useState(true)
 
@@ -105,7 +107,7 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
       </div>
 
       {/* 2D Sketch */}
-      <SectionToggle label="2D Geometry Preview" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
+      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
       {showSketch && (
         <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
           {result.isValid ? (
@@ -120,6 +122,21 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
           ) : (
             <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
           )}
+        </div>
+      )}
+
+      {/* 3D Model */}
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          <JTSModelPreview
+            outerRadiusMm={params.outerRadiusMm}
+            innerRadiusMm={params.innerRadiusMm}
+            spokeWidthMm={params.spokeWidthMm}
+            spokeThicknessMm={params.spokeThicknessMm}
+            spokeCount={params.spokeCount}
+            us={us}
+          />
         </div>
       )}
 
@@ -220,7 +237,7 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
             <tr><th colSpan={3}>Strain & Sensitivity</th></tr>
             <tr>
               <td>Peak Strain at Spoke Root</td>
-              <td>{show(result.peakStrainMicrostrain, 1)}</td>
+              <td>{show(result.peakStrainMicrostrain, 0)}</td>
               <td>µε</td>
             </tr>
             <tr>

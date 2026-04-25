@@ -28,6 +28,26 @@ type Props = {
   onUnitChange: (next: UnitSystem) => void
 }
 
+function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', padding: '6px 2px 2px',
+        cursor: 'pointer', width: '100%', textAlign: 'left',
+        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontFamily: 'inherit',
+      }}
+      aria-expanded={open}
+    >
+      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+      {label}
+    </button>
+  )
+}
+
 export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [load, setLoad] = useState(100)             // N or lbf
   const [width, setWidth] = useState(25)             // mm or in
@@ -41,6 +61,11 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [poissonRatio, setPoissonRatio] = useState(0.3)
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('closed-form')
   const [viewMode, setViewMode] = useState<CstFeaViewMode>('contour')
+  const [show2D, setShow2D] = useState(true)
+  const [show3D, setShow3D] = useState(true)
+  const [showInputs, setShowInputs] = useState(true)
+  const [showResults, setShowResults] = useState(true)
+  const [showFea, setShowFea] = useState(true)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -145,20 +170,29 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       </div>
 
-      <div className="calc-preview-pair">
-        <div className="calc-diagram-2d">
-          <ReverseBeamDiagram
-            load={load}
-            width={width}
-            thickness={thickness}
-            beamLength={beamLength}
-            distBetweenGages={distBetweenGages}
-            gageLength={gageLength}
-            unitSystem={unitSystem}
-            bridgeConfig={bridgeConfig}
-          />
-          <ReverseBeamBridgeDiagram bridgeConfig={bridgeConfig} poissonRatio={poissonRatio} />
+      <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />
+      {show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <ReverseBeamDiagram
+              load={load}
+              width={width}
+              thickness={thickness}
+              beamLength={beamLength}
+              distBetweenGages={distBetweenGages}
+              gageLength={gageLength}
+              unitSystem={unitSystem}
+              bridgeConfig={bridgeConfig}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <ReverseBeamBridgeDiagram bridgeConfig={bridgeConfig} poissonRatio={poissonRatio} />
+          </div>
         </div>
+      )}
+
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
         <div className="calc-model-3d">
           <ReverseBeamModelPreview
             load={load}
@@ -171,75 +205,86 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
             bridgeConfig={bridgeConfig}
           />
         </div>
-      </div>
+      )}
 
-      <div className="bino-grid">
-        <label style={{ gridColumn: '1 / -1' }}>Bridge Configuration
-          <select value={bridgeConfig} onChange={e => setBridgeConfig(e.target.value as BridgeConfig)}
-            style={{ display: 'block', width: '100%', marginTop: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid #c8d8e8', fontSize: 13 }}>
-            {(Object.keys(BRIDGE_CONFIG_LABELS) as BridgeConfig[]).map(k => (
-              <option key={k} value={k}>{BRIDGE_CONFIG_LABELS[k]}</option>
-            ))}
-          </select>
-        </label>
-        <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Beam length, L ({lenUnit})<input type="number" value={Number.isFinite(beamLength) ? beamLength : ''} onChange={e => setBeamLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Distance between gages, D ({lenUnit})<input type="number" value={Number.isFinite(distBetweenGages) ? distBetweenGages : ''} onChange={e => setDistBetweenGages(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        {bridgeConfig === 'fullBridgeTop' && (
-          <label>Poisson's Ratio<input type="number" value={poissonRatio} step={0.01} min={0.1} max={0.5}
-            onChange={e => setPoissonRatio(e.target.value === '' ? 0.3 : Number(e.target.value))} /></label>
-        )}
-      </div>
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid">
+            <label style={{ gridColumn: '1 / -1' }}>Bridge Configuration
+              <select value={bridgeConfig} onChange={e => setBridgeConfig(e.target.value as BridgeConfig)}
+                style={{ display: 'block', width: '100%', marginTop: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid #c8d8e8', fontSize: 13 }}>
+                {(Object.keys(BRIDGE_CONFIG_LABELS) as BridgeConfig[]).map(k => (
+                  <option key={k} value={k}>{BRIDGE_CONFIG_LABELS[k]}</option>
+                ))}
+              </select>
+            </label>
+            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Beam length, L ({lenUnit})<input type="number" value={Number.isFinite(beamLength) ? beamLength : ''} onChange={e => setBeamLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Distance between gages, D ({lenUnit})<input type="number" value={Number.isFinite(distBetweenGages) ? distBetweenGages : ''} onChange={e => setDistBetweenGages(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            {bridgeConfig === 'fullBridgeTop' && (
+              <label>Poisson's Ratio<input type="number" value={poissonRatio} step={0.01} min={0.1} max={0.5}
+                onChange={e => setPoissonRatio(e.target.value === '' ? 0.3 : Number(e.target.value))} /></label>
+            )}
+          </div>
+          {result.error && <p className="workspace-note">{result.error}</p>}
+        </>
+      )}
 
-      {result.error && <p className="workspace-note">{result.error}</p>}
-
-      <table className="bino-table">
-        <tbody>
-          <tr><th colSpan={3}>Calculated Values</th></tr>
-          <tr><td>Nominal Gage Strain:</td><td>{show(result.data?.avgStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Min Strain:</td><td>{show(result.data?.minStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Max Strain:</td><td>{show(result.data?.maxStrain ?? NaN, 1)}</td><td>µε</td></tr>
-          <tr><td>Strain Variation:</td><td>{show(result.data?.gradient ?? NaN, 2)}</td><td>%</td></tr>
-          <tr><td>Span at Applied Force:</td><td>{show(result.data?.fullSpanSensitivity ?? NaN, 4)}</td><td>mV/V</td></tr>
-        </tbody>
-      </table>
+      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
+      {showResults && (
+        <table className="bino-table">
+          <tbody>
+            <tr><th colSpan={3}>Calculated Values</th></tr>
+            <tr><td>Nominal Gage Strain:</td><td>{show(result.data?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Min Strain:</td><td>{show(result.data?.minStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Max Strain:</td><td>{show(result.data?.maxStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Strain Variation:</td><td>{show(result.data?.gradient ?? NaN, 2)}</td><td>%</td></tr>
+            <tr><td>Span at Applied Force:</td><td>{show(result.data?.fullSpanSensitivity ?? NaN, 4)}</td><td>mV/V</td></tr>
+          </tbody>
+        </table>
+      )}
 
       {analysisMode === 'fea' && (
-        <div className="viewer-block">
-          <h3>FEA Analysis</h3>
-          {feaSolution ? (
-            <>
-              <div className="analysis-toggle" style={{ marginBottom: 8 }}>
-                {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
-                  <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
-                ))}
-              </div>
-              <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
-                <CstFeaViewer
-                  solution={feaSolution}
-                  depthMm={siInputs.widthMm}
-                  viewMode={viewMode}
-                  strainKey="exx"
-                  bcType="simply-supported"
-                  unitSystem={unitSystem}
-                  dimLabels={[
-                    { label: 'span', value: siInputs.distMm },
-                    { label: 'w', value: siInputs.widthMm },
-                    { label: 't', value: siInputs.thicknessMm },
-                  ]}
-                />
-              </Suspense>
-              <p className="fea-note">2D plane-stress CST · linear elastic</p>
-            </>
-          ) : (
-            <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+        <>
+          <SectionToggle label="FEA Viewer" open={showFea} onToggle={() => setShowFea(v => !v)} />
+          {showFea && (
+            <div className="viewer-block">
+              {feaSolution ? (
+                <>
+                  <div className="analysis-toggle" style={{ marginBottom: 8 }}>
+                    {(['mesh', 'contour', 'deformed', 'boundary'] as const).map((m) => (
+                      <button key={m} className={viewMode === m ? 'active' : ''} onClick={() => setViewMode(m)}>{m}</button>
+                    ))}
+                  </div>
+                  <Suspense fallback={<p className="fea-note">Loading 3D viewer…</p>}>
+                    <CstFeaViewer
+                      solution={feaSolution}
+                      depthMm={siInputs.widthMm}
+                      viewMode={viewMode}
+                      strainKey="exx"
+                      bcType="simply-supported"
+                      unitSystem={unitSystem}
+                      dimLabels={[
+                        { label: 'span', value: siInputs.distMm },
+                        { label: 'w', value: siInputs.widthMm },
+                        { label: 't', value: siInputs.thicknessMm },
+                      ]}
+                    />
+                  </Suspense>
+                  <p className="fea-note">2D plane-stress CST · linear elastic</p>
+                </>
+              ) : (
+                <p className="fea-note">Enter valid inputs to compute FEA strain field.</p>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   )

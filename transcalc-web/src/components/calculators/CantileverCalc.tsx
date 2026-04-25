@@ -11,6 +11,7 @@ import { runCantileverFeaScaffold } from '../../domain/fea/cantilever'
 import { generateCantileverMeshStep } from '../../domain/fea/stepExport'
 import StrainFieldViewer from '../StrainFieldViewer'
 import CantileverDiagram from '../diagrams/CantileverDiagram'
+import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
 import CantileverModelPreview from '../CantileverModelPreview'
 
 const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
@@ -190,17 +191,22 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         <button className="export-btn" onClick={exportStep} disabled={!!inputError}>Export STEP</button>
       </div>
 
-      <SectionToggle label="2D Diagram" open={show2D} onToggle={() => setShow2D(v => !v)} />
+      <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />
       {show2D && (
-        <div className="calc-diagram-2d">
-          <CantileverDiagram
-            load={norm.loadN}
-            width={norm.widthMm}
-            thickness={norm.thicknessMm}
-            momentArm={norm.momentArmMm}
-            gageLength={norm.gageLengthMm}
-            unitSystem={unitSystem}
-          />
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <CantileverDiagram
+              load={norm.loadN}
+              width={norm.widthMm}
+              thickness={norm.thicknessMm}
+              momentArm={norm.momentArmMm}
+              gageLength={norm.gageLengthMm}
+              unitSystem={unitSystem}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <WheatstoneBridgeDiagram config="cantilever" />
+          </div>
         </div>
       )}
 
@@ -243,7 +249,7 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         <table className="bino-table">
           <tbody>
             <tr><th colSpan={3}>Calculated Values</th></tr>
-            <tr><td>Nominal Gage Strain:</td><td>{show(activeResult?.avgStrain ?? NaN, 1)}</td><td>µε</td></tr>
+            <tr><td>Nominal Gage Strain:</td><td>{show(activeResult?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
             <tr><td>Strain Variation:</td><td>{show(activeResult?.gradient ?? NaN, 2)}</td><td>%</td></tr>
             <tr><td>Span at Applied Force:</td><td>{show(activeResult?.spanMvV ?? NaN, 4)}</td><td>mV/V</td></tr>
             <tr><td>Bending Stress:</td><td>{show(stressDisplay, 3)}</td><td>{stressUnit}</td></tr>

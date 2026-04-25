@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
 import { calculateRadial, calculateTangential } from '../../domain/pressure'
 import PressureModelPreview from '../PressureModelPreview'
+import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -13,6 +14,26 @@ const GPA_PER_MPSI = 6.8947572932
 const round = (v: number, d = 4): number => Math.round(v * Math.pow(10, d)) / Math.pow(10, d)
 const show = (v: number, d: number): string => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
+function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', padding: '6px 2px 2px',
+        cursor: 'pointer', width: '100%', textAlign: 'left',
+        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+        fontFamily: 'inherit',
+      }}
+      aria-expanded={open}
+    >
+      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+      {label}
+    </button>
+  )
+}
+
 type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void }
 
 export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
@@ -21,6 +42,10 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
   const [diameter, setDiameter] = useState(50)      // mm or in
   const [modulusGPa, setModulusGPa] = useState(200) // GPa or Mpsi
   const [poisson, setPoisson] = useState(0.3)
+  const [showDiagrams, setShowDiagrams] = useState(true)
+  const [show3D, setShow3D] = useState(true)
+  const [showInputs, setShowInputs] = useState(true)
+  const [showResults, setShowResults] = useState(true)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -73,25 +98,48 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
           <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
         </div>
       </div>
-      <PressureModelPreview
-        params={{ pressure, thickness, diameter, modulus: modulusGPa }}
-        us={unitSystem === 'US'}
-      />
-      <div className="bino-grid">
-        <label>Applied pressure ({pressureUnit})<input type="number" value={Number.isFinite(pressure) ? pressure : ''} onChange={e => setPressure(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Diaphragm thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Diaphragm diameter ({lenUnit})<input type="number" value={Number.isFinite(diameter) ? diameter : ''} onChange={e => setDiameter(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-        <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-      </div>
-      {result.error && <p className="workspace-note">{result.error}</p>}
-      <table className="bino-table">
-        <tbody>
-          <tr><th colSpan={3}>Calculated Values</th></tr>
-          <tr><td>Radial Strain:</td><td>{show(result.radial, 1)}</td><td>µε</td></tr>
-          <tr><td>Tangential Strain:</td><td>{show(result.tangential, 1)}</td><td>µε</td></tr>
-        </tbody>
-      </table>
+
+      <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />
+      {showDiagrams && (
+        <div className="calc-diagram-2d">
+          <WheatstoneBridgeDiagram config="pressure" />
+        </div>
+      )}
+
+      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          <PressureModelPreview
+            params={{ pressure, thickness, diameter, modulus: modulusGPa }}
+            us={unitSystem === 'US'}
+          />
+        </div>
+      )}
+
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid">
+            <label>Applied pressure ({pressureUnit})<input type="number" value={Number.isFinite(pressure) ? pressure : ''} onChange={e => setPressure(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Diaphragm thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Diaphragm diameter ({lenUnit})<input type="number" value={Number.isFinite(diameter) ? diameter : ''} onChange={e => setDiameter(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+          </div>
+          {result.error && <p className="workspace-note">{result.error}</p>}
+        </>
+      )}
+
+      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
+      {showResults && (
+        <table className="bino-table">
+          <tbody>
+            <tr><th colSpan={3}>Calculated Values</th></tr>
+            <tr><td>Radial Strain:</td><td>{show(result.radial, 0)}</td><td>µε</td></tr>
+            <tr><td>Tangential Strain:</td><td>{show(result.tangential, 0)}</td><td>µε</td></tr>
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

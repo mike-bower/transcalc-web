@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { buildBinocularGeometry, type BinocularRawParams } from '../domain/binocularGeometry'
+import { createAxesGizmo } from './sceneHelpers'
 
 type Props = {
   params: BinocularRawParams
@@ -100,6 +101,7 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
   const [showDimensions, setShowDimensions] = useState(true)
   const [showGages, setShowGages] = useState(true)
   const [showHotspots, setShowHotspots] = useState(true)
+  const [showForces, setShowForces] = useState(true)
   const [preset, setPreset] = useState<CameraPreset>('iso')
 
   const geometry = useMemo(() => buildBinocularGeometry(params), [params])
@@ -251,20 +253,22 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
       group.add(dimensions)
     }
 
-    const forceText = makeTextSprite(us ? `${geometry.load.toFixed(1)} lbf` : `${geometry.load.toFixed(0)} N`)
-    forceText.position.set(halfLength - 0.16, halfHeight + 0.32, 0)
-    const arrow = new THREE.ArrowHelper(
-      new THREE.Vector3(0, -1, 0),
-      new THREE.Vector3(halfLength - 0.16, halfHeight + 0.22, 0),
-      0.35,
-      0xdc2626,
-      0.08,
-      0.05
-    )
-    group.add(forceText, arrow)
+    if (showForces) {
+      const forceText = makeTextSprite(us ? `${geometry.load.toFixed(1)} lbf` : `${geometry.load.toFixed(0)} N`)
+      forceText.position.set(halfLength - 0.16, halfHeight + 0.32, 0)
+      const arrow = new THREE.ArrowHelper(
+        new THREE.Vector3(0, -1, 0),
+        new THREE.Vector3(halfLength - 0.16, halfHeight + 0.22, 0),
+        0.35,
+        0xe05530,
+        0.08,
+        0.05
+      )
+      group.add(forceText, arrow)
+    }
 
     return group
-  }, [geometry, showDimensions, showGages, showHotspots, us])
+  }, [geometry, showDimensions, showGages, showHotspots, showForces, us])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -295,11 +299,13 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
     cameraRef.current = camera
     controlsRef.current = controls
     applyCameraPreset(preset, camera, controls, geometry)
+    const gizmo = createAxesGizmo(renderer, host)
 
     let frame = 0
     const render = () => {
       controls.update()
       renderer.render(scene, camera)
+      gizmo.render(camera)
       frame = requestAnimationFrame(render)
     }
     render()
@@ -316,6 +322,7 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
       cancelAnimationFrame(frame)
       controls.dispose()
       renderer.dispose()
+      gizmo.dispose()
       if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement)
     }
   }, [geometry, model, preset])
@@ -350,6 +357,9 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
           </button>
           <button className={`model-chip ${showHotspots ? 'active' : ''}`} onClick={() => setShowHotspots((v) => !v)}>
             hotspots
+          </button>
+          <button className={`model-chip ${showForces ? 'active' : ''}`} onClick={() => setShowForces((v) => !v)}>
+            forces & BCs
           </button>
         </div>
       </div>

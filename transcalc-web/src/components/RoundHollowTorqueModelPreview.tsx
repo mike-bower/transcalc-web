@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { createAxesGizmo } from './sceneHelpers'
 
 /**
  * 3D parametric model viewer for the Round Hollow Torque Shaft.
@@ -47,7 +48,7 @@ function addDimensionLine(
 }
 
 function addTorqueArrow(group: THREE.Group, xPos: number, R: number, clockwise: boolean) {
-  const color = 0x1f2f3f
+  const color = 0xe05530
   const nPts = 48
   const sweep = Math.PI * 1.5
   const startA = clockwise ? 0 : Math.PI
@@ -75,6 +76,7 @@ function addTorqueArrow(group: THREE.Group, xPos: number, R: number, clockwise: 
 function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [showForces, setShowForces] = useState(true)
 
   const model = useMemo(() => {
     const g = new THREE.Group()
@@ -112,13 +114,15 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     const wallT = L * 0.07
     const wall = new THREE.Mesh(new THREE.CylinderGeometry(Ro * 1.8, Ro * 1.8, wallT, 32), wallMat)
     wall.rotation.z = Math.PI / 2; wall.position.set(-L / 2 - wallT / 2, 0, 0); g.add(wall)
-    const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
-    const hX = -L / 2 - wallT - 0.003
-    for (let i = -2; i <= 2; i++) {
-      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(hX, -Ro * 1.4, i * Ro * 0.55 - 0.03),
-        new THREE.Vector3(hX, Ro * 1.4, i * Ro * 0.55 + 0.03),
-      ]), hatchMat))
+    if (showForces) {
+      const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
+      const hX = -L / 2 - wallT - 0.003
+      for (let i = -2; i <= 2; i++) {
+        g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(hX, -Ro * 1.4, i * Ro * 0.55 - 0.03),
+          new THREE.Vector3(hX, Ro * 1.4, i * Ro * 0.55 + 0.03),
+        ]), hatchMat))
+      }
     }
 
     // ── Gage pads at 45° — four positions around outer circumference ──────
@@ -145,7 +149,9 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     lbl.scale.set(0.30, 0.10, 1); lbl.position.set(0, Ro + 0.14, Ro + 0.06); g.add(lbl)
 
     // ── Torsion arrow ─────────────────────────────────────────────────────
-    addTorqueArrow(g, L / 2 + 0.06, Ro * 1.3, true)
+    if (showForces) {
+      addTorqueArrow(g, L / 2 + 0.06, Ro * 1.3, true)
+    }
 
     // ── Dimension lines ───────────────────────────────────────────────────
     const dim = new THREE.Group()
@@ -161,7 +167,7 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     tLabel.position.set(L / 2 + Ro * 1.8, Ro * 1.3, 0); dim.add(tLabel)
     dim.visible = showDimensions; g.add(dim)
     return g
-  }, [params, us, showDimensions])
+  }, [params, us, showDimensions, showForces])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -175,12 +181,13 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0); controls.update()
+    const gizmo = createAxesGizmo(renderer, host)
     scene.add(new THREE.AmbientLight(0xffffff, 0.75))
     const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(4, 5, 3); scene.add(dl)
     scene.add(new THREE.GridHelper(6, 14, 0xcccccc, 0xeeeeee))
     const root = new THREE.Group(); scene.add(root); root.add(model)
     let raf = 0
-    const animate = () => { raf = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera) }
+    const animate = () => { raf = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); gizmo.render(camera) }
     animate()
     const ro = new ResizeObserver(() => {
       const w = host.clientWidth, h = host.clientHeight
@@ -189,7 +196,7 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     })
     ro.observe(host)
     return () => {
-      cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose()
+      cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); gizmo.dispose()
       if (host.contains(renderer.domElement)) host.removeChild(renderer.domElement)
     }
   }, [model])
@@ -203,8 +210,26 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
         fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px',
         border: '1px solid rgba(71,85,105,0.5)', color: '#f8fafc', pointerEvents: 'auto',
       }}>
-        <input type="checkbox" id="rhlwtq-dims" checked={showDimensions} onChange={e => setShowDimensions(e.target.checked)} style={{ margin: 0 }} />
-        <label htmlFor="rhlwtq-dims" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>Dimensions</label>
+        <button
+          onClick={() => setShowDimensions(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showDimensions ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showDimensions ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Dimensions</button>
+        <button
+          onClick={() => setShowForces(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, fontWeight: 500, lineHeight: 1.5,
+            border: showForces ? '1px solid rgba(96,165,250,0.7)' : '1px solid rgba(71,85,105,0.4)',
+            background: showForces ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+            color: '#f8fafc',
+          }}
+        >Forces & BCs</button>
       </div>
     </div>
   )
