@@ -327,7 +327,7 @@ function JTS3D(p: Props) {
 
 export default function JTSModelPreview(props: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <JTS3D {...props} />
     </div>
   )

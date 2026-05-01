@@ -634,7 +634,8 @@ select:focus {
   border-radius: 12px;
   background: #f4f8fc;
   overflow: hidden;
-  height: 340px;
+  min-height: 680px;
+  height: auto;
 }
 
 .bino-grid {
@@ -820,6 +821,10 @@ select:focus {
   font-size: 0.82rem;
   color: #556677;
   margin: 4px 0 8px;
+}
+
+@keyframes fea-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes rise {

@@ -306,7 +306,7 @@ function RoundSolidColumn3D({ params, us }: { params: Record<string, number>; us
 
 export default function RoundSolidColumnModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <RoundSolidColumn3D params={params} us={us} />
     </div>
   )

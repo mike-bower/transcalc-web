@@ -1,4 +1,5 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import CantileverFea3DCalc from './CantileverFea3DCalc'
 import { computeCantileverStress } from '../../domain/core'
 import {
   calculateCantileverAvgStrain,
@@ -7,34 +8,14 @@ import {
   calculateCantileverMinStrain,
   calculateCantileverNaturalFrequency,
 } from '../../domain/beams'
-import { runCantileverFeaScaffold } from '../../domain/fea/cantilever'
 import { generateCantileverMeshStep } from '../../domain/fea/stepExport'
-import StrainFieldViewer from '../StrainFieldViewer'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import CantileverDiagram from '../diagrams/CantileverDiagram'
-import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
+import WheatstoneBridgeDiagram, { type BridgePreset } from '../diagrams/WheatstoneBridgeDiagram'
 import CantileverModelPreview from '../CantileverModelPreview'
-
-const StepMeshViewer = lazy(() => import('../StepMeshViewer'))
-
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
-}
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -56,20 +37,48 @@ type Props = {
   onUnitChange: (next: UnitSystem) => void
 }
 
+type WorkspaceMode = 'analytical' | '3d-fea'
+
 export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
+  const [mode, setMode] = useState<WorkspaceMode>('analytical')
   const [load, setLoad] = useState(100)         // N or lbf
   const [width, setWidth] = useState(25)         // mm or in
   const [thickness, setThickness] = useState(2)  // mm or in
   const [momentArm, setMomentArm] = useState(100)// mm or in
-  const [modulusGPa, setModulusGPa] = useState(200) // GPa or Mpsi
+  const [modulusGPa, setModulusGPa] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).eGPa)
+  const [poisson, setPoisson] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [densityKgM3, setDensityKgM3] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).densityKgM3)
+  const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
   const [gageLength, setGageLength] = useState(5)   // mm or in
   const [gageFactor, setGageFactor] = useState(2.0)
-  const [analysisPath, setAnalysisPath] = useState<'closed-form' | 'fea'>('closed-form')
-  const [show2D, setShow2D]         = useState(true)
-  const [show3D, setShow3D]         = useState(true)
+  const [bridgeConfig, setBridgeConfig] = useState<BridgePreset>('cantHalfTopBot')
+
+  const bridgeFactor = useMemo(() => {
+    switch (bridgeConfig) {
+      case 'cantQuarter':     return 0.25
+      case 'cantPoissonHalf': return (1 + poisson) / 4
+      case 'cantHalfTopBot':  return 0.5
+      case 'cantFullBend':    return 1.0
+      case 'cantFullPoisson': return (1 + poisson) / 2
+      default:                return 0.5
+    }
+  }, [bridgeConfig, poisson])
+
+  // Maps WheatstoneBridgeDiagram preset → 3D model bridge config key
+  const model3DBridgeConfig = useMemo(() => {
+    switch (bridgeConfig) {
+      case 'cantQuarter':     return 'quarter'
+      case 'cantPoissonHalf': return 'poissonHalf'
+      case 'cantHalfTopBot':  return 'halfBending'
+      case 'cantFullBend':    return 'fullBending'
+      case 'cantFullPoisson': return 'poissonFullTop'
+      default:                return 'halfBending'
+    }
+  }, [bridgeConfig])
+  const [show2D, setShow2D]         = useState(false)
+  const [show3D, setShow3D]         = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
-  const [showFea, setShowFea]       = useState(true)
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -128,20 +137,21 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
       const stressMPa = computeCantileverStress(norm.loadN, norm.widthMm, norm.thicknessMm, norm.momentArmMm)
       const naturalFreqHz = calculateCantileverNaturalFrequency(
         norm.modulusGPa * 1e9, norm.widthMm, norm.thicknessMm, norm.momentArmMm, norm.loadN,
+        densityKgM3,
       )
       return {
         minStrain: min,
         maxStrain: max,
         avgStrain: avg,
         gradient: calculateCantileverGradient(max, min),
-        spanMvV: avg * gageFactor * 1e-3,
+        spanMvV: avg * gageFactor * bridgeFactor * 1e-3,
         stressMPa,
         naturalFreqHz,
       }
     } catch {
       return null
     }
-  }, [inputError, norm, gageFactor])
+  }, [inputError, norm, gageFactor, bridgeFactor, densityKgM3])
 
   const feaInput = useMemo(() => ({
     appliedForceN: norm.loadN,
@@ -153,14 +163,24 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
     gageFactor,
   }), [norm, gageFactor])
 
-  const feaSolution = useMemo(() => {
-    if (inputError || analysisPath !== 'fea') return null
-    try { return runCantileverFeaScaffold(feaInput, MESH_OPTIONS) } catch { return null }
-  }, [inputError, analysisPath, feaInput])
+  const activeResult = result
 
-  const activeResult = analysisPath === 'fea'
-    ? (feaSolution ? { ...result, avgStrain: feaSolution.gauge.nominalStrainMicrostrain, gradient: feaSolution.gauge.strainVariationPercent, spanMvV: feaSolution.gauge.spanMvV } : null)
-    : result
+  // Per-gage strain values for display (µε)
+  const gageStrains = useMemo(() => {
+    const ε = activeResult?.avgStrain
+    if (!ε) return null
+    const ν = poisson
+    switch (bridgeConfig) {
+      case 'cantQuarter':     return [{ label: 'A', strain: +ε, desc: 'top 0°' }]
+      case 'cantPoissonHalf': return [{ label: 'A', strain: +ε, desc: 'top 0°' }, { label: 'B', strain: -ν * ε, desc: 'top 90°' }]
+      case 'cantHalfTopBot':  return [{ label: 'A', strain: +ε, desc: 'top 0°' }, { label: 'B', strain: -ε, desc: 'bot 0°' }]
+      case 'cantFullBend':    return [{ label: 'A', strain: +ε, desc: 'top 0°' }, { label: 'B', strain: -ε, desc: 'bot 0°' },
+                                      { label: 'C', strain: +ε, desc: 'top 0°' }, { label: 'D', strain: -ε, desc: 'bot 0°' }]
+      case 'cantFullPoisson': return [{ label: 'A', strain: +ε, desc: 'top 0°' }, { label: 'B', strain: -ν * ε, desc: 'top 90°' },
+                                      { label: 'C', strain: +ε, desc: 'top 0°' }, { label: 'D', strain: -ν * ε, desc: 'top 90°' }]
+      default:                return [{ label: 'A', strain: +ε, desc: 'top 0°' }]
+    }
+  }, [activeResult?.avgStrain, bridgeConfig, poisson])
 
   const forceUnit = unitSystem === 'SI' ? 'N' : 'lbf'
   const lenUnit = unitSystem === 'SI' ? 'mm' : 'in'
@@ -179,20 +199,62 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
 
   return (
     <div className="bino-wrap">
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={analysisPath === 'closed-form' ? 'active' : ''} onClick={() => setAnalysisPath('closed-form')}>Closed-form</button>
-          <button className={analysisPath === 'fea' ? 'active' : ''} onClick={() => setAnalysisPath('fea')}>FEA</button>
-        </div>
-        <div className="analysis-toggle">
-          <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-        <button className="export-btn" onClick={exportStep} disabled={!!inputError}>Export STEP</button>
-      </div>
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange}>
+        {mode === 'analytical' && <button className="export-btn" onClick={exportStep} disabled={!!inputError}>Export STEP</button>}
+      </WorkspaceControls>
 
-      <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />
-      {show2D && (
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid" style={{ marginBottom: 4 }}>
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => {
+                setMaterialId(sel.id)
+                setModulusGPa(sel.eGPaDisplay)
+                setPoisson(sel.nu)
+                setDensityKgM3(sel.densityKgM3)
+              }}
+            />
+          </div>
+          <div className="bino-grid">
+            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Load point to gage CL, L ({lenUnit})<input type="number" value={Number.isFinite(momentArm) ? momentArm : ''} onChange={e => setMomentArm(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+          </div>
+          {inputError && <p className="workspace-note">{inputError}</p>}
+        </>
+      )}
+
+
+      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
+      {mode === 'analytical' && showResults && (
+        <table className="bino-table">
+          <tbody>
+            <tr><th colSpan={3}>Calculated Values</th></tr>
+            <tr><td>Nominal Gage Strain:</td><td>{show(activeResult?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Strain Variation:</td><td>{show(activeResult?.gradient ?? NaN, 2)}</td><td>%</td></tr>
+            <tr><td>Span at Applied Force:</td><td>{show(activeResult?.spanMvV ?? NaN, 4)}</td><td>mV/V</td></tr>
+            <tr><td>Bending Stress:</td><td>{show(stressDisplay, 3)}</td><td>{stressUnit}</td></tr>
+            <tr><td>Natural Frequency:</td><td>{show(result?.naturalFreqHz ?? NaN, 1)}</td><td>Hz</td></tr>
+            {gageStrains && <tr><th colSpan={3}>Gage Strains</th></tr>}
+            {gageStrains?.map(g => (
+              <tr key={g.label}>
+                <td>Gage {g.label} ({g.desc}):</td>
+                <td>{show(g.strain, 0)}</td>
+                <td>µε</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {mode === 'analytical' && show2D && (
         <div className="calc-diagram-row">
           <div className="calc-diagram-2d">
             <CantileverDiagram
@@ -202,85 +264,67 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
               momentArm={norm.momentArmMm}
               gageLength={norm.gageLengthMm}
               unitSystem={unitSystem}
+              bridgeConfig={bridgeConfig}
             />
           </div>
           <div className="calc-diagram-2d">
-            <WheatstoneBridgeDiagram config="cantilever" />
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+              {([
+                ['cantQuarter',     '¼ Bridge'],
+                ['cantPoissonHalf', '½ Poisson'],
+                ['cantHalfTopBot',  '½ Top/Bot'],
+                ['cantFullBend',    'Full Bend'],
+                ['cantFullPoisson', 'Full Poisson'],
+              ] as [BridgePreset, string][]).map(([key, label]) => (
+                <button key={key} onClick={() => setBridgeConfig(key)} style={{
+                  fontSize: '0.72rem', padding: '3px 7px',
+                  border: '1px solid', borderRadius: 3, cursor: 'pointer',
+                  background: bridgeConfig === key ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+                  borderColor: bridgeConfig === key ? 'rgba(96,165,250,0.7)' : 'rgba(71,85,105,0.4)',
+                  color: '#f8fafc',
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <WheatstoneBridgeDiagram config={bridgeConfig} />
           </div>
         </div>
       )}
 
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
-          <CantileverModelPreview
-            params={{
-              load: norm.loadN,
-              width: norm.widthMm,
-              thickness: norm.thicknessMm,
-              momentArm: norm.momentArmMm,
-              gageLength: norm.gageLengthMm,
-              modulus: norm.modulusGPa,
-              gageFactor,
-            }}
-            us={unitSystem === 'US'}
-          />
-        </div>
-      )}
-
-      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
-      {showInputs && (
-        <>
-          <div className="bino-grid">
-            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Load point to gage CL, L ({lenUnit})<input type="number" value={Number.isFinite(momentArm) ? momentArm : ''} onChange={e => setMomentArm(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-          </div>
-          {inputError && <p className="workspace-note">{inputError}</p>}
-        </>
-      )}
-
-      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
-      {showResults && (
-        <table className="bino-table">
-          <tbody>
-            <tr><th colSpan={3}>Calculated Values</th></tr>
-            <tr><td>Nominal Gage Strain:</td><td>{show(activeResult?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
-            <tr><td>Strain Variation:</td><td>{show(activeResult?.gradient ?? NaN, 2)}</td><td>%</td></tr>
-            <tr><td>Span at Applied Force:</td><td>{show(activeResult?.spanMvV ?? NaN, 4)}</td><td>mV/V</td></tr>
-            <tr><td>Bending Stress:</td><td>{show(stressDisplay, 3)}</td><td>{stressUnit}</td></tr>
-            <tr><td>Natural Frequency:</td><td>{show(result?.naturalFreqHz ?? NaN, 1)}</td><td>Hz</td></tr>
-          </tbody>
-        </table>
-      )}
-
-      {analysisPath === 'fea' && (
-        <>
-          <SectionToggle label="FEA Viewer" open={showFea} onToggle={() => setShowFea(v => !v)} />
-          {showFea && (
-            <div className="viewer-block">
-              {!inputError && feaSolution ? (
-                <>
-                  <StrainFieldViewer
-                    solution={feaSolution.solution}
-                    strainKey="exx"
-                    gageMarkersMm={[0, norm.gageLengthMm]}
-                    label="ε_xx field — fixed end at left · dashed lines bound gage region"
-                  />
-                  <Suspense fallback={<div className="step-viewer loading">Loading 3D viewer…</div>}>
-                    <StepMeshViewer input={feaInput} solution={feaSolution.solution} meshOptions={MESH_OPTIONS} />
-                  </Suspense>
-                </>
-              ) : (
-                <div className="step-viewer loading">{inputError || 'Unable to solve FEA for current inputs.'}</div>
-              )}
-            </div>
+          {mode === 'analytical' && (
+            <CantileverModelPreview
+              params={{
+                load: norm.loadN,
+                width: norm.widthMm,
+                thickness: norm.thicknessMm,
+                momentArm: norm.momentArmMm,
+                gageLength: norm.gageLengthMm,
+                gageLen: norm.gageLengthMm,
+                gageOffset: norm.gageLengthMm / 2,
+                clampLength: Math.max(norm.momentArmMm * 0.2, norm.gageLengthMm * 0.8),
+                modulus: norm.modulusGPa,
+                poisson,
+                gageFactor,
+                bridgeConfig: model3DBridgeConfig,
+              }}
+              us={unitSystem === 'US'}
+            />
           )}
-        </>
+          {mode === '3d-fea' && (
+            <CantileverFea3DCalc
+              loadN={norm.loadN}
+              widthMm={norm.widthMm}
+              thicknessMm={norm.thicknessMm}
+              momentArmMm={norm.momentArmMm}
+              modulusGPa={norm.modulusGPa}
+              nu={poisson}
+            />
+          )}
+        </div>
       )}
     </div>
   )

@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import { designThreeBeamFT, type ThreeBeamFTParams } from '../../domain/threeBeamFT'
-import { MATERIALS, DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import ThreeBeamModelPreview from '../ThreeBeamModelPreview'
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
+import ThreeBeamFea3DCalc from './ThreeBeamFea3DCalc'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -15,25 +19,6 @@ const show = (v: number, d: number) => (Number.isFinite(v) && v > 0 ? v.toFixed(
 interface Props {
   unitSystem: UnitSystem
   onUnitChange: (next: UnitSystem) => void
-}
-
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
 }
 
 /** Minimal top-view SVG for the 3-arm sensor — shows 3 arms at 120°, hub, outer ring, gage positions. */
@@ -114,17 +99,13 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
   const us = unitSystem === 'US'
 
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
-  const mat = getMaterial(materialId)
-  const [modulus,    setModulus]    = useState(us ? +(mat.eGPa / GPA_PER_MPSI).toFixed(2) : mat.eGPa)
-  const [poisson,    setPoisson]    = useState(mat.nu)
+  const [modulus,    setModulus]    = useState(() => { const m = getMaterial(DEFAULT_MATERIAL_ID); return us ? +(m.eGPa / GPA_PER_MPSI).toFixed(2) : m.eGPa })
+  const [poisson,    setPoisson]    = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [densityKgM3, setDensityKgM3] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).densityKgM3)
+  const [yieldMPa,   setYieldMPa]   = useState(() => getMaterial(DEFAULT_MATERIAL_ID).yieldMPa)
   const [gageFactor, setGageFactor] = useState(2.0)
-
-  function applyMaterial(id: string) {
-    const m = getMaterial(id)
-    setMaterialId(id)
-    setModulus(us ? +(m.eGPa / GPA_PER_MPSI).toFixed(2) : m.eGPa)
-    setPoisson(m.nu)
-  }
+  // mat alias for params compatibility
+  const mat = { densityKgM3, yieldMPa }
 
   const lenUnit    = us ? 'in' : 'mm'
   const forceUnit  = us ? 'lbf' : 'N'
@@ -140,7 +121,8 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
   const [ratedForce,   setRatedForce]   = useState(us ? 90 : 400)
   const [ratedMoment,  setRatedMoment]  = useState(us ? 0.27 : 3.0)
 
-  const [showSketch,  setShowSketch]  = useState(true)
+  const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
+  const [showSketch,  setShowSketch]  = useState(false)
   const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
@@ -164,7 +146,7 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
     gageFactor,
     densityKgM3:             mat.densityKgM3,
     yieldStrengthPa:         mat.yieldMPa ? mat.yieldMPa * 1e6 : undefined,
-  }), [us, outerRadius, innerRadius, beamWidth, beamThick, gageDistRoot, ratedForce, ratedMoment, modulus, poisson, gageFactor, mat])
+  }), [us, outerRadius, innerRadius, beamWidth, beamThick, gageDistRoot, ratedForce, ratedMoment, modulus, poisson, gageFactor, densityKgM3, yieldMPa])
 
   const result = useMemo(() => designThreeBeamFT(params), [params])
 
@@ -180,68 +162,24 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
   return (
     <div className="bino-wrap">
 
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={!us ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={us ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-      </div>
-
-      {/* 2D Sketch */}
-      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
-      {showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <ThreeBeamSketch
-              outerR={params.outerRadiusMm}
-              innerR={params.innerRadiusMm}
-              armW={params.beamWidthMm}
-              gageD={params.gageDistFromOuterRingMm}
-            />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
-      {/* 3D Model */}
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
-      {show3D && (
-        <div className="calc-model-3d">
-          <ThreeBeamModelPreview
-            outerRadiusMm={params.outerRadiusMm}
-            innerRadiusMm={params.innerRadiusMm}
-            beamWidthMm={params.beamWidthMm}
-            beamThicknessMm={params.beamThicknessMm}
-            gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
-            us={us}
-          />
-        </div>
-      )}
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
       {/* Inputs */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
           <div className="bino-grid" style={{ marginBottom: 4 }}>
-            <label style={{ gridColumn: '1 / -1' }}>
-              Material
-              <select
-                value={materialId}
-                onChange={e => applyMaterial(e.target.value)}
-                style={{ fontFamily: 'inherit', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--line)', background: '#fff', color: 'var(--ink)', width: '100%', marginTop: 4 }}
-              >
-                {MATERIALS.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}{m.yieldMPa ? ` — E=${m.eGPa} GPa, σy=${m.yieldMPa} MPa` : ` — E=${m.eGPa} GPa`}</option>
-                ))}
-              </select>
-            </label>
-            <label>Modulus of Elasticity ({modUnit})
-              <input type="number" value={modulus} step={1} min={1} onChange={e => setModulus(Number(e.target.value))} />
-            </label>
-            <label>Poisson Ratio ν
-              <input type="number" value={poisson} step={0.01} min={0.1} max={0.5} onChange={e => setPoisson(Number(e.target.value))} />
-            </label>
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => {
+                setMaterialId(sel.id)
+                setModulus(sel.eGPaDisplay)
+                setPoisson(sel.nu)
+                setDensityKgM3(sel.densityKgM3)
+                setYieldMPa(sel.yieldMPa)
+              }}
+            />
           </div>
           <div className="bino-grid">
             <label>Outer Radius ({lenUnit})
@@ -280,8 +218,8 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Design Metrics */}
-      <SectionToggle label="Design Metrics" open={showMetrics} onToggle={() => setShowMetrics(v => !v)} />
-      {showMetrics && (
+      {mode === 'analytical' && <SectionToggle label="Design Metrics" open={showMetrics} onToggle={() => setShowMetrics(v => !v)} />}
+      {mode === 'analytical' && showMetrics && (
         <table className="bino-table">
           <tbody>
             <tr><th colSpan={3}>Decoupling</th></tr>
@@ -334,8 +272,8 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Channel Sensitivity */}
-      <SectionToggle label="Channel Sensitivity & Rated Output" open={showChannels} onToggle={() => setShowChannels(v => !v)} />
-      {showChannels && (
+      {mode === 'analytical' && <SectionToggle label="Channel Sensitivity & Rated Output" open={showChannels} onToggle={() => setShowChannels(v => !v)} />}
+      {mode === 'analytical' && showChannels && (
         <table className="bino-table">
           <tbody>
             <tr>
@@ -368,8 +306,8 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Sensitivity Matrix */}
-      <SectionToggle label="Sensitivity Matrix S (mV/V per unit load)" open={showMatrix} onToggle={() => setShowMatrix(v => !v)} />
-      {showMatrix && (
+      {mode === 'analytical' && <SectionToggle label="Sensitivity Matrix S (mV/V per unit load)" open={showMatrix} onToggle={() => setShowMatrix(v => !v)} />}
+      {mode === 'analytical' && showMatrix && (
         <div style={{ overflowX: 'auto' }}>
           <p className="workspace-note" style={{ marginBottom: 6 }}>
             3-arm 120° topology: Fz and Mz equal 4-arm sensitivity. Fx/Fy = 2/3·Fz. Mx/My = 1/3 of equivalent 4-arm sensor — weaker moment channels are the main trade-off.
@@ -407,6 +345,51 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
           <p className="workspace-note" style={{ marginTop: 4 }}>
             Force channels: mV/V/{forceUnit}. Moment channels: mV/V/{momentUnit}. Off-diagonal coupling = 0% for ideal geometry (real sensors: 1–5%).
           </p>
+        </div>
+      )}
+
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <ThreeBeamSketch
+              outerR={params.outerRadiusMm}
+              innerR={params.innerRadiusMm}
+              armW={params.beamWidthMm}
+              gageD={params.gageDistFromOuterRingMm}
+            />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* 3D View */}
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          {mode === 'analytical' && (
+            <ThreeBeamModelPreview
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              beamWidthMm={params.beamWidthMm}
+              beamThicknessMm={params.beamThicknessMm}
+              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
+              us={us}
+            />
+          )}
+          {mode === '3d-fea' && (
+            <ThreeBeamFea3DCalc
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              beamWidthMm={params.beamWidthMm}
+              beamThicknessMm={params.beamThicknessMm}
+              E={params.youngsModulusPa}
+              nu={params.poissonRatio}
+              ratedForceN={params.ratedForceN}
+            />
+          )}
         </div>
       )}
 

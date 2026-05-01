@@ -237,7 +237,7 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
 
 export default function RoundHollowTorqueModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <RoundHollowTorque3D params={params} us={us} />
     </div>
   )

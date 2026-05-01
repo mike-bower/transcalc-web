@@ -384,7 +384,7 @@ function CrossBeam3D(p: Props) {
 
 export default function CrossBeamModelPreview(props: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <CrossBeam3D {...props} />
     </div>
   )

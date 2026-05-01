@@ -343,7 +343,7 @@ function RoundHollowColumn3D({ params, us }: { params: Record<string, number>; u
 
 export default function RoundHollowColumnModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <RoundHollowColumn3D params={params} us={us} />
     </div>
   )

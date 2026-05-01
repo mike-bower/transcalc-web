@@ -14,7 +14,7 @@ export default function DualBeamDiagram({ load, width, thickness, distBetweenGag
   const lu = unitSystem === 'SI' ? 'mm' : 'in'
   const fu = unitSystem === 'SI' ? 'N' : 'lbf'
 
-  const W = 520, H = 280
+  const W = 520, H = 310
 
   // End block geometry
   const blockW = 38
@@ -79,6 +79,9 @@ export default function DualBeamDiagram({ load, width, thickness, distBetweenGag
   )
 
   const loadX = rightBlockX + blockW / 2
+  const midX  = (beamLeft + beamRight) / 2
+  const mBaseY = lowerBot + 80
+  const mAmp   = 20
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }} aria-hidden="true">
@@ -162,6 +165,41 @@ export default function DualBeamDiagram({ load, width, thickness, distBetweenGag
         stroke={dc} strokeWidth={0.8} />
       <VDim x={rightBlockX + blockW + 30} y1={upperTop} y2={upperBot}
         label={`t=${fv(thickness, 1)} ${lu}`} />
+
+      {/* Zero-moment centreline at midspan */}
+      <line x1={midX} y1={blockTop - 4} x2={midX} y2={lowerBot + 4}
+        stroke="#888" strokeWidth={0.9} strokeDasharray="4,3" opacity={0.6}/>
+      <text x={midX + 4} y={blockTop - 6} fontSize={8} fill="#888" fontStyle="italic">M=0</text>
+
+      {/* Top-face stress labels: T on left section, C on right section of upper beam */}
+      {tPx >= 12 && (
+        <>
+          <text x={(beamLeft + leftGageCX) / 2} y={upperTop + tPx * 0.35 + 3}
+            textAnchor="middle" fontSize={8} fill={tCol} fontWeight="700" opacity={0.7}>T</text>
+          <text x={(rightGageCX + beamRight) / 2} y={upperTop + tPx * 0.35 + 3}
+            textAnchor="middle" fontSize={8} fill={cCol} fontWeight="700" opacity={0.7}>C</text>
+        </>
+      )}
+
+      {/* Bending moment diagram — fixed-guided S-shape: +M left half, −M right half */}
+      <text x={beamLeft - 4} y={mBaseY + 4} textAnchor="end" fontSize={9} fill={dc}>M</text>
+      <line x1={beamLeft} y1={mBaseY} x2={beamRight} y2={mBaseY}
+        stroke={dc} strokeWidth={0.8} opacity={0.5}/>
+      {/* +M region: left half — tension on top face */}
+      <polygon
+        points={`${beamLeft},${mBaseY} ${beamLeft},${mBaseY - mAmp} ${midX},${mBaseY}`}
+        fill="rgba(192,48,48,0.18)" stroke={tCol} strokeWidth={1}/>
+      {/* −M region: right half — compression on top face */}
+      <polygon
+        points={`${midX},${mBaseY} ${beamRight},${mBaseY + mAmp} ${beamRight},${mBaseY}`}
+        fill="rgba(32,112,192,0.18)" stroke={cCol} strokeWidth={1}/>
+      {/* Labels at triangle centroids */}
+      <text x={(2 * beamLeft + midX) / 3} y={mBaseY - mAmp / 3 + 3}
+        textAnchor="middle" fontSize={8} fill={tCol} fontWeight="600">+M</text>
+      <text x={(midX + 2 * beamRight) / 3} y={mBaseY + mAmp / 3 + 3}
+        textAnchor="middle" fontSize={8} fill={cCol} fontWeight="600">−M</text>
+      {/* M = 0 dot at midspan */}
+      <circle cx={midX} cy={mBaseY} r={2.5} fill={dc} opacity={0.7}/>
     </svg>
   )
 }

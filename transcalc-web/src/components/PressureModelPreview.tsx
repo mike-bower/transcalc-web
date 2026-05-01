@@ -241,7 +241,7 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
 
 export default function PressureModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <Pressure3D params={params} us={us} />
     </div>
   )

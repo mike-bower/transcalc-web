@@ -276,7 +276,7 @@ function RoundSBeam3D({ params, us }: { params: Record<string, number>; us?: boo
 
 export default function RoundSBeamShearModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <RoundSBeam3D params={params} us={us} />
     </div>
   )

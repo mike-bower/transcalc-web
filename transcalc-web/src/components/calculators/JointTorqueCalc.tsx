@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import { designJTS, type JTSParams } from '../../domain/jointTorqueSensor'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import JTSSketch2D from '../diagrams/JTSSketch2D'
 import JTSModelPreview from '../JTSModelPreview'
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -13,26 +17,6 @@ const MPA_PER_KSI  = 6.8947572932
 
 const show = (v: number | undefined, d: number) =>
   v != null && Number.isFinite(v) && v > 0 ? v.toFixed(d) : '—'
-
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
-}
 
 interface Props {
   unitSystem: UnitSystem
@@ -49,13 +33,15 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
   const [spokeThick,    setSpokeThick]    = useState(us ? 0.12 : 3)     // mm or in
   const [spokeCount,    setSpokeCount]    = useState(4)
   const [torque,        setTorque]        = useState(us ? 7.08 : 50)    // N·m or in·lbf
-  const [modulus,       setModulus]       = useState(us ? 29 : 200)     // Mpsi or GPa
-  const [poisson,       setPoisson]       = useState(0.3)
+  const [modulus,       setModulus]       = useState(() => us ? getMaterial(DEFAULT_MATERIAL_ID).eGPa / GPA_PER_MPSI : getMaterial(DEFAULT_MATERIAL_ID).eGPa)     // Mpsi or GPa
+  const [poisson,       setPoisson]       = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [materialId,    setMaterialId]    = useState(DEFAULT_MATERIAL_ID)
   const [gageFactor,    setGageFactor]    = useState(2.0)
   const [yieldStr,      setYieldStr]      = useState(us ? 72.5 : 500)   // ksi or MPa
   const [showYield,     setShowYield]     = useState(false)
 
-  const [showSketch,  setShowSketch]  = useState(true)
+  const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
+  const [showSketch,  setShowSketch]  = useState(false)
   const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -99,52 +85,18 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
 
       {/* Controls */}
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={!us ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={us ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-      </div>
-
-      {/* 2D Sketch */}
-      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
-      {showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <JTSSketch2D
-              outerRadiusMm={params.outerRadiusMm}
-              innerRadiusMm={params.innerRadiusMm}
-              spokeWidthMm={params.spokeWidthMm}
-              spokeCount={params.spokeCount}
-              width={300}
-              height={300}
-            />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
-      {/* 3D Model */}
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
-      {show3D && (
-        <div className="calc-model-3d">
-          <JTSModelPreview
-            outerRadiusMm={params.outerRadiusMm}
-            innerRadiusMm={params.innerRadiusMm}
-            spokeWidthMm={params.spokeWidthMm}
-            spokeThicknessMm={params.spokeThicknessMm}
-            spokeCount={params.spokeCount}
-            us={us}
-          />
-        </div>
-      )}
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
       {/* Inputs */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
           <div className="bino-grid">
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => { setMaterialId(sel.id); setModulus(sel.eGPaDisplay); setPoisson(sel.nu) }}
+            />
             <label>Outer Radius ({lenUnit})
               <input type="number" value={outerRadius} step={us ? 0.05 : 1} min={0.1}
                 onChange={e => setOuterRadius(Number(e.target.value))} />
@@ -168,14 +120,6 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
             <label>Rated Torque ({torqueUnit})
               <input type="number" value={torque} step={us ? 0.5 : 1} min={0.001}
                 onChange={e => setTorque(Number(e.target.value))} />
-            </label>
-            <label>Modulus of Elasticity ({modUnit})
-              <input type="number" value={modulus} step={1} min={1}
-                onChange={e => setModulus(Number(e.target.value))} />
-            </label>
-            <label>Poisson Ratio ν
-              <input type="number" value={poisson} step={0.01} min={0.1} max={0.49}
-                onChange={e => setPoisson(Number(e.target.value))} />
             </label>
             <label>Gage Factor
               <input type="number" value={gageFactor} step={0.1} min={0.5} max={5}
@@ -208,8 +152,8 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Results */}
-      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
-      {showResults && (
+      {mode === 'analytical' && <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />}
+      {mode === 'analytical' && showResults && (
         <table className="bino-table">
           <tbody>
             <tr><th colSpan={3}>Structural Performance</th></tr>
@@ -275,6 +219,43 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
             )}
           </tbody>
         </table>
+      )}
+
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <JTSSketch2D
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              spokeWidthMm={params.spokeWidthMm}
+              spokeCount={params.spokeCount}
+              width={300}
+              height={300}
+            />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* 3D View */}
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          {mode === 'analytical' && (
+            <JTSModelPreview
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              spokeWidthMm={params.spokeWidthMm}
+              spokeThicknessMm={params.spokeThicknessMm}
+              spokeCount={params.spokeCount}
+              us={us}
+            />
+          )}
+          {mode === '3d-fea' && <p className="workspace-note" style={{ padding: '1.5rem', textAlign: 'center' }}>3D FEA is not yet available for this calculator type.</p>}
+        </div>
       )}
     </div>
   )

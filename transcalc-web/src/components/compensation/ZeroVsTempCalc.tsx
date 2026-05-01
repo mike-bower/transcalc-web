@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { WIRE_TYPES, WireTypeName, getResistorTcr, calculateZeroVsTemp } from '../../domain/zeroVsTemp'
+import ZeroVsTempBridgeDiagram from '../diagrams/ZeroVsTempBridgeDiagram'
 
 type UnitSystem = 'SI' | 'US'
 type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void }
@@ -81,25 +82,33 @@ export default function ZeroVsTempCalc({ unitSystem, onUnitChange }: Props) {
 
       {result.error && <p className="workspace-note comp-error">{result.error}</p>}
 
-      {result.value && (
-        <table className="bino-table">
-          <thead><tr><th>Output</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr>
-              <td>Compensation Resistance</td>
-              <td>{result.value.resistance.toFixed(4)} Ω</td>
-            </tr>
-            <tr>
-              <td>Bridge Arm</td>
-              <td>{result.value.bridgeArm === 'minus-s-minus' ? '−S / −' : '+S / −'}</td>
-            </tr>
-            <tr>
-              <td>Compensator Type</td>
-              <td>{result.value.useWire ? 'Wire (> 0.5 Ω)' : 'E01 Resistor (≤ 0.5 Ω)'}</td>
-            </tr>
-          </tbody>
-        </table>
-      )}
+      <div className="calc-diagram-row" style={{ marginTop: 8 }}>
+        <div className="calc-diagram-2d">
+          <ZeroVsTempBridgeDiagram
+            bridgeArm={result.value?.bridgeArm ?? null}
+            resistance={result.value?.resistance ?? null}
+          />
+        </div>
+        {result.value && (
+          <table className="bino-table" style={{ alignSelf: 'start' }}>
+            <thead><tr><th>Output</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Compensation Resistance</td>
+                <td>{result.value.resistance.toFixed(4)} Ω</td>
+              </tr>
+              <tr>
+                <td>Bridge Arm</td>
+                <td>{result.value.bridgeArm === 'minus-s-minus' ? '−S / −' : '+S / −'}</td>
+              </tr>
+              <tr>
+                <td>Compensator Type</td>
+                <td>{result.value.useWire ? 'Wire (> 0.5 Ω)' : 'E01 Resistor (≤ 0.5 Ω)'}</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }

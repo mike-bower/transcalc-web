@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { designHexapodFT, generateHexapodCalibrationProcedure, type HexapodFTParams } from '../../domain/hexapodFT'
-import { MATERIALS, DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import HexapodSketch2D from '../diagrams/HexapodSketch2D'
 import HexapodModelPreview from '../HexapodModelPreview'
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -13,26 +16,6 @@ const NM_PER_INLB  = 0.112984829
 
 const show = (v: number | undefined, d: number) =>
   v != null && Number.isFinite(v) && v > 0 ? v.toFixed(d) : '—'
-
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
-}
 
 function MatrixCell({ value, isDiag }: { value: number; isDiag: boolean }) {
   const abs = Math.abs(value)
@@ -61,11 +44,14 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
   const us = unitSystem === 'US'
 
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
-  const mat = getMaterial(materialId)
-  const [modulus,    setModulus]    = useState(us ? +(mat.eGPa / GPA_PER_MPSI).toFixed(2) : mat.eGPa)
-  const [poisson,    setPoisson]    = useState(mat.nu)
+  const [modulus,    setModulus]    = useState(() => { const m = getMaterial(DEFAULT_MATERIAL_ID); return us ? +(m.eGPa / GPA_PER_MPSI).toFixed(2) : m.eGPa })
+  const [poisson,    setPoisson]    = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [densityKgM3, setDensityKgM3] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).densityKgM3)
+  const [yieldMPa,   setYieldMPa]   = useState(() => getMaterial(DEFAULT_MATERIAL_ID).yieldMPa)
   const [gageFactor, setGageFactor] = useState(2.0)
   const [bridgeType, setBridgeType] = useState<'quarter' | 'half' | 'full'>('quarter')
+  // mat alias for params compatibility
+  const mat = { densityKgM3, yieldMPa }
 
   // Geometry — stored in display units
   const [topRadius,   setTopRadius]   = useState(us ? +(35 / MM_PER_IN).toFixed(4) : 35)
@@ -79,7 +65,8 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
   const [ratedForce,  setRatedForce]  = useState(us ? +(200 / N_PER_LBF).toFixed(2) : 200)
   const [ratedMoment, setRatedMoment] = useState(us ? +(5 / NM_PER_INLB).toFixed(2) : 5)
 
-  const [showSketch,  setShowSketch]  = useState(true)
+  const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
+  const [showSketch,  setShowSketch]  = useState(false)
   const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
@@ -87,13 +74,6 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
   const [showStruts,  setShowStruts]  = useState(false)
   const [showJacobian,setShowJacobian]= useState(false)
   const [showCalib,   setShowCalib]   = useState(false)
-
-  function applyMaterial(id: string) {
-    const m = getMaterial(id)
-    setMaterialId(id)
-    setModulus(us ? +(m.eGPa / GPA_PER_MPSI).toFixed(2) : m.eGPa)
-    setPoisson(m.nu)
-  }
 
   const params = useMemo((): HexapodFTParams => {
     const toMm = (v: number) => us ? v * MM_PER_IN : v
@@ -117,7 +97,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
       ratedMomentNm:      toNm(ratedMoment),
     }
   }, [us, topRadius, botRadius, platHeight, topOffset, spread, strutDiam,
-      modulus, poisson, gageFactor, bridgeType, mat, ratedForce, ratedMoment])
+      modulus, poisson, gageFactor, bridgeType, densityKgM3, yieldMPa, ratedForce, ratedMoment])
 
   const result = useMemo(() => designHexapodFT(params), [params])
 
@@ -143,40 +123,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
 
       {/* Controls */}
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={!us ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={us ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-      </div>
-
-      {/* 2D Sketch */}
-      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
-      {showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <HexapodSketch2D {...sketchProps} width={480} height={260} />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
-      {/* 3D Model */}
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
-      {show3D && (
-        <div className="calc-model-3d">
-          <HexapodModelPreview
-            topRingRadiusMm={params.topRingRadiusMm}
-            bottomRingRadiusMm={params.bottomRingRadiusMm}
-            platformHeightMm={params.platformHeightMm}
-            strutDiameterMm={params.strutDiameterMm}
-            strutSpreadDeg={params.strutSpreadDeg}
-            topAnglesOffsetDeg={params.topAnglesOffsetDeg}
-            us={us}
-          />
-        </div>
-      )}
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
       {/* Inputs */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
@@ -184,26 +131,17 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
         <>
           {/* Material */}
           <div className="bino-grid" style={{ marginBottom: 4 }}>
-            <label style={{ gridColumn: '1 / -1' }}>
-              Material
-              <select
-                value={materialId}
-                onChange={e => applyMaterial(e.target.value)}
-                style={{ fontFamily: 'inherit', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--line)', background: '#fff', color: 'var(--ink)', width: '100%', marginTop: 4 }}
-              >
-                {MATERIALS.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}{m.yieldMPa ? ` — E=${m.eGPa} GPa, σy=${m.yieldMPa} MPa` : ` — E=${m.eGPa} GPa`}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Modulus ({us ? 'Mpsi' : 'GPa'})
-              <input type="number" value={modulus} step={1} min={1} onChange={e => setModulus(Number(e.target.value))} />
-            </label>
-            <label>
-              Poisson Ratio ν
-              <input type="number" value={poisson} step={0.01} min={0.1} max={0.5} onChange={e => setPoisson(Number(e.target.value))} />
-            </label>
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => {
+                setMaterialId(sel.id)
+                setModulus(sel.eGPaDisplay)
+                setPoisson(sel.nu)
+                setDensityKgM3(sel.densityKgM3)
+                setYieldMPa(sel.yieldMPa)
+              }}
+            />
           </div>
 
           {/* Geometry */}
@@ -269,8 +207,8 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Design Metrics */}
-      <SectionToggle label="Design Metrics" open={showMetrics} onToggle={() => setShowMetrics(v => !v)} />
-      {showMetrics && result.isValid && (
+      {mode === 'analytical' && <SectionToggle label="Design Metrics" open={showMetrics} onToggle={() => setShowMetrics(v => !v)} />}
+      {mode === 'analytical' && showMetrics && result.isValid && (
         <table className="bino-table">
           <tbody>
             <tr><th colSpan={3}>Geometry</th></tr>
@@ -331,8 +269,8 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Rated Output per DOF */}
-      <SectionToggle label="Rated Output per DOF" open={showRated} onToggle={() => setShowRated(v => !v)} />
-      {showRated && result.isValid && (
+      {mode === 'analytical' && <SectionToggle label="Rated Output per DOF" open={showRated} onToggle={() => setShowRated(v => !v)} />}
+      {mode === 'analytical' && showRated && result.isValid && (
         <table className="bino-table">
           <tbody>
             <tr>
@@ -359,8 +297,8 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Strut Geometry Table */}
-      <SectionToggle label="Strut Geometry" open={showStruts} onToggle={() => setShowStruts(v => !v)} />
-      {showStruts && result.isValid && (
+      {mode === 'analytical' && <SectionToggle label="Strut Geometry" open={showStruts} onToggle={() => setShowStruts(v => !v)} />}
+      {mode === 'analytical' && showStruts && result.isValid && (
         <div style={{ overflowX: 'auto' }}>
           <table className="bino-table">
             <tbody>
@@ -390,8 +328,8 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Jacobian Matrix */}
-      <SectionToggle label="Jacobian Matrix (6×6)" open={showJacobian} onToggle={() => setShowJacobian(v => !v)} />
-      {showJacobian && result.isValid && (
+      {mode === 'analytical' && <SectionToggle label="Jacobian Matrix (6×6)" open={showJacobian} onToggle={() => setShowJacobian(v => !v)} />}
+      {mode === 'analytical' && showJacobian && result.isValid && (
         <div style={{ overflowX: 'auto' }}>
           <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 6px', fontFamily: 'monospace' }}>
             W = J × f_struts &nbsp;|&nbsp; rows: [Fx Fy Fz Mx My Mz] &nbsp;|&nbsp; cols: struts 0–5
@@ -443,9 +381,40 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       )}
 
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <HexapodSketch2D {...sketchProps} width={480} height={260} />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* 3D View */}
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          {mode === 'analytical' && (
+            <HexapodModelPreview
+              topRingRadiusMm={params.topRingRadiusMm}
+              bottomRingRadiusMm={params.bottomRingRadiusMm}
+              platformHeightMm={params.platformHeightMm}
+              strutDiameterMm={params.strutDiameterMm}
+              strutSpreadDeg={params.strutSpreadDeg}
+              topAnglesOffsetDeg={params.topAnglesOffsetDeg}
+              us={us}
+            />
+          )}
+          {mode === '3d-fea' && <p className="workspace-note" style={{ padding: '1.5rem', textAlign: 'center' }}>3D FEA is not yet available for this calculator type.</p>}
+        </div>
+      )}
+
       {/* Calibration Export */}
-      <SectionToggle label="Calibration Export (Ahmad et al. 2021)" open={showCalib} onToggle={() => setShowCalib(v => !v)} />
-      {showCalib && result.isValid && (() => {
+      {mode === 'analytical' && <SectionToggle label="Calibration Export (Ahmad et al. 2021)" open={showCalib} onToggle={() => setShowCalib(v => !v)} />}
+      {mode === 'analytical' && showCalib && result.isValid && (() => {
         const cal = generateHexapodCalibrationProcedure(result, params)
 
         function downloadBlob(content: string, filename: string, type: string) {

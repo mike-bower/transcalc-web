@@ -64,9 +64,14 @@ function applyCameraPreset(
   controls: OrbitControls,
   geometry: ReturnType<typeof buildBinocularGeometry>
 ) {
-  const maxLength = Math.max(geometry.totalLength, geometry.beamHeight, geometry.beamDepth)
-  const distance = maxLength / 10
-  const gageFocus = new THREE.Vector3((geometry.leftActiveX + geometry.rightActiveX) / 2 / 60, 0, 0)
+  const mmToScene = 1 / 60
+  const maxDim = Math.max(
+    geometry.totalLength * mmToScene,
+    geometry.beamHeight * mmToScene,
+    geometry.beamDepth * mmToScene,
+  )
+  const distance = maxDim * 2.2
+  const gageFocus = new THREE.Vector3((geometry.leftActiveX + geometry.rightActiveX) / 2 * mmToScene, 0, 0)
 
   switch (preset) {
     case 'front':
@@ -114,7 +119,6 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
     const depth = geometry.beamDepth * mmToScene
     const radius = geometry.radius * mmToScene
     const spacing = geometry.holeSpacing * mmToScene
-    const centerSlotHalfHeight = geometry.centerSlotHalfHeight * mmToScene
     const halfLength = length / 2
     const halfHeight = height / 2
     const halfDepth = depth / 2
@@ -133,16 +137,57 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
     shape.closePath()
 
     const halfSpacing = spacing / 2
-    const dx = Math.sqrt(Math.max(0, radius * radius - centerSlotHalfHeight * centerSlotHalfHeight))
-    const alpha = centerSlotHalfHeight > 0 ? Math.asin(centerSlotHalfHeight / radius) : 0
-    const cutout = new THREE.Path()
-    cutout.moveTo(-halfSpacing + dx, centerSlotHalfHeight)
-    cutout.lineTo(halfSpacing - dx, centerSlotHalfHeight)
-    cutout.absarc(halfSpacing, 0, radius, Math.PI - alpha, alpha - Math.PI, true)
-    cutout.lineTo(-halfSpacing + dx, -centerSlotHalfHeight)
-    cutout.absarc(-halfSpacing, 0, radius, -alpha, alpha, true)
-    cutout.closePath()
-    shape.holes.push(cutout)
+    const holeCenterY = geometry.holeCenterY * mmToScene
+    const innerSlotHH = geometry.innerSlotHalfHeight * mmToScene
+
+    if (geometry.isFourArm) {
+      // 4-arm: 4 holes + vertical arm cuts (width=2R) from hole centers to edges + center slot
+      for (const [hx, hy] of [
+        [-halfSpacing, holeCenterY], [halfSpacing, holeCenterY],
+        [-halfSpacing, -holeCenterY], [halfSpacing, -holeCenterY],
+      ]) {
+        const hole = new THREE.Path()
+        hole.absarc(hx, hy, radius, 0, Math.PI * 2, true)
+        shape.holes.push(hole)
+      }
+      // Vertical arm cuts from each hole center to nearest bar face, width = 2R
+      for (const hx of [-halfSpacing, halfSpacing]) {
+        const upperCut = new THREE.Path()
+        upperCut.moveTo(hx - radius, holeCenterY)
+        upperCut.lineTo(hx - radius, halfHeight)
+        upperCut.lineTo(hx + radius, halfHeight)
+        upperCut.lineTo(hx + radius, holeCenterY)
+        upperCut.closePath()
+        shape.holes.push(upperCut)
+        const lowerCut = new THREE.Path()
+        lowerCut.moveTo(hx - radius, -halfHeight)
+        lowerCut.lineTo(hx - radius, -holeCenterY)
+        lowerCut.lineTo(hx + radius, -holeCenterY)
+        lowerCut.lineTo(hx + radius, -halfHeight)
+        lowerCut.closePath()
+        shape.holes.push(lowerCut)
+      }
+      if (innerSlotHH > 0) {
+        // Horizontal center slot decoupling upper/lower beam pairs
+        const centerSlot = new THREE.Path()
+        centerSlot.moveTo(-halfSpacing, -innerSlotHH)
+        centerSlot.lineTo(-halfSpacing, innerSlotHH)
+        centerSlot.lineTo(halfSpacing, innerSlotHH)
+        centerSlot.lineTo(halfSpacing, -innerSlotHH)
+        centerSlot.closePath()
+        shape.holes.push(centerSlot)
+      }
+    } else {
+      // 2-arm: stadium (binocular) cutout — two circles at Y=0 connected by slot of height 2R
+      const cutout = new THREE.Path()
+      cutout.moveTo(-halfSpacing, radius)
+      cutout.lineTo(halfSpacing, radius)
+      cutout.absarc(halfSpacing, 0, radius, Math.PI / 2, -Math.PI / 2, true)
+      cutout.lineTo(-halfSpacing, -radius)
+      cutout.absarc(-halfSpacing, 0, radius, -Math.PI / 2, Math.PI / 2, true)
+      cutout.closePath()
+      shape.holes.push(cutout)
+    }
 
     const geometry3d = new THREE.ExtrudeGeometry(shape, {
       depth,
@@ -367,7 +412,7 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
       <div className="model-footer">
         <span>Length {geometry.totalLength.toFixed(us ? 3 : 1)} {us ? 'in' : 'mm'}</span>
         <span>Height {geometry.beamHeight.toFixed(us ? 3 : 1)} {us ? 'in' : 'mm'}</span>
-        <span>Active gage offset {geometry.gageOffsetX.toFixed(us ? 3 : 1)} {us ? 'in' : 'mm'}</span>
+        <span>{geometry.isFourArm ? '4-arm' : '2-arm'} · t = {geometry.minThickness.toFixed(us ? 3 : 1)} {us ? 'in' : 'mm'}</span>
       </div>
     </div>
   )

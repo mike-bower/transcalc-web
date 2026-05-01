@@ -75,6 +75,14 @@ export const calculateSquareShearSpan = (params: ShearSpanParams): number => {
   return calculateSpanFromStrain(maxStrain, params.gageFactor)
 }
 
+// Returns peak tensor shear strain exy in µε for use in FEA comparison
+export const calculateRoundSBeamMaxExy = (params: ShearSpanParams): number => {
+  const d = params.diameter / 2
+  const flange = (params.height - params.diameter) / 2
+  const factor1 = flange * params.width * (d - 2 * flange / 2)
+  return calculateMaxStrain(params.load, params.width, params.height, params.diameter, params.thickness, params.modulus, params.poisson, factor1)
+}
+
 export const calculateRoundShearSpan = (params: ShearSpanParams): number => {
   const d = params.diameter / 2
   const flange = (params.height - params.diameter) / 2

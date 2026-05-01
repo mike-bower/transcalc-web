@@ -108,9 +108,9 @@ function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: b
     // ── Fixed support (left wall) ─────────────────────────────────────────
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a6888, roughness: 0.55, metalness: 0.15 })
     const wallT = L * 0.07
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(wallT, W * 2, W * 2), wallMat), {
-      position: new THREE.Vector3(-L / 2 - wallT / 2, 0, 0),
-    }))
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(wallT, W * 2, W * 2), wallMat)
+    wall.position.set(-L / 2 - wallT / 2, 0, 0)
+    g.add(wall)
     if (showForces) {
       const hatchMat = new THREE.LineBasicMaterial({ color: 0x1a2535, transparent: true, opacity: 0.6 })
       const hX = -L / 2 - wallT - 0.003
@@ -235,7 +235,7 @@ function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: b
 
 export default function SquareTorqueModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <SquareTorque3D params={params} us={us} />
     </div>
   )

@@ -366,7 +366,7 @@ function ThreeBeam3D(p: Props) {
 
 export default function ThreeBeamModelPreview(props: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <ThreeBeam3D {...props} />
     </div>
   )

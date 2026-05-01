@@ -228,7 +228,7 @@ function RoundSolidTorque3D({ params, us }: { params: Record<string, number>; us
 
 export default function RoundSolidTorqueModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <RoundSolidTorque3D params={params} us={us} />
     </div>
   )

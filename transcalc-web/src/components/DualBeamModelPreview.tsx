@@ -322,7 +322,7 @@ function DualBeam3D({ params, us }: { params: Record<string, number>; us?: boole
 
 export default function DualBeamModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <DualBeam3D params={params} us={us} />
     </div>
   )

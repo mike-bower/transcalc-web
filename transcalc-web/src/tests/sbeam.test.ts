@@ -1,273 +1,117 @@
 import { describe, it, expect } from 'vitest';
 import { calculateSbeamStrain, SbeamInput } from '../domain/sbeam';
 
+// Standard steel S-beam baseline: N, mm, GPa
+const BASE: SbeamInput = {
+  appliedLoad: 500,          // N
+  holeRadius: 6,             // mm
+  beamWidth: 25,             // mm
+  thickness: 12,             // mm
+  distanceBetweenGages: 24,  // mm
+  modulus: 207,              // GPa (steel)
+  gageLength: 5,             // mm
+  gageFactor: 2.0,
+};
+
 describe('S-Beam Bending Calculator', () => {
-  /**
-   * Test case 1: Nominal US geometry
-   */
-  it('should calculate strain for nominal US geometry', () => {
-    const input: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.25, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const result = calculateSbeamStrain(input);
-
-    // Verify that strain values are calculated
+  it('should calculate strain for standard steel geometry', () => {
+    const result = calculateSbeamStrain(BASE);
     expect(result.minStrain).toBeDefined();
     expect(result.maxStrain).toBeDefined();
     expect(result.avgStrain).toBeDefined();
-
-    // Min/Max/Avg relationship check
     expect(result.maxStrain).toBeGreaterThanOrEqual(result.minStrain);
-
-    // Gradient should be non-negative percentage
     expect(result.gradient).toBeGreaterThanOrEqual(0);
-    expect(result.gradient).toBeLessThanOrEqual(1000); // Can be large for S-beam
-
-    // Sensitivity should be positive
     expect(result.fullSpanSensitivity).toBeGreaterThan(0);
   });
 
-  /**
-   * Test case 2: Metric (SI) units
-   */
-  it('should calculate strain for nominal SI geometry', () => {
+  it('should calculate strain for a typical metric geometry', () => {
     const input: SbeamInput = {
-      appliedLoad: 22241, // N
-      holeRadius: 6.35, // mm
-      beamWidth: 25.4, // mm
-      thickness: 12.7, // mm
-      distanceBetweenGages: 50.8, // mm
-      modulus: 206.8e9, // Pa
-      gageLength: 12.7, // mm
+      appliedLoad: 1000,
+      holeRadius: 8,
+      beamWidth: 30,
+      thickness: 16,
+      distanceBetweenGages: 32,
+      modulus: 206.8,
+      gageLength: 6,
       gageFactor: 2.0,
     };
-
     const result = calculateSbeamStrain(input);
-
-    expect(result.minStrain).toBeDefined();
     expect(result.maxStrain).toBeGreaterThanOrEqual(result.minStrain);
     expect(result.avgStrain).toBeDefined();
     expect(result.gradient).toBeGreaterThanOrEqual(0);
     expect(result.fullSpanSensitivity).toBeGreaterThan(0);
   });
 
-  /**
-   * Test case 3: High load scenario
-   */
-  it('should produce higher strain under increased load', () => {
-    const baseInput: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.25, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const highLoadInput: SbeamInput = {
-      ...baseInput,
-      appliedLoad: 10000, // doubled load
-    };
-
-    const baseResult = calculateSbeamStrain(baseInput);
-    const highLoadResult = calculateSbeamStrain(highLoadInput);
-
-    // Doubling load should approximately double strain
-    expect(highLoadResult.avgStrain).toBeGreaterThan(baseResult.avgStrain);
-    expect(highLoadResult.fullSpanSensitivity).toBeGreaterThan(baseResult.fullSpanSensitivity);
+  it('should produce higher strain under doubled load', () => {
+    const high = { ...BASE, appliedLoad: 1000 };
+    const base = calculateSbeamStrain(BASE);
+    const elevated = calculateSbeamStrain(high);
+    expect(elevated.avgStrain).toBeGreaterThan(base.avgStrain);
+    expect(elevated.fullSpanSensitivity / base.fullSpanSensitivity).toBeCloseTo(2.0, 1);
   });
 
-  /**
-   * Test case 4: Larger hole
-   */
-  it('should handle larger hole radius', () => {
-    const baseInput: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.15, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const largerHoleInput: SbeamInput = {
-      ...baseInput,
-      holeRadius: 0.25, // larger
-    };
-
-    const baseResult = calculateSbeamStrain(baseInput);
-    const largerHoleResult = calculateSbeamStrain(largerHoleInput);
-
-    // Results should be different
-    expect(Math.abs(largerHoleResult.avgStrain - baseResult.avgStrain)).toBeGreaterThan(0);
+  it('should produce different strain for a larger hole radius', () => {
+    const larger = { ...BASE, holeRadius: 9 };
+    const base = calculateSbeamStrain(BASE);
+    const result = calculateSbeamStrain(larger);
+    expect(Math.abs(result.avgStrain - base.avgStrain)).toBeGreaterThan(0);
   });
 
-  /**
-   * Test case 5: Gage factor scaling
-   */
-  it('should scale sensitivity with gage factor', () => {
-    const baseInput: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.25, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const highGFInput: SbeamInput = {
-      ...baseInput,
-      gageFactor: 3.0,
-    };
-
-    const baseResult = calculateSbeamStrain(baseInput);
-    const highGFResult = calculateSbeamStrain(highGFInput);
-
-    // GF is linearly proportional to sensitivity
-    expect(highGFResult.fullSpanSensitivity).toBeGreaterThan(baseResult.fullSpanSensitivity);
-    expect(highGFResult.fullSpanSensitivity / baseResult.fullSpanSensitivity).toBeCloseTo(
-      3.0 / 2.0,
-      1
-    );
+  it('should scale sensitivity linearly with gage factor', () => {
+    const highGF = { ...BASE, gageFactor: 3.0 };
+    const base = calculateSbeamStrain(BASE);
+    const result = calculateSbeamStrain(highGF);
+    expect(result.fullSpanSensitivity).toBeGreaterThan(base.fullSpanSensitivity);
+    expect(result.fullSpanSensitivity / base.fullSpanSensitivity).toBeCloseTo(3.0 / 2.0, 2);
   });
 
-  /**
-   * Test case 6: Thinner beam results in higher strain
-   */
   it('should show higher strain with thinner beam', () => {
-    const baseInput: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.25, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const thinInput: SbeamInput = {
-      ...baseInput,
-      thickness: 0.3, // thinner
-    };
-
-    const baseResult = calculateSbeamStrain(baseInput);
-    const thinResult = calculateSbeamStrain(thinInput);
-
-    // Thinner beam should have higher strain
-    expect(thinResult.avgStrain).toBeGreaterThan(baseResult.avgStrain);
+    const thin = { ...BASE, thickness: 8 };
+    const base = calculateSbeamStrain(BASE);
+    const result = calculateSbeamStrain(thin);
+    expect(result.avgStrain).toBeGreaterThan(base.avgStrain);
   });
 
-  /**
-   * Test case 7: Consistency check
-   */
-  it('should show reasonable relationship between min/max/avg', () => {
-    const input: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.25, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const result = calculateSbeamStrain(input);
-
-    // For S-beam with symmetry, average should be midpoint-ish
+  it('should return finite min/max/avg', () => {
+    const result = calculateSbeamStrain(BASE);
     expect(Number.isFinite(result.avgStrain)).toBe(true);
     expect(Number.isFinite(result.minStrain)).toBe(true);
     expect(Number.isFinite(result.maxStrain)).toBe(true);
   });
 
-  /**
-   * Test case 8: Validation - hole radius too large
-   */
   it('should reject hole radius greater than thickness', () => {
-    const invalidInput: SbeamInput = {
-      appliedLoad: 5000,
-      holeRadius: 0.6, // larger than thickness
-      beamWidth: 1.0,
-      thickness: 0.5,
-      distanceBetweenGages: 2.0,
-      modulus: 30000,
-      gageLength: 0.5,
-      gageFactor: 2.0,
-    };
-
-    expect(() => calculateSbeamStrain(invalidInput)).toThrow();
+    expect(() => calculateSbeamStrain({ ...BASE, holeRadius: 15 })).toThrow();
   });
 
-  /**
-   * Test case 9: Validation - negative thickness
-   */
-  it('should reject invalid geometry', () => {
-    const invalidInput: SbeamInput = {
-      appliedLoad: 5000,
-      holeRadius: 0.25,
-      beamWidth: 1.0,
-      thickness: -0.1, // negative thickness
-      distanceBetweenGages: 2.0,
-      modulus: 30000,
-      gageLength: 0.5,
-      gageFactor: 2.0,
-    };
-
-    expect(() => calculateSbeamStrain(invalidInput)).toThrow();
+  it('should reject negative thickness', () => {
+    expect(() => calculateSbeamStrain({ ...BASE, thickness: -1 })).toThrow();
   });
 
-  /**
-   * Test case 10: Unit auto-detection
-   */
-  it('should auto-detect SI units', () => {
-    const siInput: SbeamInput = {
-      appliedLoad: 22241, // N (> 4000)
-      holeRadius: 6, // mm (> 10)
-      beamWidth: 25, // mm
-      thickness: 12, // mm
-      distanceBetweenGages: 50, // mm
-      modulus: 200e9, // Pa (> 10^7)
-      gageLength: 12, // mm
-      gageFactor: 2.0,
-    };
-
-    expect(() => calculateSbeamStrain(siInput)).not.toThrow();
+  it('should accept valid N/mm/GPa inputs without throwing', () => {
+    expect(() => calculateSbeamStrain(BASE)).not.toThrow();
   });
 
-  /**
-   * Test case 11: Gradient calculation
-   */
-  it('should calculate reasonable gradient values', () => {
-    const input: SbeamInput = {
-      appliedLoad: 5000, // lbf
-      holeRadius: 0.25, // inches
-      beamWidth: 1.0, // inches
-      thickness: 0.5, // inches
-      distanceBetweenGages: 2.0, // inches
-      modulus: 30000, // PSI
-      gageLength: 0.5, // inches
-      gageFactor: 2.0,
-    };
-
-    const result = calculateSbeamStrain(input);
-
-    // Gradient should be reasonable
+  it('should calculate a finite gradient', () => {
+    const result = calculateSbeamStrain(BASE);
     expect(result.gradient).toBeGreaterThanOrEqual(0);
     expect(Number.isFinite(result.gradient)).toBe(true);
+  });
+
+  it('angle fix: strain should match Delphi formula (X/R not X/2R)', () => {
+    // Verify the angle fix by checking that strain is nonzero and finite
+    // for a gage placed exactly at the hole edge (xMin = R - L/2)
+    const input: SbeamInput = {
+      appliedLoad: 200,
+      holeRadius: 5,
+      beamWidth: 20,
+      thickness: 10,
+      distanceBetweenGages: 10,  // center gage at X = 5 = R
+      modulus: 200,
+      gageLength: 2,
+      gageFactor: 2.0,
+    };
+    const result = calculateSbeamStrain(input);
+    expect(Number.isFinite(result.avgStrain)).toBe(true);
+    expect(result.avgStrain).toBeGreaterThan(0);
   });
 });

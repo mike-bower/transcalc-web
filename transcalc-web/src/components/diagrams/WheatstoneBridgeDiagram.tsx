@@ -10,7 +10,7 @@
  * For max bridge output, adjacent arms should carry opposite-sign strains.
  */
 
-type ArmRole = 'tension' | 'compression' | 'resistor'
+type ArmRole = 'tension' | 'compression' | 'poisson' | 'resistor'
 
 interface ArmDef {
   role: ArmRole
@@ -20,6 +20,11 @@ interface ArmDef {
 
 export type BridgePreset =
   | 'cantilever'
+  | 'cantQuarter'
+  | 'cantPoissonHalf'
+  | 'cantHalfTopBot'
+  | 'cantFullBend'
+  | 'cantFullPoisson'
   | 'bending'
   | 'column'
   | 'shear'
@@ -34,6 +39,7 @@ type Props = {
 // ── Colors ────────────────────────────────────────────────────────────────────
 const tensionC     = '#c04010'
 const compressionC = '#2060b0'
+const poissonC     = '#c07020'   // transverse / Poisson gages
 const resistorC    = '#9aaabb'
 const dc           = '#3a4a6b'
 
@@ -50,6 +56,39 @@ const CONFIGS: Record<BridgePreset, [ArmDef, ArmDef, ArmDef, ArmDef]> = {
     { role: 'resistor',    label: 'R', desc: '' },
     { role: 'compression', label: 'B', desc: 'bot · root (−)' },
   ],
+
+  // ── Five explicit cantilever bridge types ──────────────────────────────────
+  cantQuarter: [
+    { role: 'resistor', label: 'R', desc: '' },
+    { role: 'resistor', label: 'R', desc: '' },
+    { role: 'resistor', label: 'R', desc: '' },
+    { role: 'tension',  label: 'A', desc: 'top · 0° (+ε)' },
+  ],
+  cantPoissonHalf: [
+    { role: 'resistor', label: 'R', desc: '' },
+    { role: 'resistor', label: 'R', desc: '' },
+    { role: 'poisson',  label: 'B', desc: 'top · 90° (−νε)' },
+    { role: 'tension',  label: 'A', desc: 'top · 0° (+ε)' },
+  ],
+  cantHalfTopBot: [
+    { role: 'resistor',    label: 'R', desc: '' },
+    { role: 'resistor',    label: 'R', desc: '' },
+    { role: 'compression', label: 'B', desc: 'bot · 0° (−ε)' },
+    { role: 'tension',     label: 'A', desc: 'top · 0° (+ε)' },
+  ],
+  cantFullBend: [
+    { role: 'compression', label: 'D', desc: 'bot · 0° (−ε)' },
+    { role: 'tension',     label: 'C', desc: 'top · 0° (+ε)' },
+    { role: 'compression', label: 'B', desc: 'bot · 0° (−ε)' },
+    { role: 'tension',     label: 'A', desc: 'top · 0° (+ε)' },
+  ],
+  cantFullPoisson: [
+    { role: 'poisson',  label: 'D', desc: 'top · 90° (−νε)' },
+    { role: 'tension',  label: 'C', desc: 'top · 0° (+ε)' },
+    { role: 'poisson',  label: 'B', desc: 'top · 90° (−νε)' },
+    { role: 'tension',  label: 'A', desc: 'top · 0° (+ε)' },
+  ],
+
   bending: [
     { role: 'tension',     label: 'A', desc: 'tension · L (+)' },
     { role: 'compression', label: 'B', desc: 'compress · L (−)' },
@@ -83,8 +122,13 @@ const CONFIGS: Record<BridgePreset, [ArmDef, ArmDef, ArmDef, ArmDef]> = {
 }
 
 const FORMULA: Record<BridgePreset, (nu?: number) => string> = {
-  cantilever: () => 'Half bridge · output ≈ GF·ε / 2',
-  bending:    () => 'Full bridge · output ≈ GF·ε',
+  cantilever:      () => 'Half bridge · output ≈ GF·ε / 2',
+  cantQuarter:     () => 'Quarter bridge · output = GF·ε / 4',
+  cantPoissonHalf: (nu = 0.3) => `Poisson ½ bridge · output = GF·ε·(1+ν)/4  [ν=${nu.toFixed(2)} → ×${((1 + nu) / 4).toFixed(3)}·GF·ε]`,
+  cantHalfTopBot:  () => 'Half bridge (top/bot) · output = GF·ε / 2',
+  cantFullBend:    () => 'Full bridge (bending) · output = GF·ε',
+  cantFullPoisson: (nu = 0.3) => `Full bridge (Poisson) · output = GF·ε·(1+ν)/2  [ν=${nu.toFixed(2)} → ×${((1 + nu) / 2).toFixed(3)}·GF·ε]`,
+  bending:         () => 'Full bridge · output ≈ GF·ε',
   column:     (nu = 0.3) => `Full bridge · output ≈ GF·ε·(1+${nu.toFixed(2)}) ≈ ${(1 + nu).toFixed(2)}·GF·ε`,
   shear:      () => 'Full bridge · output ≈ GF·γ  (γ = shear strain)',
   torque:     () => 'Full bridge · output ≈ GF·γ  (γ = torsional shear strain)',
@@ -95,6 +139,7 @@ const FORMULA: Record<BridgePreset, (nu?: number) => string> = {
 function armColor(role: ArmRole): string {
   if (role === 'tension')     return tensionC
   if (role === 'compression') return compressionC
+  if (role === 'poisson')     return poissonC
   return resistorC
 }
 
@@ -112,6 +157,7 @@ function BridgeArm({ x1, y1, x2, y2, arm }: SegProps) {
   const lx2 = mx + ux * rw / 2, ly2 = my + uy * rw / 2
   const col = armColor(arm.role)
   const isRes = arm.role === 'resistor'
+  const isActive = !isRes
 
   return (
     <g>

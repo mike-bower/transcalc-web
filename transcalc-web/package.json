@@ -9,9 +9,16 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "format": "prettier --write .",
-    "build:wasm": "wasm-pack build wasm --target bundler --out-dir ../wasm/pkg"
+    "build:wasm": "wasm-pack build wasm --target bundler --out-dir ../wasm/pkg",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "cap:android": "npm run build && npx cap sync android && npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/ios": "^8.3.1",
     "@react-three/drei": "^9.105.6",
     "@react-three/fiber": "^8.16.8",
     "react": "^18.2.0",

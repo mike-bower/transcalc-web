@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react'
 import { designCrossBeamFT, generateCalibrationProcedure, type CrossBeamFTParams } from '../../domain/sixAxisForceTorque'
-import { MATERIALS, DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import CrossBeamSketch2D from '../diagrams/CrossBeamSketch2D'
 import CrossBeamModelPreview from '../CrossBeamModelPreview'
+import CrossBeamFea3DCalc from './CrossBeamFea3DCalc'
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -84,27 +88,6 @@ function MatrixCell({ value, isDiag }: { value: number; isDiag: boolean }) {
   )
 }
 
-// Lightweight collapsible section using existing app styling patterns
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
-}
-
 const CHANNEL_LABELS = ['Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'] as const
 type Channel = typeof CHANNEL_LABELS[number]
 
@@ -112,26 +95,21 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
   const us = unitSystem === 'US'
   const [fields, setFields] = useState<FieldValues>(() => initFields(us))
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
-  const mat = getMaterial(materialId)
-  const [modulus, setModulus]     = useState(us ? +(mat.eGPa / GPA_PER_MPSI).toFixed(2) : mat.eGPa)
-  const [poisson, setPoisson]     = useState(mat.nu)
+  const [modulus, setModulus]       = useState(() => { const m = getMaterial(DEFAULT_MATERIAL_ID); return us ? +(m.eGPa / GPA_PER_MPSI).toFixed(2) : m.eGPa })
+  const [poisson, setPoisson]       = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [densityKgM3, setDensityKgM3] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).densityKgM3)
+  const [yieldMPa, setYieldMPa]     = useState(() => getMaterial(DEFAULT_MATERIAL_ID).yieldMPa)
   const [gageFactor, setGageFactor] = useState(2.0)
 
-  function applyMaterial(id: string) {
-    const m = getMaterial(id)
-    setMaterialId(id)
-    setModulus(us ? +(m.eGPa / GPA_PER_MPSI).toFixed(2) : m.eGPa)
-    setPoisson(m.nu)
-  }
-
   const [showInputs, setShowInputs]   = useState(true)
-  const [showSketch, setShowSketch]   = useState(true)
+  const [showSketch, setShowSketch]   = useState(false)
   const [show3D, setShow3D]           = useState(false)
   const [showMetrics, setShowMetrics] = useState(true)
   const [showChannels, setShowChannels] = useState(true)
   const [showGages, setShowGages]     = useState(true)
   const [showMatrix, setShowMatrix]   = useState(true)
   const [showCalib, setShowCalib]     = useState(false)
+  const [mode, setMode]               = useState<'analytical' | '3d-fea'>('analytical')
 
   function setField(key: string, val: number) {
     setFields(prev => ({ ...prev, [key]: val }))
@@ -151,10 +129,10 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
       youngsModulusPa:         E_Pa,
       poissonRatio:            poisson,
       gageFactor,
-      densityKgM3:             mat.densityKgM3,
-      yieldStrengthPa:         mat.yieldMPa ? mat.yieldMPa * 1e6 : undefined,
+      densityKgM3:             densityKgM3,
+      yieldStrengthPa:         yieldMPa ? yieldMPa * 1e6 : undefined,
     }
-  }, [fields, modulus, poisson, gageFactor, us, mat])
+  }, [fields, modulus, poisson, gageFactor, us, densityKgM3, yieldMPa])
 
   const result = useMemo(() => designCrossBeamFT(params), [params])
 
@@ -175,73 +153,25 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
 
       {/* Controls */}
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={!us ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={us ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-      </div>
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
-      {/* 2D Sketch */}
-      <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />
-      {showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <CrossBeamSketch2D
-              outerRadiusMm={params.outerRadiusMm}
-              innerRadiusMm={params.innerRadiusMm}
-              beamWidthMm={params.beamWidthMm}
-              beamThicknessMm={params.beamThicknessMm}
-              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
-              width={320} height={320}
-            />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
-      {/* 3D Model */}
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
-      {show3D && (
-        <div className="calc-model-3d">
-          <CrossBeamModelPreview
-            outerRadiusMm={params.outerRadiusMm}
-            innerRadiusMm={params.innerRadiusMm}
-            beamWidthMm={params.beamWidthMm}
-            beamThicknessMm={params.beamThicknessMm}
-            gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
-            us={us}
-          />
-        </div>
-      )}
-
-      {/* Inputs */}
+      {/* Inputs — always visible so geometry can be adjusted in any mode */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
           {/* Material group */}
           <div className="bino-grid" style={{ marginBottom: 4 }}>
-            <label style={{ gridColumn: '1 / -1' }}>
-              Material
-              <select
-                value={materialId}
-                onChange={e => applyMaterial(e.target.value)}
-                style={{ fontFamily: 'inherit', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--line)', background: '#fff', color: 'var(--ink)', width: '100%', marginTop: 4 }}
-              >
-                {MATERIALS.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}{m.yieldMPa ? ` — E=${m.eGPa} GPa, σy=${m.yieldMPa} MPa` : ` — E=${m.eGPa} GPa`}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Modulus of Elasticity ({us ? 'Mpsi' : 'GPa'})
-              <input type="number" value={modulus} step={1} min={1} onChange={e => setModulus(Number(e.target.value))} />
-            </label>
-            <label>
-              Poisson Ratio ν
-              <input type="number" value={poisson} step={0.01} min={0.1} max={0.5} onChange={e => setPoisson(Number(e.target.value))} />
-            </label>
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => {
+                setMaterialId(sel.id)
+                setModulus(sel.eGPaDisplay)
+                setPoisson(sel.nu)
+                setDensityKgM3(sel.densityKgM3)
+                setYieldMPa(sel.yieldMPa)
+              }}
+            />
           </div>
 
           {/* Geometry + gage inputs */}
@@ -271,8 +201,8 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Design Metrics */}
-      <SectionToggle label="Design Metrics" open={showMetrics} onToggle={() => setShowMetrics(v => !v)} />
-      {showMetrics && (
+      {mode === 'analytical' && <SectionToggle label="Design Metrics" open={showMetrics} onToggle={() => setShowMetrics(v => !v)} />}
+      {mode === 'analytical' && showMetrics && (
         <table className="bino-table">
           <tbody>
             <tr><th colSpan={3}>Decoupling</th></tr>
@@ -333,8 +263,8 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Channel Sensitivity */}
-      <SectionToggle label="Channel Sensitivity & Rated Output" open={showChannels} onToggle={() => setShowChannels(v => !v)} />
-      {showChannels && (
+      {mode === 'analytical' && <SectionToggle label="Channel Sensitivity & Rated Output" open={showChannels} onToggle={() => setShowChannels(v => !v)} />}
+      {mode === 'analytical' && showChannels && (
         <table className="bino-table">
           <tbody>
             <tr>
@@ -367,8 +297,8 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Gage Strain Map */}
-      <SectionToggle label="Gage Strain Map — Individual Strains at Rated Load" open={showGages} onToggle={() => setShowGages(v => !v)} />
-      {showGages && (
+      {mode === 'analytical' && <SectionToggle label="Gage Strain Map — Individual Strains at Rated Load" open={showGages} onToggle={() => setShowGages(v => !v)} />}
+      {mode === 'analytical' && showGages && (
         <table className="bino-table">
           <tbody>
             <tr>
@@ -408,8 +338,8 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
       )}
 
       {/* Sensitivity Matrix */}
-      <SectionToggle label="Sensitivity Matrix S (mV/V per unit load)" open={showMatrix} onToggle={() => setShowMatrix(v => !v)} />
-      {showMatrix && (
+      {mode === 'analytical' && <SectionToggle label="Sensitivity Matrix S (mV/V per unit load)" open={showMatrix} onToggle={() => setShowMatrix(v => !v)} />}
+      {mode === 'analytical' && showMatrix && (
         <div style={{ overflowX: 'auto' }}>
           <p className="workspace-note" style={{ marginBottom: 6 }}>
             Ideal symmetric geometry — off-diagonal coupling = 0%. Real sensors: 1–5% from manufacturing tolerances.
@@ -440,9 +370,57 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       )}
 
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <CrossBeamSketch2D
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              beamWidthMm={params.beamWidthMm}
+              beamThicknessMm={params.beamThicknessMm}
+              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
+              width={320} height={320}
+            />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* 3D View */}
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          {mode === 'analytical' && (
+            <CrossBeamModelPreview
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              beamWidthMm={params.beamWidthMm}
+              beamThicknessMm={params.beamThicknessMm}
+              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
+              us={us}
+            />
+          )}
+          {mode === '3d-fea' && (
+            <CrossBeamFea3DCalc
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              beamWidthMm={params.beamWidthMm}
+              beamThicknessMm={params.beamThicknessMm}
+              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
+              E={params.youngsModulusPa}
+              nu={params.poissonRatio}
+              ratedForceN={params.ratedForceN}
+            />
+          )}
+        </div>
+      )}
+
       {/* Calibration Export */}
-      <SectionToggle label="Calibration Export (Ahmad et al. 2021)" open={showCalib} onToggle={() => setShowCalib(v => !v)} />
-      {showCalib && result.isValid && (() => {
+      {mode === 'analytical' && <SectionToggle label="Calibration Export (Ahmad et al. 2021)" open={showCalib} onToggle={() => setShowCalib(v => !v)} />}
+      {mode === 'analytical' && showCalib && result.isValid && (() => {
         const cal = generateCalibrationProcedure(result, params)
         const forceUnit = us ? 'lbf' : 'N'
         const momentUnit = us ? 'in·lbf' : 'N·m'

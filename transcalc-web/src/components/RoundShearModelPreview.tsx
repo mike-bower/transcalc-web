@@ -260,7 +260,7 @@ function RoundShear3D({ params, us }: { params: Record<string, number>; us?: boo
 
 export default function RoundShearModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <RoundShear3D params={params} us={us} />
     </div>
   )

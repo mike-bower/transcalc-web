@@ -5,13 +5,13 @@ import { BridgeConfig } from '../domain/orchestrator'
 import { createAxesGizmo } from './sceneHelpers'
 
 type Props = {
-  params: Record<string, number>
+  params: Record<string, unknown>
   us?: boolean
 }
 
-function p(params: Record<string, number>, key: string, fallback: number): number {
+function p(params: Record<string, unknown>, key: string, fallback: number): number {
   const v = params[key]
-  return Number.isFinite(v) && v > 0 ? v : fallback
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -107,7 +107,7 @@ function makeTaperedBeamGeometry(length: number, thickness: number, wRoot: numbe
   return geo
 }
 
-function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boolean }) {
+function Cantilever3D({ params, us }: { params: Record<string, unknown>, us?: boolean }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
@@ -115,11 +115,11 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
 
   const model = useMemo(() => {
     const g = new THREE.Group()
-    const mmToScene = 1 / 90
+    let mmToScene = 1 / 90
     
     // Logic for Target Driven Mode
     const isTargetDriven = params.isTargetDriven === 1
-    const targetOutput = params.targetOutput || 0
+    const targetOutput: number = typeof params.targetOutput === 'number' ? params.targetOutput : 0
     let loadN = p(params, 'load', 100)
     
     const bridgeConfig = (params.bridgeConfig as unknown as BridgeConfig) || 'quarter'
@@ -177,12 +177,15 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     const forceStr = us ? `${(loadN / 4.44822).toFixed(1)} lbf` : `${loadN.toFixed(0)} N`
 
     const beamLengthMm = Math.max(momentArmMm + gageOffsetMm, gageOffsetMm + gageLenMm)
-    const L = clamp(beamLengthMm * mmToScene, 0.5, 4.2)
-    const T = clamp(thicknessMm * mmToScene, 0.05, 0.45)
-    const W = clamp(widthMm * mmToScene, 0.14, 1.2)
-    const clampLen = clamp(clampLengthMm * mmToScene, 0.12, 1.2)
-    const gageLen = clamp(gageLenMm * mmToScene, 0.05, L * 0.65)
-    const gageWidth = clamp(gageLen * 0.5, 0.04, W * 0.92)
+    // Auto-scale: boost mmToScene so beam always occupies 0.5–4.0 scene units,
+    // preserving all proportions for any input size.
+    mmToScene = Math.min(Math.max(0.5 / beamLengthMm, mmToScene), 4.0 / beamLengthMm)
+    const L = beamLengthMm * mmToScene
+    const T = clamp(thicknessMm * mmToScene, 0.012, L * 0.5)
+    const W = clamp(widthMm * mmToScene, 0.04, L * 3.0)
+    const clampLen = Math.max(clampLengthMm * mmToScene, 0.06)
+    const gageLen = clamp(gageLenMm * mmToScene, 0.02, L * 0.85)
+    const gageWidth = clamp(gageLen * 0.5, 0.02, W * 0.92)
     const gageCenter = clamp(gageOffsetMm * mmToScene, gageLen * 0.55, L - gageLen * 0.55)
     const loadArrowLength = clamp(0.18 + Math.log10(Math.max(loadN, 1)) * 0.12, 0.22, 0.58)
 
@@ -492,7 +495,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     if (!hostRef.current) return
     const host = hostRef.current
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x000000)
+    scene.background = new THREE.Color(0xffffff)
     const camera = new THREE.PerspectiveCamera(45, host.clientWidth / Math.max(1, host.clientHeight), 0.1, 100)
     camera.position.set(2.5, 1.8, 2.2)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -513,7 +516,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
     const d = new THREE.DirectionalLight(0xffffff, 1.0)
     d.position.set(4, 5, 3)
     scene.add(d)
-    scene.add(new THREE.GridHelper(6, 14, 0x333333, 0x1a1a1a))
+    scene.add(new THREE.GridHelper(6, 14, 0xbbbbbb, 0xdddddd))
 
     const root = new THREE.Group()
     rootRef.current = root
@@ -597,7 +600,7 @@ function Cantilever3D({ params, us }: { params: Record<string, number>, us?: boo
 
 export default function CantileverModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <Cantilever3D params={params} us={us} />
     </div>
   )

@@ -3,6 +3,9 @@ import ProjectPanel from './components/ProjectPanel'
 import TransducerGallery from './components/TransducerGallery'
 import WorkspaceRouter from './components/WorkspaceRouter'
 import CalcSidebar from './components/CalcSidebar'
+import KnowledgeBase from './components/KnowledgeBase'
+import KbSeeAlso from './components/KbSeeAlso'
+import { KbContext, type KbOpenArgs } from './components/KbContext'
 import { newProject, type ProjectState } from './domain/projectSchema'
 import { initWasm, isWasmLoaded } from './domain/wasmBridge'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -52,7 +55,11 @@ export default function App() {
   const [helpSearch, setHelpSearch]         = useState('')
   const [helpHtml, setHelpHtml]             = useState<string>('')
   const [helpOpen, setHelpOpen]             = useState(false)
+  const [refsOpen, setRefsOpen]             = useState(false)
+  const [refsArgs, setRefsArgs]             = useState<KbOpenArgs | undefined>()
   const [helpTopicKey, setHelpTopicKey]     = useState('bbcant')
+
+  function openRefs(args?: KbOpenArgs) { setRefsArgs(args); setRefsOpen(true) }
   const [wasmReady, setWasmReady]           = useState(false)
 
   useEffect(() => {
@@ -114,26 +121,32 @@ export default function App() {
           )}
           <button className="export-btn" onClick={() => window.print()} aria-label="Print engineering report">Print Report</button>
           <a className="export-btn" href="/user-guide.html" target="_blank" rel="noopener noreferrer">User Guide</a>
+          <button className="export-btn" onClick={() => setRefsOpen(true)}>References</button>
           <button className="export-btn" onClick={() => setHelpOpen(true)}>Help</button>
         </div>
       </header>
 
-      <div className="app-body">
-        <CalcSidebar selectedKey={selectedCalcKey} onSelect={setSelectedCalcKey} />
-        <main className="main-content">
-          <ErrorBoundary label="Main">
-            {selectedCalcKey ? (
-              <WorkspaceRouter
-                calcKey={selectedCalcKey}
-                unitSystem={unitSystem}
-                onUnitChange={setUnitSystem}
-              />
-            ) : (
-              <TransducerGallery onSelect={setSelectedCalcKey} />
-            )}
-          </ErrorBoundary>
-        </main>
-      </div>
+      <KbContext.Provider value={openRefs}>
+        <div className="app-body">
+          <CalcSidebar selectedKey={selectedCalcKey} onSelect={setSelectedCalcKey} />
+          <main className="main-content">
+            <ErrorBoundary key={selectedCalcKey ?? 'gallery'} label="Main">
+              {selectedCalcKey ? (
+                <WorkspaceRouter
+                  calcKey={selectedCalcKey}
+                  unitSystem={unitSystem}
+                  onUnitChange={setUnitSystem}
+                />
+              ) : (
+                <TransducerGallery onSelect={setSelectedCalcKey} />
+              )}
+            </ErrorBoundary>
+            {selectedCalcKey && <KbSeeAlso calcKey={selectedCalcKey} />}
+          </main>
+        </div>
+      </KbContext.Provider>
+
+      <KnowledgeBase open={refsOpen} onClose={() => setRefsOpen(false)} initialArgs={refsArgs} />
 
       {helpOpen && (
         <div className="help-overlay" onClick={() => setHelpOpen(false)}>

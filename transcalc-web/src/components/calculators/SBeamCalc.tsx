@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSbeamStrain } from '../../domain/sbeam'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import SBeamModelPreview from '../SBeamModelPreview'
 import SBeamDiagram from '../diagrams/SBeamDiagram'
 import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
+import SBeamFea3DCalc from './SBeamFea3DCalc'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -18,39 +23,23 @@ type Props = {
   onUnitChange: (next: UnitSystem) => void
 }
 
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
-}
-
 export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [load, setLoad] = useState(100)
   const [holeRadius, setHoleRadius] = useState(5)
   const [width, setWidth] = useState(25)
   const [thickness, setThickness] = useState(12)
   const [distBetweenGages, setDistBetweenGages] = useState(25)
-  const [modulusGPa, setModulusGPa] = useState(200)
+  const [modulusGPa, setModulusGPa] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).eGPa)
   const [gageLength, setGageLength] = useState(5)
   const [gageFactor, setGageFactor] = useState(2.1)
-  const [show2D, setShow2D] = useState(true)
-  const [show3D, setShow3D] = useState(true)
+  const [poisson, setPoisson] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
+  const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
+  const [show2D, setShow2D] = useState(false)
+  const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
+
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -83,7 +72,7 @@ export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
     const thicknessMm = thickness * mm
     const distMm = distBetweenGages * mm
     const gageLenMm = gageLength * mm
-    const modulusPa = (unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI) * 1e9
+    const modulusGPa_calc = unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI
 
     const checks: [number, string][] = [
       [loadN, 'Applied load'],
@@ -91,7 +80,7 @@ export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
       [widthMm, 'Beam width'],
       [thicknessMm, 'Thickness'],
       [distMm, 'Distance between gages'],
-      [modulusPa, 'Modulus'],
+      [modulusGPa_calc, 'Modulus'],
       [gageLenMm, 'Gage length'],
       [gageFactor, 'Gage factor'],
     ]
@@ -105,7 +94,7 @@ export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
         beamWidth: widthMm,
         thickness: thicknessMm,
         distanceBetweenGages: distMm,
-        modulus: modulusPa,
+        modulus: modulusGPa_calc,
         gageLength: gageLenMm,
         gageFactor,
       })
@@ -121,15 +110,44 @@ export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
 
   return (
     <div className="bino-wrap">
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-      </div>
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
-      <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />
-      {show2D && (
+      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
+      {showInputs && (
+        <>
+          <div className="bino-grid">
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => { setMaterialId(sel.id); setModulusGPa(sel.eGPaDisplay); setPoisson(sel.nu) }}
+            />
+            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Hole radius, R ({lenUnit})<input type="number" value={Number.isFinite(holeRadius) ? holeRadius : ''} onChange={e => setHoleRadius(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Distance between gages, D ({lenUnit})<input type="number" value={Number.isFinite(distBetweenGages) ? distBetweenGages : ''} onChange={e => setDistBetweenGages(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+          </div>
+          {result.error && <p className="workspace-note">{result.error}</p>}
+        </>
+      )}
+
+      {mode === 'analytical' && <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />}
+      {mode === 'analytical' && showResults && (
+        <table className="bino-table">
+          <tbody>
+            <tr><th colSpan={3}>Calculated Values</th></tr>
+            <tr><td>Nominal Gage Strain:</td><td>{show(result.data?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Min / Max Strain:</td><td>{show(result.data?.minStrain ?? NaN, 0)} / {show(result.data?.maxStrain ?? NaN, 0)}</td><td>µε</td></tr>
+            <tr><td>Strain Variation:</td><td>{show(result.data?.gradient ?? NaN, 2)}</td><td>%</td></tr>
+            <tr><td>Span at Applied Force:</td><td>{show(result.data?.fullSpanSensitivity ?? NaN, 4)}</td><td>mV/V</td></tr>
+          </tbody>
+        </table>
+      )}
+
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {mode === 'analytical' && show2D && (
         <div className="calc-diagram-row">
           <div className="calc-diagram-2d">
             <SBeamDiagram
@@ -147,53 +165,40 @@ export default function SBeamCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       )}
 
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
-          <SBeamModelPreview
-            params={{
-              load:   unitSystem === 'SI' ? load : load * N_PER_LBF,
-              holeRadius:   (unitSystem === 'SI' ? holeRadius  : holeRadius  * MM_PER_IN),
-              width:  (unitSystem === 'SI' ? width       : width       * MM_PER_IN),
-              thickness:    (unitSystem === 'SI' ? thickness   : thickness   * MM_PER_IN),
-              distBetweenGages: (unitSystem === 'SI' ? distBetweenGages : distBetweenGages * MM_PER_IN),
-              gageLen: (unitSystem === 'SI' ? gageLength  : gageLength  * MM_PER_IN),
-              modulus: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
-              gageFactor,
-            }}
-            us={unitSystem === 'US'}
-          />
+          {mode === 'analytical' && (
+            <SBeamModelPreview
+              params={{
+                load:   unitSystem === 'SI' ? load : load * N_PER_LBF,
+                holeRadius:   (unitSystem === 'SI' ? holeRadius  : holeRadius  * MM_PER_IN),
+                width:  (unitSystem === 'SI' ? width       : width       * MM_PER_IN),
+                thickness:    (unitSystem === 'SI' ? thickness   : thickness   * MM_PER_IN),
+                distBetweenGages: (unitSystem === 'SI' ? distBetweenGages : distBetweenGages * MM_PER_IN),
+                gageLen: (unitSystem === 'SI' ? gageLength  : gageLength  * MM_PER_IN),
+                modulus: unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI,
+                gageFactor,
+              }}
+              us={unitSystem === 'US'}
+            />
+          )}
+          {mode === '3d-fea' && (() => {
+            const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+            return (
+              <SBeamFea3DCalc
+                loadN={unitSystem === 'SI' ? load : load * N_PER_LBF}
+                holeRadiusMm={holeRadius * mm}
+                beamWidthMm={width * mm}
+                thicknessMm={thickness * mm}
+                distBetweenGagesMm={distBetweenGages * mm}
+                gageLengthMm={gageLength * mm}
+                modulusGPa={unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI}
+                nu={poisson}
+              />
+            )
+          })()}
         </div>
-      )}
-
-      <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
-      {showInputs && (
-        <>
-          <div className="bino-grid">
-            <label>Applied load ({forceUnit})<input type="number" value={Number.isFinite(load) ? load : ''} onChange={e => setLoad(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Hole radius, R ({lenUnit})<input type="number" value={Number.isFinite(holeRadius) ? holeRadius : ''} onChange={e => setHoleRadius(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Beam width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Thickness ({lenUnit})<input type="number" value={Number.isFinite(thickness) ? thickness : ''} onChange={e => setThickness(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Distance between gages, D ({lenUnit})<input type="number" value={Number.isFinite(distBetweenGages) ? distBetweenGages : ''} onChange={e => setDistBetweenGages(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Modulus of Elasticity ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-          </div>
-          {result.error && <p className="workspace-note">{result.error}</p>}
-        </>
-      )}
-
-      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
-      {showResults && (
-        <table className="bino-table">
-          <tbody>
-            <tr><th colSpan={3}>Calculated Values</th></tr>
-            <tr><td>Nominal Gage Strain:</td><td>{show(result.data?.avgStrain ?? NaN, 0)}</td><td>µε</td></tr>
-            <tr><td>Min / Max Strain:</td><td>{show(result.data?.minStrain ?? NaN, 0)} / {show(result.data?.maxStrain ?? NaN, 0)}</td><td>µε</td></tr>
-            <tr><td>Strain Variation:</td><td>{show(result.data?.gradient ?? NaN, 2)}</td><td>%</td></tr>
-            <tr><td>Span at Applied Force:</td><td>{show(result.data?.fullSpanSensitivity ?? NaN, 4)}</td><td>mV/V</td></tr>
-          </tbody>
-        </table>
       )}
     </div>
   )

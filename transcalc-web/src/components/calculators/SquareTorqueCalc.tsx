@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateSqTorque } from '../../domain/sqtorque'
+import { DEFAULT_MATERIAL_ID, getMaterial } from '../../domain/materials'
+import MaterialSelector from '../MaterialSelector'
 import SquareTorqueModelPreview from '../SquareTorqueModelPreview'
 import WheatstoneBridgeDiagram from '../diagrams/WheatstoneBridgeDiagram'
+import SectionToggle from '../SectionToggle'
+import WorkspaceControls from '../WorkspaceControls'
+import SquareTorqueFea3DCalc from './SquareTorqueFea3DCalc'
 
 type UnitSystem = 'SI' | 'US'
 
@@ -12,39 +17,23 @@ const GPA_PER_MPSI = 6.8947572932
 const round = (v: number, d = 4): number => Math.round(v * Math.pow(10, d)) / Math.pow(10, d)
 const show = (v: number, d: number): string => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
-function SectionToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', padding: '6px 2px 2px',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600,
-        textTransform: 'uppercase', letterSpacing: '0.05em',
-        fontFamily: 'inherit',
-      }}
-      aria-expanded={open}
-    >
-      <span style={{ fontSize: 10, display: 'inline-block', width: 10, transition: 'transform 0.15s', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
-      {label}
-    </button>
-  )
-}
-
 type Props = { unitSystem: UnitSystem; onUnitChange: (next: UnitSystem) => void }
 
 export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
-  const [torque, setTorque] = useState(1000)       // N·mm or in·lb
-  const [width, setWidth] = useState(25)            // mm or in
-  const [modulusGPa, setModulusGPa] = useState(200) // GPa or Mpsi
-  const [poisson, setPoisson] = useState(0.3)
-  const [gageLength, setGageLength] = useState(5)   // mm or in
+  const [torque, setTorque] = useState(1000)        // N·mm or in·lb
+  const [width, setWidth] = useState(25)             // mm or in
+  const [shaftLength, setShaftLength] = useState(100) // mm or in
+  const [modulusGPa, setModulusGPa] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).eGPa)  // GPa or Mpsi
+  const [poisson, setPoisson] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
+  const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
+  const [gageLength, setGageLength] = useState(5)    // mm or in
   const [gageFactor, setGageFactor] = useState(2.1)
-  const [showDiagrams, setShowDiagrams] = useState(true)
-  const [show3D, setShow3D] = useState(true)
+  const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
+  const [showDiagrams, setShowDiagrams] = useState(false)
+  const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
+
 
   const prevUnit = useRef<UnitSystem>(unitSystem)
   useEffect(() => {
@@ -53,11 +42,13 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
     if (unitSystem === 'US') {
       setTorque(v => round(v / NMAM_PER_INLB))
       setWidth(v => round(v / MM_PER_IN))
+      setShaftLength(v => round(v / MM_PER_IN))
       setModulusGPa(v => round(v / GPA_PER_MPSI))
       setGageLength(v => round(v / MM_PER_IN))
     } else {
       setTorque(v => round(v * NMAM_PER_INLB))
       setWidth(v => round(v * MM_PER_IN))
+      setShaftLength(v => round(v * MM_PER_IN))
       setModulusGPa(v => round(v * GPA_PER_MPSI))
       setGageLength(v => round(v * MM_PER_IN))
     }
@@ -90,38 +81,20 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
 
   return (
     <div className="bino-wrap">
-      <div className="workspace-controls">
-        <div className="analysis-toggle">
-          <button className={unitSystem === 'SI' ? 'active' : ''} onClick={() => onUnitChange('SI')}>SI</button>
-          <button className={unitSystem === 'US' ? 'active' : ''} onClick={() => onUnitChange('US')}>US</button>
-        </div>
-      </div>
-
-      <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />
-      {showDiagrams && (
-        <div className="calc-diagram-2d">
-          <WheatstoneBridgeDiagram config="torque" />
-        </div>
-      )}
-
-      <SectionToggle label="3D Model" open={show3D} onToggle={() => setShow3D(v => !v)} />
-      {show3D && (
-        <div className="calc-model-3d">
-          <SquareTorqueModelPreview
-            params={{ torque, width, gageLength, modulus: modulusGPa }}
-            us={unitSystem === 'US'}
-          />
-        </div>
-      )}
+      <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
           <div className="bino-grid">
+            <MaterialSelector
+              materialId={materialId}
+              unitSystem={unitSystem}
+              onSelect={sel => { setMaterialId(sel.id); setModulusGPa(sel.eGPaDisplay); setPoisson(sel.nu) }}
+            />
             <label>Applied torque ({torqueUnit})<input type="number" value={Number.isFinite(torque) ? torque : ''} onChange={e => setTorque(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
             <label>Shaft width ({lenUnit})<input type="number" value={Number.isFinite(width) ? width : ''} onChange={e => setWidth(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Modulus ({modUnit})<input type="number" value={Number.isFinite(modulusGPa) ? modulusGPa : ''} onChange={e => setModulusGPa(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
-            <label>Poisson&apos;s ratio<input type="number" value={Number.isFinite(poisson) ? poisson : ''} onChange={e => setPoisson(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+            <label>Shaft length ({lenUnit})<input type="number" value={Number.isFinite(shaftLength) ? shaftLength : ''} onChange={e => setShaftLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
             <label>Gage length ({lenUnit})<input type="number" value={Number.isFinite(gageLength) ? gageLength : ''} onChange={e => setGageLength(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
             <label>Gage factor<input type="number" value={Number.isFinite(gageFactor) ? gageFactor : ''} onChange={e => setGageFactor(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
           </div>
@@ -129,8 +102,8 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
         </>
       )}
 
-      <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />
-      {showResults && (
+      {mode === 'analytical' && <SectionToggle label="Results" open={showResults} onToggle={() => setShowResults(v => !v)} />}
+      {mode === 'analytical' && showResults && (
         <table className="bino-table">
           <tbody>
             <tr><th colSpan={3}>Calculated Values</th></tr>
@@ -140,6 +113,38 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
             <tr><td>Full Bridge Span:</td><td>{show(result.data?.fullSpan ?? NaN, 4)}</td><td>mV/V</td></tr>
           </tbody>
         </table>
+      )}
+
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
+      {mode === 'analytical' && showDiagrams && (
+        <div className="calc-diagram-2d">
+          <WheatstoneBridgeDiagram config="torque" />
+        </div>
+      )}
+
+      <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
+      {show3D && (
+        <div className="calc-model-3d">
+          {mode === 'analytical' && (
+            <SquareTorqueModelPreview
+              params={{ torque, width, gageLength, modulus: modulusGPa }}
+              us={unitSystem === 'US'}
+            />
+          )}
+          {mode === '3d-fea' && (() => {
+            const mm = unitSystem === 'SI' ? 1 : MM_PER_IN
+            const torqueNm = unitSystem === 'SI' ? torque / 1000 : torque * NMAM_PER_INLB / 1000
+            return (
+              <SquareTorqueFea3DCalc
+                torqueNm={torqueNm}
+                sideMm={width * mm}
+                lengthMm={shaftLength * mm}
+                modulusGPa={unitSystem === 'SI' ? modulusGPa : modulusGPa * GPA_PER_MPSI}
+                nu={poisson}
+              />
+            )
+          })()}
+        </div>
       )}
     </div>
   )

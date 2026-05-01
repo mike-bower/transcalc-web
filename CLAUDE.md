@@ -2,7 +2,7 @@
 
 This file is the working guide for Claude Code or any coding agent modifying this repository. It is the source of truth for the current product surface, architecture, and extension strategy.
 
-Last verified: April 2026 — 1096 tests passing / 57 files.
+Last verified: April 2026 — 1117 tests passing / 58 files.
 
 ---
 
@@ -53,8 +53,8 @@ transcalc/
 - **Trim network realization** via C01/C11/C12/D01/E01 ladder resistor solvers
 - **Unified workflow orchestrator** (`orchestrator.ts`) dispatching design → compensation → trim
 - **Project persistence** via JSON (`.tcalc.json`)
-- **FEA infrastructure** — 9 linear CST 2D solvers wired into calculators
-- **1096 tests** / 57 files, all passing
+- **3D FEA infrastructure** — T10 tetrahedral solver running in a Web Worker; wired into Cantilever, Square Column, Binocular, and 6-DOF Cross-Beam calculators; `FeaViewer3D` with jet color scale bar and XYZ axes widget
+- **1117 tests** / 58 files, all passing
 - `npm run build` passes
 - `npx tsc --noEmit` has one known false failure (WASM import; see Known Problems)
 
@@ -243,9 +243,32 @@ All domain modules live in `transcalc-web/src/domain/`. They are pure TypeScript
 
 ## FEA Architecture
 
-All FEA solvers live in `transcalc-web/src/domain/fea/`. All use linear CST (Constant Strain Triangle) 2D plane-stress with rectangular meshes.
+FEA lives in two tiers: the original 2D CST plane-stress solvers (reference / legacy), and the current 3D T10 tetrahedral solver (production, runs in a Web Worker).
 
-### Solvers
+### 3D FEA infrastructure (current, production)
+
+| File | Purpose |
+|------|---------|
+| `domain/fea/sparseMatrix.ts` | CSR sparse matrix + PCG solver with progress callbacks every 200 iterations |
+| `domain/fea/paramMesh.ts` | Parametric hex→T10 mesh generator; `maskFn` for arbitrary void geometry; exports `Tet10Mesh` |
+| `domain/fea/tet10Solver.ts` | T10 element stiffness, global assembly, penalty BCs, nodal strain recovery, von Mises |
+| `domain/fea/feaWorker.ts` | Web Worker entry point; reconstructs `maskFn` from serialized params; posts `progress` / `result` / `error` messages; transfers typed arrays zero-copy |
+| `hooks/useFeaSolver.ts` | React hook wrapping the worker lifecycle; exposes `{ solve, solving, progress, solved, error, reset }` |
+| `components/FeaViewer3D.tsx` | Three.js 3D result viewer; jet color scale bar (bottom-left), XYZ axes widget (bottom-left), scalar field selector, deformation scale, wireframe toggle |
+| `components/FeaProgressPanel.tsx` | Shared progress display panel with PCG iteration bar; used by all *Fea3DCalc sub-components |
+
+**Mask types** (`feaWorker.ts`): `'none'` | `'binocular'` (two cylindrical holes) | `'crossbeam'` (Maltese-cross hub+arms).
+
+**FEA sub-components** (one per calculator that has 3D FEA):
+
+| Component | Calculator | Load case |
+|-----------|------------|-----------|
+| `CantileverFea3DCalc.tsx` | CantileverCalc | Transverse Fy at tip |
+| `SquareColumnFea3DCalc.tsx` | SquareColumnCalc | Axial Fx compression |
+| `BinocularFea3DCalc.tsx` | BinocularBeamWorkspace | Transverse Fy bending |
+| `CrossBeamFea3DCalc.tsx` | SixAxisFTCalc | Axial Fz at hub |
+
+### 2D CST solvers (legacy, still used for 2D strain field views)
 
 | File | Geometry | Boundary Conditions | Loading |
 |------|----------|---------------------|---------|
@@ -260,20 +283,7 @@ All FEA solvers live in `transcalc-web/src/domain/fea/`. All use linear CST (Con
 | `rectangularCstSolver.ts` | Generic rectangular | Injected via `RectBcSpec` callbacks | Injected via `applyForces` callback |
 | `stepExport.ts` | Any mesh | — | STEP/CAD mesh export (Abaqus/Nastran) |
 
-### Solver Output (target schema)
-
-```typescript
-{
-  nodes: number[][]              // [n × 2] x,y coordinates
-  elements: number[][]           // [m × 3] node index triples
-  displacements: number[]        // [ux0, uy0, ux1, uy1, ...]
-  nodalStrains: { exx, eyy, exy }[]
-  elementStrains: { exx, eyy, exy }[]
-  sampleStrain: (x: number, y: number) => { exx, eyy, exy }
-}
-```
-
-### FEA Viewers
+### 2D FEA viewers
 
 | Component | Purpose |
 |-----------|---------|
@@ -298,6 +308,20 @@ All FEA solvers live in `transcalc-web/src/domain/fea/`. All use linear CST (Con
 
 ### WorkspaceRouter (`WorkspaceRouter.tsx`)
 Dispatch switch from `calcKey` → calculator component. Passes `{ unitSystem, onUnitChange }` to all calculators. See Calculator Inventory tables above for the complete routing map.
+
+### Calculator UX pattern (all calculators)
+
+Every calculator follows this section order — **do not deviate**:
+
+1. **Controls bar** (`workspace-controls`) — SI/US toggle; Analytical|3D FEA mode toggle if the calc has 3D FEA; any calc-specific toggles (e.g. Bending-null).
+2. **Inputs** — always visible in both modes; uses `SectionToggle` from `components/SectionToggle.tsx`; default **open**.
+3. **Results / Design Metrics** — analytical numbers; hidden in 3D FEA mode; default **open**.
+4. **3D FEA sub-component** — rendered after Inputs when `mode === '3d-fea'`; not shown in analytical mode.
+5. **Diagrams** — 2D engineering sketch; default **closed**.
+6. **3D Model** — parametric preview; default **closed**.
+7. **Calibration Export / Advanced** — bottom of page; default **closed**.
+
+**Shared `SectionToggle` component** lives at `components/SectionToggle.tsx`. Import it with `import SectionToggle from '../SectionToggle'`. Do **not** define a local copy inside a calculator file.
 
 ### 2D Diagram Components (`components/diagrams/`)
 One SVG engineering sketch per transducer type. Standards for all diagrams:
@@ -361,7 +385,7 @@ Maps measurement → ladder network rung state (boolean array) via greedy solver
 
 ## Test Coverage
 
-**1096 tests / 57 files** as of April 2026.
+**1117 tests / 58 files** as of April 2026.
 
 Key files by area:
 
@@ -434,7 +458,97 @@ Must look like engineering drawings, not decorative illustrations:
 All geometry must be driven from the domain model. Do not hard-code pixel values unrelated to actual input parameters.
 
 ### 3D viewers
-Use Three.js / `@react-three/fiber`. Expose camera presets, dimension toggles, gage visibility. Avoid purely decorative detail.
+
+Use raw Three.js (not `@react-three/fiber`) with a `useEffect`-managed render loop and a `useRef` host div. Every `*ModelPreview.tsx` must follow the standards below exactly so all previews are visually consistent.
+
+#### Scene
+
+| Property | Value |
+|----------|-------|
+| Background | `new THREE.Color(0xffffff)` |
+| Ambient light | `AmbientLight(0xffffff, 0.75)` |
+| Directional light | `DirectionalLight(0xffffff, 1.0)`, position `(4, 5, 3)` |
+| Floor grid | `GridHelper(6, 14, 0xcccccc, 0xeeeeee)` — scale size up for large models |
+
+For models larger than ~100 mm in any dimension, scale the GridHelper proportionally (e.g. `size = 8, divisions = 16`), but keep the same grid colors.
+
+#### Camera
+
+| Property | Value |
+|----------|-------|
+| Type | `PerspectiveCamera` |
+| FOV | `45` |
+| Near / Far | `0.1` / `100` |
+| Initial position | Set per-model so the geometry fills ~60–70% of the viewport |
+
+#### OrbitControls
+
+```typescript
+controls.enableDamping = true
+controls.dampingFactor = 0.08
+controls.enablePan = true
+controls.enableZoom = true
+```
+
+Always call `controls.update()` each animation frame when damping is enabled.
+
+#### Renderer
+
+```typescript
+renderer.setPixelRatio(window.devicePixelRatio)
+renderer.setSize(host.clientWidth, host.clientHeight)
+renderer.shadowMap.enabled = false   // keep performance predictable
+```
+
+#### Container / overlay
+
+```tsx
+// Outer wrapper
+<div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+  {/* Canvas mount point */}
+  <div ref={hostRef} style={{ height: '100%', border: 'none', background: 'transparent' }} />
+  {/* Control overlay — top-right */}
+  <div style={{
+    position: 'absolute', top: 10, right: 10, zIndex: 10,
+    backgroundColor: 'rgba(30,41,59,0.7)', padding: '4px 8px',
+    borderRadius: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
+    border: '1px solid rgba(71,85,105,0.5)', color: '#f8fafc', pointerEvents: 'auto',
+  }}>
+    …toggle buttons…
+  </div>
+</div>
+```
+
+Toggle buttons (active / inactive):
+- Active: `border: '1px solid rgba(96,165,250,0.7)'`, `background: 'rgba(37,99,235,0.55)'`
+- Inactive: `border: '1px solid rgba(71,85,105,0.4)'`, `background: 'rgba(51,65,85,0.35)'`
+- Text: `color: '#f8fafc'` in both states
+
+#### Material palette
+
+| Role | Color | Roughness | Metalness |
+|------|-------|-----------|-----------|
+| Main body | `0x4a88b8` | 0.45 | 0.10 |
+| Secondary / flanges | `0x3a6888` | 0.50 | 0.15 |
+| Active gage (+ε) | `0xf0a451` | 0.55 | 0.06 |
+| Active gage (−ε) | `0x51a4f0` | 0.55 | 0.06 |
+| Passive gage | `0x8aa7be` | 0.55 | 0.05 |
+| Force / load arrow | `0xff4444` (red) | — | — |
+| Dimension lines | `0x5898c8`, opacity 0.9 | — | — |
+
+#### Controls exposed per preview
+
+Every preview must expose at minimum:
+- **Dimensions** toggle — shows/hides dimension annotation sprites and lines
+- **Forces & BCs** toggle — shows/hides load arrows and support indicators
+
+Additional toggles (e.g. Gages, Section) are encouraged where relevant.
+
+#### What to avoid
+
+- Do not hard-code geometry sizes unrelated to the actual input parameters.
+- Do not add decorative lighting effects (bloom, tone-mapping, shadows) that are not present in other previews.
+- Do not use `@react-three/fiber`; all previews use raw Three.js for consistency.
 
 ### FEA viewers
 Standardize on `CstFeaViewer.tsx` where possible. Target a reusable result schema (nodes, elements, nodal/element fields, displacements, BCs, loads, probe metadata). The binocular beam FEA path is the experimental pathfinder, not the finished framework.
@@ -467,7 +581,7 @@ Import from `cantileverSolver.ts`, **not** from `cantilever.ts`. Getting this wr
 
 ```bash
 cd transcalc-web
-npm test -- --run          # must pass (currently 1096 / 57 files)
+npm test -- --run          # must pass (currently 1117 / 58 files)
 npm run build              # must pass cleanly
 npx tsc --noEmit           # one known WASM failure expected; anything else is new
 ```
@@ -516,6 +630,8 @@ Do not optimize for:
 | Task touches multiple views of the same part | Create or update a shared geometry/result model first |
 | Task touches mesh or contour rendering | Move toward `CstFeaViewer` reuse, not a one-off scene |
 | Task changes workflow behavior | Inspect `orchestrator.ts` and `WorkflowWizard.tsx` |
+| Adding or editing a calculator section | Follow the UX pattern: Controls → Inputs → Results → Diagrams → 3D Model; use shared `SectionToggle` |
+| Adding collapsible sections to a calculator | Import from `components/SectionToggle.tsx`; defaults: Inputs/Results open, Diagrams/3D/Calibration closed |
 | Verification command fails | Determine whether it is the known WASM problem, a sandbox issue, or a real regression |
 
 ---

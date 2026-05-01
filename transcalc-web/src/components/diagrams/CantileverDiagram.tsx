@@ -16,14 +16,30 @@ type Props = {
   momentArm: number
   gageLength: number
   unitSystem: 'SI' | 'US'
+  bridgeConfig?: string
 }
 
-export default function CantileverDiagram({ load, width, thickness, momentArm, gageLength, unitSystem }: Props) {
+type GageDef = { label: string; surface: 'top' | 'bot'; orient: 0 | 90 }
+
+function getGages(config?: string): GageDef[] {
+  switch (config) {
+    case 'cantQuarter':     return [{ label: 'A', surface: 'top', orient: 0 }]
+    case 'cantPoissonHalf': return [{ label: 'A', surface: 'top', orient: 0 }, { label: 'B', surface: 'top', orient: 90 }]
+    case 'cantHalfTopBot':  return [{ label: 'A', surface: 'top', orient: 0 }, { label: 'B', surface: 'bot', orient: 0 }]
+    case 'cantFullBend':    return [{ label: 'A', surface: 'top', orient: 0 }, { label: 'C', surface: 'top', orient: 0 },
+                                    { label: 'B', surface: 'bot', orient: 0 }, { label: 'D', surface: 'bot', orient: 0 }]
+    case 'cantFullPoisson': return [{ label: 'A', surface: 'top', orient: 0 }, { label: 'B', surface: 'top', orient: 90 },
+                                    { label: 'C', surface: 'top', orient: 0 }, { label: 'D', surface: 'top', orient: 90 }]
+    default:                return [{ label: 'A', surface: 'top', orient: 0 }]
+  }
+}
+
+export default function CantileverDiagram({ load, width, thickness, momentArm, gageLength, unitSystem, bridgeConfig }: Props) {
   const lu = unitSystem === 'SI' ? 'mm' : 'in'
   const fu = unitSystem === 'SI' ? 'N' : 'lbf'
 
   // ── layout constants ──────────────────────────────────────────────────────
-  const W = 500, H = 188
+  const W = 500, H = 230
   const wallX = 2, wallW = 26
   const beamX0 = wallX + wallW       // 28
   const beamX1 = 388                  // beam free end
@@ -42,11 +58,25 @@ export default function CantileverDiagram({ load, width, thickness, momentArm, g
     ? gageLength / momentArm : 0.05
   const gagePx = clamp(gRatio * beamLen, 4, beamLen * 0.35)
 
+  // Dynamic gage list from bridge config
+  const gageList = getGages(bridgeConfig)
+  const topGages = gageList.filter(g => g.surface === 'top')
+  const botGages = gageList.filter(g => g.surface === 'bot')
+  const maxGages = Math.max(topGages.length, botGages.length, 1)
+  const gSp = 3  // px gap between adjacent gages
+  const effGagePx = maxGages === 1
+    ? gagePx
+    : Math.min(gagePx, (beamLen * 0.45 - gSp * (maxGages - 1)) / maxGages)
+
   // colours
   const dc = '#44556a'   // dimension annotation
   const gc = '#c03030'   // gage + load
   const bc = '#dce8f5'   // beam fill
   const bs = '#3a4a6b'   // beam stroke
+
+  // Bending moment diagram layout
+  const mBaseY = beamBot + 80
+  const mAmp   = 28
 
   // ── dimension helper: horizontal ─────────────────────────────────────────
   const HDim = ({ x1, x2, y, label }: { x1: number; x2: number; y: number; label: string }) => (
@@ -84,10 +114,34 @@ export default function CantileverDiagram({ load, width, thickness, momentArm, g
       <rect x={beamX0} y={beamTop} width={beamLen} height={tPx}
         fill={bc} stroke={bs} strokeWidth={1.5} rx={1} />
 
-      {/* Gage A — on top surface */}
-      <rect x={beamX0} y={beamTop - 4} width={gagePx} height={4} rx={1} fill={gc} opacity={0.85} />
-      <text x={beamX0 + gagePx / 2} y={beamTop - 7}
-        textAnchor="middle" fontSize={9} fill={gc} fontWeight="700">A</text>
+      {/* Top-surface gages */}
+      {topGages.map((gage, idx) => {
+        const col = gage.orient === 0 ? '#c03030' : '#c07020'
+        const w = gage.orient === 0 ? effGagePx : effGagePx * 0.55
+        const x = beamX0 + idx * (effGagePx + gSp)
+        return (
+          <g key={gage.label}>
+            <rect x={x} y={beamTop - 4} width={w} height={4} rx={1} fill={col} opacity={0.85} />
+            <text x={x + w / 2} y={beamTop - 7} textAnchor="middle" fontSize={9} fill={col} fontWeight="700">
+              {gage.label}{gage.orient === 90 ? '⊥' : ''}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* Bottom-surface gages */}
+      {botGages.map((gage, idx) => {
+        const col = '#2060b0'
+        const x = beamX0 + idx * (effGagePx + gSp)
+        return (
+          <g key={gage.label}>
+            <rect x={x} y={beamBot} width={effGagePx} height={4} rx={1} fill={col} opacity={0.85} />
+            <text x={x + effGagePx / 2} y={beamBot + 15} textAnchor="middle" fontSize={9} fill={col} fontWeight="700">
+              {gage.label}
+            </text>
+          </g>
+        )
+      })}
 
       {/* w label inside beam (only if tall enough) */}
       {tPx >= 18 && (
@@ -112,6 +166,23 @@ export default function CantileverDiagram({ load, width, thickness, momentArm, g
       <line x1={beamX1 + 4} y1={beamTop} x2={beamX1 + 36} y2={beamTop} stroke={dc} strokeWidth={0.8} />
       <line x1={beamX1 + 4} y1={beamBot} x2={beamX1 + 36} y2={beamBot} stroke={dc} strokeWidth={0.8} />
       <VDim x={beamX1 + 34} y1={beamTop} y2={beamBot} label={`t=${fv(thickness, 1)} ${lu}`} />
+
+      {/* Bending moment diagram — triangular: max at fixed end, zero at free end */}
+      <text x={beamX0 - 4} y={mBaseY + 4} textAnchor="end" fontSize={9} fill={dc}>M</text>
+      <line x1={beamX0} y1={mBaseY} x2={beamX1} y2={mBaseY}
+        stroke={dc} strokeWidth={0.8} opacity={0.5}/>
+      {/* +M triangle: peak at wall, falls to zero at free end */}
+      <polygon
+        points={`${beamX0},${mBaseY} ${beamX0},${mBaseY - mAmp} ${beamX1},${mBaseY}`}
+        fill="rgba(192,48,48,0.18)" stroke={gc} strokeWidth={1}/>
+      {/* +M label at triangle centroid */}
+      <text x={(2 * beamX0 + beamX1) / 3} y={mBaseY - mAmp / 3 + 3}
+        textAnchor="middle" fontSize={8} fill={gc} fontWeight="600">+M</text>
+      {/* Peak tick at fixed end */}
+      <line x1={beamX0 - 3} y1={mBaseY - mAmp} x2={beamX0 + 3} y2={mBaseY - mAmp}
+        stroke={gc} strokeWidth={1}/>
+      {/* M = 0 dot at free end */}
+      <circle cx={beamX1} cy={mBaseY} r={2.5} fill={dc} opacity={0.7}/>
 
     </svg>
   )

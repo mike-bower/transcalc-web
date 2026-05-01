@@ -311,7 +311,7 @@ function SquareShear3D({ params, us }: { params: Record<string, number>; us?: bo
 
 export default function SquareShearModelPreview({ params, us }: Props) {
   return (
-    <div className="transducer-svg-wrap" style={{ height: '400px' }}>
+    <div className="transducer-svg-wrap" style={{ height: '800px' }}>
       <SquareShear3D params={params} us={us} />
     </div>
   )
