@@ -32,7 +32,7 @@ export default function RoundSBeamShearCalc({ unitSystem, onUnitChange }: Props)
   const [gageFactor, setGageFactor] = useState(2.1)
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
   const [bendingNull, setBendingNull] = useState(false)
-  const [show2D, setShow2D] = useState(false)
+  const [show2D, setShow2D] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -100,6 +100,26 @@ export default function RoundSBeamShearCalc({ unitSystem, onUnitChange }: Props)
           <button className={bendingNull ? 'active' : ''} onClick={() => setBendingNull(true)}>Bending-null (Fig C)</button>
         </div>
       </WorkspaceControls>
+
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {mode === 'analytical' && show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <RoundSBeamShearDiagram
+              load={siInputs.loadN}
+              width={siInputs.widthMm}
+              height={siInputs.heightMm}
+              diameter={siInputs.diameterMm}
+              thickness={siInputs.thicknessMm}
+              unitSystem={unitSystem}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <WheatstoneBridgeDiagram config="shear" />
+          </div>
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -130,25 +150,6 @@ export default function RoundSBeamShearCalc({ unitSystem, onUnitChange }: Props)
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
-      {mode === 'analytical' && show2D && (
-        <div className="calc-diagram-row">
-          <div className="calc-diagram-2d">
-            <RoundSBeamShearDiagram
-              load={siInputs.loadN}
-              width={siInputs.widthMm}
-              height={siInputs.heightMm}
-              diameter={siInputs.diameterMm}
-              thickness={siInputs.thicknessMm}
-              unitSystem={unitSystem}
-            />
-          </div>
-          <div className="calc-diagram-2d">
-            <WheatstoneBridgeDiagram config="shear" />
-          </div>
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -163,6 +164,7 @@ export default function RoundSBeamShearCalc({ unitSystem, onUnitChange }: Props)
                 bendingNull: bendingNull ? 1 : 0,
               }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (

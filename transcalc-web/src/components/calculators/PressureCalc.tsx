@@ -28,7 +28,7 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
   const [poisson, setPoisson] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [showDiagrams, setShowDiagrams] = useState(false)
+  const [showDiagrams, setShowDiagrams] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -81,6 +81,13 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
+      {mode === 'analytical' && showDiagrams && (
+        <div className="calc-diagram-2d">
+          <WheatstoneBridgeDiagram config="pressure" />
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -109,13 +116,6 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
-      {mode === 'analytical' && showDiagrams && (
-        <div className="calc-diagram-2d">
-          <WheatstoneBridgeDiagram config="pressure" />
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -123,6 +123,7 @@ export default function PressureCalc({ unitSystem, onUnitChange }: Props) {
             <PressureModelPreview
               params={{ pressure, thickness, diameter, modulus: modulusGPa }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && <p className="workspace-note" style={{ padding: '1.5rem', textAlign: 'center' }}>3D FEA is not yet available for this calculator type.</p>}

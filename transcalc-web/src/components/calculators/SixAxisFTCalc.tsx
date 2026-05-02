@@ -102,7 +102,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
   const [gageFactor, setGageFactor] = useState(2.0)
 
   const [showInputs, setShowInputs]   = useState(true)
-  const [showSketch, setShowSketch]   = useState(false)
+  const [showSketch, setShowSketch]   = useState(true)
   const [show3D, setShow3D]           = useState(false)
   const [showMetrics, setShowMetrics] = useState(true)
   const [showChannels, setShowChannels] = useState(true)
@@ -135,6 +135,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
   }, [fields, modulus, poisson, gageFactor, us, densityKgM3, yieldMPa])
 
   const result = useMemo(() => designCrossBeamFT(params), [params])
+  const mat = getMaterial(materialId)
 
   const sensCols: Record<Channel, number> = {
     Fx: result.sensitivity.Fx, Fy: result.sensitivity.Fy, Fz: result.sensitivity.Fz,
@@ -154,6 +155,25 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
 
       {/* Controls */}
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
+
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <CrossBeamSketch2D
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              beamWidthMm={params.beamWidthMm}
+              beamThicknessMm={params.beamThicknessMm}
+              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
+              width={320} height={320}
+            />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
 
       {/* Inputs — always visible so geometry can be adjusted in any mode */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
@@ -370,25 +390,6 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       )}
 
-      {/* 2D Sketch */}
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
-      {mode === 'analytical' && showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <CrossBeamSketch2D
-              outerRadiusMm={params.outerRadiusMm}
-              innerRadiusMm={params.innerRadiusMm}
-              beamWidthMm={params.beamWidthMm}
-              beamThicknessMm={params.beamThicknessMm}
-              gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
-              width={320} height={320}
-            />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
       {/* 3D View */}
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
@@ -401,6 +402,7 @@ export default function SixAxisFTCalc({ unitSystem, onUnitChange }: Props) {
               beamThicknessMm={params.beamThicknessMm}
               gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
               us={us}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (

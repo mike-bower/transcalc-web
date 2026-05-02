@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { buildBinocularGeometry, type BinocularRawParams } from '../domain/binocularGeometry'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 type Props = {
   params: BinocularRawParams
   us?: boolean
+  materialId?: string
 }
 
 type CameraPreset = 'iso' | 'front' | 'top' | 'side' | 'gage'
@@ -99,7 +102,7 @@ function applyCameraPreset(
   controls.update()
 }
 
-export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
+export const BinocularModelPreview: React.FC<Props> = ({ params, us, materialId }) => {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
@@ -123,11 +126,7 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
     const halfHeight = height / 2
     const halfDepth = depth / 2
 
-    const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      roughness: 0.45,
-      metalness: 0.18,
-    })
+    const bodyMaterial = makeBodyMaterial(materialId)
 
     const shape = new THREE.Shape()
     shape.moveTo(-halfLength, -halfHeight)
@@ -313,7 +312,7 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
     }
 
     return group
-  }, [geometry, showDimensions, showGages, showHotspots, showForces, us])
+  }, [geometry, showDimensions, showGages, showHotspots, showForces, us, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -325,6 +324,9 @@ export const BinocularModelPreview: React.FC<Props> = ({ params, us }) => {
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     host.appendChild(renderer.domElement)
 
     const controls = new OrbitControls(camera, renderer.domElement)

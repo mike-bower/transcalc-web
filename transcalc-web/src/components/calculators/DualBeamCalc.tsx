@@ -35,7 +35,7 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [nu, setNu] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [show2D, setShow2D] = useState(false)
+  const [show2D, setShow2D] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -114,6 +114,25 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {mode === 'analytical' && show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <DualBeamDiagram
+              load={siInputs.loadN}
+              width={siInputs.widthMm}
+              thickness={siInputs.thicknessMm}
+              distBetweenGages={siInputs.distMm}
+              gageLength={siInputs.gageLenMm}
+              unitSystem={unitSystem}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <WheatstoneBridgeDiagram config="bending" />
+          </div>
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -149,25 +168,6 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
-      {mode === 'analytical' && show2D && (
-        <div className="calc-diagram-row">
-          <div className="calc-diagram-2d">
-            <DualBeamDiagram
-              load={siInputs.loadN}
-              width={siInputs.widthMm}
-              thickness={siInputs.thicknessMm}
-              distBetweenGages={siInputs.distMm}
-              gageLength={siInputs.gageLenMm}
-              unitSystem={unitSystem}
-            />
-          </div>
-          <div className="calc-diagram-2d">
-            <WheatstoneBridgeDiagram config="bending" />
-          </div>
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -184,6 +184,7 @@ export default function DualBeamCalc({ unitSystem, onUnitChange }: Props) {
                 gageFactor,
               }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (

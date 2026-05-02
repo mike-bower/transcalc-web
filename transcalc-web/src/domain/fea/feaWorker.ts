@@ -26,6 +26,38 @@ interface WorkerRequest {
   }
 }
 
+// Density-based 1-D node grader. Builds nIntervals+1 positions in [0, total]
+// with cells clustered near each value in clusterAt (spread controls gaussian width).
+function gradePositions(nIntervals: number, total: number, clusterAt: number[], spread: number): Float64Array {
+  const nNodes = nIntervals + 1
+  const peak = 6        // density ratio at cluster point vs background
+  const nQuad = 600     // quadrature points for cumulative integral
+
+  const cumulative = new Float64Array(nQuad + 1)
+  for (let i = 0; i < nQuad; i++) {
+    const x = (i + 0.5) / nQuad * total
+    let d = 1
+    for (const c of clusterAt) d += peak * Math.exp(-0.5 * ((x - c) / spread) ** 2)
+    cumulative[i + 1] = cumulative[i] + d
+  }
+  const totalD = cumulative[nQuad]
+
+  const positions = new Float64Array(nNodes)
+  positions[0] = 0
+  positions[nNodes - 1] = total
+  for (let i = 1; i < nNodes - 1; i++) {
+    const target = (i / nIntervals) * totalD
+    let lo = 0, hi = nQuad
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1
+      if (cumulative[mid] < target) lo = mid; else hi = mid
+    }
+    const t = (target - cumulative[lo]) / (cumulative[hi] - cumulative[lo])
+    positions[i] = ((lo + t) / nQuad) * total
+  }
+  return positions
+}
+
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   const { meshParams, solverParams } = e.data
 
@@ -33,6 +65,8 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     self.postMessage({ type: 'progress', phase: 'Generating mesh…', iter: 0, maxIter: 1 })
 
     let maskFn: ((cx: number, cy: number, cz: number) => boolean) | undefined
+    let yPositions: Float64Array | undefined
+    let zPositions: Float64Array | undefined
 
     if (meshParams.maskType === 'binocular' && meshParams.binocular) {
       const { leftHoleX, rightHoleX, holeCy, r } = meshParams.binocular
@@ -84,6 +118,9 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       const cy_c = meshParams.W / 2
       const cz_c = meshParams.H / 2
       maskFn = (_cx, cy, cz) => Math.hypot(cy - cy_c, cz - cz_c) <= r
+      const spread = r * 0.4
+      yPositions = gradePositions(meshParams.ny, meshParams.W, [cy_c - r, cy_c + r], spread)
+      zPositions = gradePositions(meshParams.nz, meshParams.H, [cz_c - r, cz_c + r], spread)
     } else if (meshParams.maskType === 'round-hollow' && meshParams.roundHollow) {
       const { outerR, innerR } = meshParams.roundHollow
       const cy_c = meshParams.W / 2
@@ -92,6 +129,9 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         const d = Math.hypot(cy - cy_c, cz - cz_c)
         return d > innerR && d <= outerR
       }
+      const spread = Math.max((outerR - innerR) * 0.5, outerR * 0.1)
+      yPositions = gradePositions(meshParams.ny, meshParams.W, [cy_c - outerR, cy_c - innerR, cy_c + innerR, cy_c + outerR], spread)
+      zPositions = gradePositions(meshParams.nz, meshParams.H, [cz_c - outerR, cz_c - innerR, cz_c + innerR, cz_c + outerR], spread)
     } else if (meshParams.maskType === 'dualbeam' && meshParams.dualbeam) {
       const { T, beamSep, blockW } = meshParams.dualbeam
       // W = beamSep + T; lower beam occupies cy in [0, T], upper beam in [beamSep, W]
@@ -114,7 +154,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     const mesh = generateRectTet10Mesh({
       L: meshParams.L, W: meshParams.W, H: meshParams.H,
       nx: meshParams.nx, ny: meshParams.ny, nz: meshParams.nz,
-      maskFn,
+      maskFn, yPositions, zPositions,
     })
 
     // For cross-beam: build composite fixed (outer ring) and hub load groups

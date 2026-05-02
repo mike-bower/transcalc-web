@@ -2,7 +2,7 @@
 
 This file is the working guide for Claude Code or any coding agent modifying this repository. It is the source of truth for the current product surface, architecture, and extension strategy.
 
-Last verified: April 2026 — 1117 tests passing / 58 files.
+Last verified: May 2026 — 1117 tests passing / 58 files.
 
 ---
 
@@ -207,7 +207,8 @@ All domain modules live in `transcalc-web/src/domain/`. They are pure TypeScript
 
 | File | Key Exports |
 |------|-------------|
-| `materials.ts` | Material property database (60+ materials: E, ν, ρ, yield, temp limits, figure-of-merit) |
+| `materials.ts` | Material property database (60+ materials: E, ν, ρ, yield, temp limits, figure-of-merit); `getMaterial(id)`, `MATERIALS` array |
+| `materialAppearance.ts` | PBR appearance lookup for 3D previews; `getMaterialAppearance(id?)`, `makeBodyMaterial(id?, overrides?)`, `swatchStyle(hex, size)`; `CATEGORY_ORDER` for modal grouping |
 | `bridges.ts` | Wheatstone bridge configuration gains (quarter/half/full bending, Poisson variants) |
 | `sensorCoeffs.ts` | Polynomial coefficient evaluator up to 7th order; SI/US dual coefficient sets |
 
@@ -250,14 +251,16 @@ FEA lives in two tiers: the original 2D CST plane-stress solvers (reference / le
 | File | Purpose |
 |------|---------|
 | `domain/fea/sparseMatrix.ts` | CSR sparse matrix + PCG solver with progress callbacks every 200 iterations |
-| `domain/fea/paramMesh.ts` | Parametric hex→T10 mesh generator; `maskFn` for arbitrary void geometry; exports `Tet10Mesh` |
+| `domain/fea/paramMesh.ts` | Parametric hex→T10 mesh generator; `maskFn` for arbitrary void geometry; optional `yPositions`/`zPositions` for non-uniform node spacing; exports `Tet10Mesh` |
 | `domain/fea/tet10Solver.ts` | T10 element stiffness, global assembly, penalty BCs, nodal strain recovery, von Mises |
-| `domain/fea/feaWorker.ts` | Web Worker entry point; reconstructs `maskFn` from serialized params; posts `progress` / `result` / `error` messages; transfers typed arrays zero-copy |
+| `domain/fea/feaWorker.ts` | Web Worker entry point; reconstructs `maskFn` from serialized params; computes graded node positions for `'round'`/`'round-hollow'` masks via `gradePositions()`; posts `progress` / `result` / `error` messages; transfers typed arrays zero-copy |
 | `hooks/useFeaSolver.ts` | React hook wrapping the worker lifecycle; exposes `{ solve, solving, progress, solved, error, reset }` |
 | `components/FeaViewer3D.tsx` | Three.js 3D result viewer; jet color scale bar (bottom-left), XYZ axes widget (bottom-left), scalar field selector, deformation scale, wireframe toggle |
 | `components/FeaProgressPanel.tsx` | Shared progress display panel with PCG iteration bar; used by all *Fea3DCalc sub-components |
 
-**Mask types** (`feaWorker.ts`): `'none'` | `'binocular'` (two cylindrical holes) | `'crossbeam'` (Maltese-cross hub+arms).
+**Mask types** (`feaWorker.ts`): `'none'` | `'binocular'` (two cylindrical holes) | `'crossbeam'` (Maltese-cross hub+arms) | `'sbeam'` (two offset holes) | `'threebeam'` (3-arm 120° hub) | `'round'` (solid cylinder) | `'round-hollow'` (annular tube) | `'dualbeam'` (two parallel beam strips) | `'shearweb'` (I-section flanges+web).
+
+**Circular section grading**: `'round'` and `'round-hollow'` masks automatically receive density-graded `yPositions`/`zPositions` (via `gradePositions()` in `feaWorker.ts`) that cluster nodes near the cylinder boundary. Spread is `r × 0.4` for solid sections and `max(wall × 0.5, outerR × 0.1)` for hollow sections. All other masks use uniform node spacing.
 
 **FEA sub-components** (one per calculator that has 3D FEA):
 
@@ -314,14 +317,40 @@ Dispatch switch from `calcKey` → calculator component. Passes `{ unitSystem, o
 Every calculator follows this section order — **do not deviate**:
 
 1. **Controls bar** (`workspace-controls`) — SI/US toggle; Analytical|3D FEA mode toggle if the calc has 3D FEA; any calc-specific toggles (e.g. Bending-null).
-2. **Inputs** — always visible in both modes; uses `SectionToggle` from `components/SectionToggle.tsx`; default **open**.
-3. **Results / Design Metrics** — analytical numbers; hidden in 3D FEA mode; default **open**.
-4. **3D FEA sub-component** — rendered after Inputs when `mode === '3d-fea'`; not shown in analytical mode.
-5. **Diagrams** — 2D engineering sketch; default **closed**.
+2. **Diagrams** — 2D engineering sketch + bridge wiring diagram; analytical mode only; default **open**.
+3. **Inputs** — always visible in both modes; uses `SectionToggle` from `components/SectionToggle.tsx`; default **open**. `MaterialSelector` is the **mandatory first element** inside the Inputs grid for every design calculator (see Material System section below).
+4. **Results / Design Metrics** — analytical numbers; hidden in 3D FEA mode; default **open**.
+5. **3D FEA sub-component** — rendered after Inputs when `mode === '3d-fea'`; not shown in analytical mode.
 6. **3D Model** — parametric preview; default **closed**.
 7. **Calibration Export / Advanced** — bottom of page; default **closed**.
 
 **Shared `SectionToggle` component** lives at `components/SectionToggle.tsx`. Import it with `import SectionToggle from '../SectionToggle'`. Do **not** define a local copy inside a calculator file.
+
+#### Material wiring (mandatory for every design calculator)
+
+Every design calculator must wire the material selector end-to-end in exactly this pattern:
+
+```typescript
+// 1. State (top of component, alongside other inputs)
+const DEFAULT_MATERIAL_ID = 'steel-4340'   // or whichever is most appropriate
+const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
+
+// 2. Material lookup (after result useMemo, before JSX)
+const mat = getMaterial(materialId)   // NEVER a partial alias like { densityKgM3, yieldMPa }
+
+// 3. MaterialSelector — first element inside the Inputs grid
+<MaterialSelector
+  materialId={materialId}
+  unitSystem={unitSystem}
+  onSelect={sel => setMaterialId(sel.id)}
+/>
+
+// 4. Pass materialId to the 3D preview
+<XxxModelPreview ... materialId={materialId} />
+```
+
+`mat` provides `mat.name`, `mat.eGPa`, `mat.densityKgM3`, `mat.yieldMPa`, `mat.nu`.
+Do **not** partially destructure material props and alias them as `mat` — this omits `name` and causes a runtime crash.
 
 ### 2D Diagram Components (`components/diagrams/`)
 One SVG engineering sketch per transducer type. Standards for all diagrams:
@@ -339,6 +368,53 @@ Current diagram files: `CantileverDiagram`, `DualBeamDiagram`, `ReverseBeamDiagr
 ### 3D Model Preview Components (`components/`)
 One `*ModelPreview.tsx` per transducer type using Three.js / `@react-three/fiber`:
 `CantileverModelPreview`, `BinocularModelPreview`, `DualBeamModelPreview`, `ReverseBeamModelPreview`, `SBeamModelPreview`, `SquareColumnModelPreview`, `RoundSolidColumnModelPreview`, `RoundHollowColumnModelPreview`, `SquareShearModelPreview`, `RoundShearModelPreview`, `RoundSBeamShearModelPreview`, `SquareTorqueModelPreview`, `RoundSolidTorqueModelPreview`, `RoundHollowTorqueModelPreview`, `PressureModelPreview`, `HexapodModelPreview`, `JTSModelPreview`, `ThreeBeamModelPreview`.
+
+### Material System
+
+The material system spans domain, context, and UI layers. All three must be consistent.
+
+#### Domain layer
+
+| File | Role |
+|------|------|
+| `domain/materials.ts` | Built-in material database; `getMaterial(id)` is the authoritative lookup |
+| `domain/materialAppearance.ts` | PBR appearance table keyed by material ID; `makeBodyMaterial(id?)`, `swatchStyle(hex, size)`, `CATEGORY_ORDER` |
+
+`makeBodyMaterial(materialId?)` returns a `THREE.MeshStandardMaterial` with realistic PBR values (color, roughness, metalness). Import it in every `*ModelPreview.tsx`. If `materialId` is unknown, it falls back to `DEFAULT_APPEARANCE` (gray metal).
+
+#### Context layer (`components/MaterialContext.tsx`)
+
+Wraps the built-in database with user overrides and hides, stored in `localStorage`:
+
+| Key | Content |
+|-----|---------|
+| `transcalc_material_overrides` | JSON `Record<id, Partial<Material>>` — shadows built-ins |
+| `transcalc_hidden_materials` | JSON `string[]` — suppresses built-ins from dropdowns |
+| `transcalc_user_materials` | JSON `UserMaterial[]` — fully user-defined entries |
+
+Provides: `allMaterials`, `addMaterial`, `editMaterial`, `deleteMaterial`, `resetBuiltIn`, `restoreBuiltIn`, `isBuiltIn`, `isModified`, `isHiddenBuiltIn`.
+
+`allMaterials` = built-ins (with overrides applied, hidden filtered out) + user materials. This is the source of truth for `MaterialSelector`.
+
+#### UI layer
+
+| Component | Role |
+|-----------|------|
+| `components/MaterialSelector.tsx` | Dropdown + swatch sphere + "Library" button; first element of every design calc's Inputs section |
+| `components/MaterialLibraryModal.tsx` | Full-screen modal; searchable; category-grouped; per-row Edit/Reset/Hide/Restore/Select actions; editor sub-modal for creating or modifying materials |
+
+`MaterialSelector` emits `MaterialSelection` on change: `{ id, name, eGPaDisplay, nu, densityKgM3, yieldMPa }`. Calculators should call `setMaterialId(sel.id)` and derive all properties from `getMaterial(materialId)`, not from the selection object.
+
+#### Adding a new design calculator — material checklist
+
+- [ ] `useState` for `materialId` initialized to a sensible default (e.g. `'steel-4340'`)
+- [ ] `<MaterialSelector>` as the first element inside the Inputs `SectionToggle`
+- [ ] `const mat = getMaterial(materialId)` — **full object, not destructured alias**
+- [ ] `materialId` in the `useMemo` dependency array for any result that depends on E, ν, or density
+- [ ] `materialId={materialId}` passed to the `*ModelPreview` component
+- [ ] `makeBodyMaterial(materialId)` called inside the preview; `RoomEnvironment` wired (see 3D viewer section)
+
+---
 
 ### Binocular Beam Workspace — reference architecture
 The binocular beam path demonstrates the preferred multi-view architecture for geometry-rich calculators:
@@ -498,7 +574,14 @@ Always call `controls.update()` each animation frame when damping is enabled.
 renderer.setPixelRatio(window.devicePixelRatio)
 renderer.setSize(host.clientWidth, host.clientHeight)
 renderer.shadowMap.enabled = false   // keep performance predictable
+
+// Immediately after setSize — required for realistic material appearance:
+const pmrem = new THREE.PMREMGenerator(renderer)
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+pmrem.dispose()
 ```
+
+Import `RoomEnvironment` from `three/examples/jsm/environments/RoomEnvironment.js`.
 
 #### Container / overlay
 
@@ -526,15 +609,29 @@ Toggle buttons (active / inactive):
 
 #### Material palette
 
+**Main body — do not hardcode; use `makeBodyMaterial(materialId)`.**
+
+```typescript
+import { makeBodyMaterial } from '../domain/materialAppearance'
+
+// Inside useMemo or useEffect where geometry is built:
+const bodyMat = makeBodyMaterial(materialId)   // PBR properties derived from selected material
+```
+
+`makeBodyMaterial` returns a `THREE.MeshStandardMaterial` whose color, roughness, and metalness reflect the chosen engineering material (steel, aluminium, titanium, BeCu, etc.). Combine it with the `RoomEnvironment` above for specular reflections.
+
+Non-body roles keep fixed colors:
+
 | Role | Color | Roughness | Metalness |
 |------|-------|-----------|-----------|
-| Main body | `0x4a88b8` | 0.45 | 0.10 |
-| Secondary / flanges | `0x3a6888` | 0.50 | 0.15 |
+| Secondary / flanges | `makeBodyMaterial(materialId)` with `color` darkened 15% | 0.50 | 0.15 |
 | Active gage (+ε) | `0xf0a451` | 0.55 | 0.06 |
 | Active gage (−ε) | `0x51a4f0` | 0.55 | 0.06 |
 | Passive gage | `0x8aa7be` | 0.55 | 0.05 |
 | Force / load arrow | `0xff4444` (red) | — | — |
 | Dimension lines | `0x5898c8`, opacity 0.9 | — | — |
+
+`materialId` must be in the `useMemo`/`useEffect` dependency array so the preview re-renders when the material changes.
 
 #### Controls exposed per preview
 
@@ -547,6 +644,8 @@ Additional toggles (e.g. Gages, Section) are encouraged where relevant.
 #### What to avoid
 
 - Do not hard-code geometry sizes unrelated to the actual input parameters.
+- Do not hard-code the body material color — always use `makeBodyMaterial(materialId)` so the preview reflects the selected engineering material.
+- Do not omit `RoomEnvironment` setup — without it, `MeshStandardMaterial` renders flat and metalness has no effect.
 - Do not add decorative lighting effects (bloom, tone-mapping, shadows) that are not present in other previews.
 - Do not use `@react-three/fiber`; all previews use raw Three.js for consistency.
 
@@ -572,7 +671,10 @@ It is starter content. This file (`CLAUDE.md`) is the authoritative reference.
 ### 5. `CantileverFeaSolution` import location
 Import from `cantileverSolver.ts`, **not** from `cantilever.ts`. Getting this wrong is a recurring mistake.
 
-### 6. Binocular beam geometry constraint
+### 6. `getMaterial(materialId)` — never use a partial alias
+Calculator components that reference material properties in JSX (e.g. `mat.name` for the yield safety factor row) must declare `const mat = getMaterial(materialId)` — the full object returned by the domain lookup. A partial destructured alias like `const mat = { densityKgM3, yieldMPa }` silently omits `name` and other fields, causing a runtime "mat is not defined" or "mat.name is not a function" crash. This bug has already been fixed in SixAxisFTCalc, HexapodFTCalc, and ThreeBeamFTCalc — do not reintroduce it. The `'custom'` built-in material entry has been removed. User-defined materials are created and managed via the Library button in `MaterialSelector` → `MaterialLibraryModal`.
+
+### 7. Binocular beam geometry constraint
 `centerSlotHalfHeight = H/2 − r − t_min`. When this exceeds `r`, the geometry is degenerate — the slot is wider than the holes and no tangent connection exists. The domain does not currently validate this. The sketch guards against it: `tdx = Math.sqrt(Math.max(0, rPx² − (cY−sT)²))` and slot wall lines only render when `tdx > 0`.
 
 ---
@@ -630,8 +732,11 @@ Do not optimize for:
 | Task touches multiple views of the same part | Create or update a shared geometry/result model first |
 | Task touches mesh or contour rendering | Move toward `CstFeaViewer` reuse, not a one-off scene |
 | Task changes workflow behavior | Inspect `orchestrator.ts` and `WorkflowWizard.tsx` |
-| Adding or editing a calculator section | Follow the UX pattern: Controls → Inputs → Results → Diagrams → 3D Model; use shared `SectionToggle` |
-| Adding collapsible sections to a calculator | Import from `components/SectionToggle.tsx`; defaults: Inputs/Results open, Diagrams/3D/Calibration closed |
+| Adding or editing a calculator section | Follow the UX pattern: Controls → Diagrams → Inputs → Results → 3D Model; use shared `SectionToggle` |
+| Adding collapsible sections to a calculator | Import from `components/SectionToggle.tsx`; defaults: Diagrams/Inputs/Results open, 3D/Calibration closed |
+| Adding a new design calculator | Follow the material checklist in the Material System section: `materialId` state, `MaterialSelector` first in Inputs, `const mat = getMaterial(materialId)`, `materialId` prop on `*ModelPreview` |
+| Adding a new `*ModelPreview.tsx` | Call `makeBodyMaterial(materialId)` for body mesh; wire `RoomEnvironment` after `renderer.setSize()`; add `materialId` to deps array |
+| Material appears wrong in 3D preview | Check: (1) `RoomEnvironment` wired, (2) `makeBodyMaterial(materialId)` used (not hardcoded color), (3) `materialId` in `useMemo`/`useEffect` deps |
 | Verification command fails | Determine whether it is the known WASM problem, a sandbox issue, or a real regression |
 
 ---

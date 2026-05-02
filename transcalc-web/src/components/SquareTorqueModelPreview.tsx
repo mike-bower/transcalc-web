@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * 3D parametric model viewer for the Square Torque Shaft.
@@ -12,7 +14,7 @@ import { createAxesGizmo } from './sceneHelpers'
  * principal strain = γ / 2 (from Saint-Venant torsion).
  */
 
-type Props = { params: Record<string, number>; us?: boolean }
+type Props = { params: Record<string, number>; us?: boolean; materialId?: string }
 
 function p(params: Record<string, number>, key: string, fallback: number): number {
   const v = params[key]; return Number.isFinite(v) && v > 0 ? v : fallback
@@ -80,7 +82,7 @@ function addTorqueArrow(group: THREE.Group, xPos: number, R: number, clockwise: 
   group.add(cone)
 }
 
-function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
+function SquareTorque3D({ params, us, materialId }: { params: Record<string, number>; us?: boolean; materialId?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showForces, setShowForces] = useState(true)
@@ -102,7 +104,7 @@ function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: b
     const GL = clamp(gageLenMm * mmToScene, 0.03, W * 0.6)
 
     // ── Shaft body ────────────────────────────────────────────────────────
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1 })
+    const bodyMat = makeBodyMaterial(materialId)
     g.add(new THREE.Mesh(new THREE.BoxGeometry(L, W, W), bodyMat))
 
     // ── Fixed support (left wall) ─────────────────────────────────────────
@@ -165,7 +167,7 @@ function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: b
     tLabel.position.set(L / 2 + W * 1.3, W * 0.85, 0); dim.add(tLabel)
     dim.visible = showDimensions; g.add(dim)
     return g
-  }, [params, us, showDimensions, showForces])
+  }, [params, us, showDimensions, showForces, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -175,7 +177,11 @@ function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: b
     camera.position.set(1.8, 1.4, 2.6)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(host.clientWidth, host.clientHeight); host.appendChild(renderer.domElement)
+    renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
+    host.appendChild(renderer.domElement)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0); controls.update()
@@ -233,10 +239,10 @@ function SquareTorque3D({ params, us }: { params: Record<string, number>; us?: b
   )
 }
 
-export default function SquareTorqueModelPreview({ params, us }: Props) {
+export default function SquareTorqueModelPreview({ params, us, materialId }: Props) {
   return (
     <div className="transducer-svg-wrap" style={{ height: '800px' }}>
-      <SquareTorque3D params={params} us={us} />
+      <SquareTorque3D params={params} us={us} materialId={materialId} />
     </div>
   )
 }

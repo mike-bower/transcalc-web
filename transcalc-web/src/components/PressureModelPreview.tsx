@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * 3D parametric model viewer for the Pressure Diaphragm load cell.
@@ -15,7 +17,7 @@ import { createAxesGizmo } from './sceneHelpers'
  *   – Two tangential gages at the centre (±Z, r ≈ 0)
  */
 
-type Props = { params: Record<string, number>; us?: boolean }
+type Props = { params: Record<string, number>; us?: boolean; materialId?: string }
 
 function p(params: Record<string, number>, key: string, fallback: number): number {
   const v = params[key]; return Number.isFinite(v) && v > 0 ? v : fallback
@@ -52,7 +54,7 @@ function addDimensionLine(
   group.add(label)
 }
 
-function Pressure3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
+function Pressure3D({ params, us, materialId }: { params: Record<string, number>; us?: boolean; materialId?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showForces, setShowForces] = useState(true)
@@ -100,7 +102,7 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     }
 
     // ── Diaphragm disc ────────────────────────────────────────────────────
-    const discMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1 })
+    const discMat = makeBodyMaterial(materialId)
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(R, R, T, 48), discMat)
     g.add(disc)
 
@@ -171,7 +173,7 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     pLabel.position.set(0, T / 2 + arrowLen + 0.12, 0); dim.add(pLabel)
     dim.visible = showDimensions; g.add(dim)
     return g
-  }, [params, us, showDimensions, showForces])
+  }, [params, us, showDimensions, showForces, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -181,7 +183,11 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
     camera.position.set(1.4, 1.6, 1.8)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(host.clientWidth, host.clientHeight); host.appendChild(renderer.domElement)
+    renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
+    host.appendChild(renderer.domElement)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0); controls.update()
@@ -239,10 +245,10 @@ function Pressure3D({ params, us }: { params: Record<string, number>; us?: boole
   )
 }
 
-export default function PressureModelPreview({ params, us }: Props) {
+export default function PressureModelPreview({ params, us, materialId }: Props) {
   return (
     <div className="transducer-svg-wrap" style={{ height: '800px' }}>
-      <Pressure3D params={params} us={us} />
+      <Pressure3D params={params} us={us} materialId={materialId} />
     </div>
   )
 }

@@ -174,15 +174,6 @@ export const MATERIALS: Material[] = [
     merit: { linearity: 8, hysteresis: 8, creepRelaxation: 8, machinability: 5, hardeningDistortion: 9, corrosionResistance: 3, lotConsistency: 7 },
   },
 
-  // ── Custom entry ────────────────────────────────────────────────────────────
-
-  {
-    id: 'custom',
-    name: 'Custom',
-    eGPa: 200, nu: 0.30, densityKgM3: 7850,
-    yieldMPa: undefined,
-    remarks: 'User-defined material. Edit E, ν, and density directly.',
-  },
 ]
 
 export const DEFAULT_MATERIAL_ID = 'steel_4340'

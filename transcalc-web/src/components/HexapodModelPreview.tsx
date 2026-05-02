@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 interface Props {
   topRingRadiusMm: number
@@ -11,6 +13,7 @@ interface Props {
   strutSpreadDeg?: number
   topAnglesOffsetDeg?: number
   us?: boolean
+  materialId?: string
 }
 
 type Vec3 = [number, number, number]
@@ -167,9 +170,9 @@ function buildHexapodScene(p: Props, showDims: boolean, showForces: boolean): TH
   const dStr = clamp(p.strutDiameterMm * S * 0.5, 0.008, 0.045)
 
   // -- Materials
-  const topDiskMat = new THREE.MeshStandardMaterial({ color: 0x5080b0, roughness: 0.35, metalness: 0.15 })
-  const botRingMat = new THREE.MeshStandardMaterial({ color: 0x607080, roughness: 0.5, metalness: 0.15 })
-  const strutMat   = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.4, metalness: 0.12 })
+  const topDiskMat = makeBodyMaterial(p.materialId)
+  const botRingMat = makeBodyMaterial(p.materialId)
+  const strutMat   = makeBodyMaterial(p.materialId)
   const topAttMat  = new THREE.MeshStandardMaterial({ color: 0xf07030, roughness: 0.35, metalness: 0.05 }) // amber
   const botAttMat  = new THREE.MeshStandardMaterial({ color: 0x20a880, roughness: 0.35, metalness: 0.05 }) // teal
   const dimMat     = new THREE.LineBasicMaterial({ color: 0x3e5a73, transparent: true, opacity: 0.8 })
@@ -313,6 +316,9 @@ function Hexapod3D(p: Props) {
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     host.appendChild(renderer.domElement)
 
     const controls = new OrbitControls(camera, renderer.domElement)

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * 3D parametric model viewer for the Round Hollow Torque Shaft.
@@ -10,7 +12,7 @@ import { createAxesGizmo } from './sceneHelpers'
  * For a hollow shaft: J = π/2 × (Ro⁴ − Ri⁴), τ_max at outer surface.
  */
 
-type Props = { params: Record<string, number>; us?: boolean }
+type Props = { params: Record<string, number>; us?: boolean; materialId?: string }
 
 function p(params: Record<string, number>, key: string, fallback: number): number {
   const v = params[key]; return Number.isFinite(v) && v > 0 ? v : fallback
@@ -73,7 +75,7 @@ function addTorqueArrow(group: THREE.Group, xPos: number, R: number, clockwise: 
   group.add(cone)
 }
 
-function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
+function RoundHollowTorque3D({ params, us, materialId }: { params: Record<string, number>; us?: boolean; materialId?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showForces, setShowForces] = useState(true)
@@ -95,7 +97,8 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     const L = clamp(3 * odMm * mmToScene, 0.50, 3.0)
 
     // ── Hollow shaft body ─────────────────────────────────────────────────
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide })
+    const bodyMat = makeBodyMaterial(materialId)
+    bodyMat.side = THREE.DoubleSide
     const outer = new THREE.Mesh(new THREE.CylinderGeometry(Ro, Ro, L, 32, 1, true), bodyMat)
     outer.rotation.z = Math.PI / 2; g.add(outer)
 
@@ -167,7 +170,7 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     tLabel.position.set(L / 2 + Ro * 1.8, Ro * 1.3, 0); dim.add(tLabel)
     dim.visible = showDimensions; g.add(dim)
     return g
-  }, [params, us, showDimensions, showForces])
+  }, [params, us, showDimensions, showForces, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -177,7 +180,11 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
     camera.position.set(1.8, 1.4, 2.6)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(host.clientWidth, host.clientHeight); host.appendChild(renderer.domElement)
+    renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
+    host.appendChild(renderer.domElement)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0); controls.update()
@@ -235,10 +242,10 @@ function RoundHollowTorque3D({ params, us }: { params: Record<string, number>; u
   )
 }
 
-export default function RoundHollowTorqueModelPreview({ params, us }: Props) {
+export default function RoundHollowTorqueModelPreview({ params, us, materialId }: Props) {
   return (
     <div className="transducer-svg-wrap" style={{ height: '800px' }}>
-      <RoundHollowTorque3D params={params} us={us} />
+      <RoundHollowTorque3D params={params} us={us} materialId={materialId} />
     </div>
   )
 }

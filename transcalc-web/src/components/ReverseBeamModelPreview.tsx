@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { getActiveGages, type BridgeConfig } from '../domain/reversebeam'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * 3D parametric model for the reverse bending beam.
@@ -26,6 +28,7 @@ type Props = {
   gageLength: number
   unitSystem: 'SI' | 'US'
   bridgeConfig?: BridgeConfig
+  materialId?: string
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -78,12 +81,13 @@ function buildScene(
   forceStr: string,
   showDimensions: boolean,
   activeGageLabels: string[],
-  showForces: boolean
+  showForces: boolean,
+  materialId?: string
 ): THREE.Group {
   const { L, T, W, GL, D, blockW } = params
   const g = new THREE.Group()
 
-  const beamMat      = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.4, metalness: 0.08 })
+  const beamMat      = makeBodyMaterial(materialId)
   const fixedMat     = new THREE.MeshStandardMaterial({ color: 0x3a4a6b, roughness: 0.7 })
   const loadBlockMat = new THREE.MeshStandardMaterial({ color: 0x7a8fa3, roughness: 0.55 })
 
@@ -210,7 +214,7 @@ function buildScene(
   return g
 }
 
-export default function ReverseBeamModelPreview({ load, width, thickness, beamLength, distBetweenGages, gageLength, unitSystem, bridgeConfig }: Props) {
+export default function ReverseBeamModelPreview({ load, width, thickness, beamLength, distBetweenGages, gageLength, unitSystem, bridgeConfig, materialId }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showForces, setShowForces] = useState(true)
@@ -244,8 +248,8 @@ export default function ReverseBeamModelPreview({ load, width, thickness, beamLe
   }, [beamLength, distBetweenGages, thickness, width, gageLength, load, isUS, bridgeConfig])
 
   const model = useMemo(() =>
-    buildScene(sceneData.params, sceneData.fmt, sceneData.uLabel, sceneData.forceStr, showDimensions, sceneData.activeGageLabels, showForces),
-    [sceneData, showDimensions, showForces]
+    buildScene(sceneData.params, sceneData.fmt, sceneData.uLabel, sceneData.forceStr, showDimensions, sceneData.activeGageLabels, showForces, materialId),
+    [sceneData, showDimensions, showForces, materialId]
   )
 
   useEffect(() => {
@@ -261,6 +265,9 @@ export default function ReverseBeamModelPreview({ load, width, thickness, beamLe
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     host.appendChild(renderer.domElement)
 
     const controls = new OrbitControls(camera, renderer.domElement)

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * 3D parametric model viewer for the Round Solid Column load cell.
@@ -15,6 +17,7 @@ import { createAxesGizmo } from './sceneHelpers'
 type Props = {
   params: Record<string, number>
   us?: boolean
+  materialId?: string
 }
 
 function p(params: Record<string, number>, key: string, fallback: number): number {
@@ -68,7 +71,7 @@ function addDimensionLine(
   group.add(label)
 }
 
-function RoundSolidColumn3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
+function RoundSolidColumn3D({ params, us, materialId }: { params: Record<string, number>; us?: boolean; materialId?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<THREE.Group | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
@@ -92,7 +95,7 @@ function RoundSolidColumn3D({ params, us }: { params: Record<string, number>; us
     const R = clamp((diamMm / 2) * mmToScene, 0.04, 0.6)
 
     // ── Column body (solid cylinder, vertical along Y-axis) ───────────────────
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1 })
+    const bodyMat = makeBodyMaterial(materialId)
     const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 32), bodyMat)
     g.add(body)
 
@@ -207,7 +210,7 @@ function RoundSolidColumn3D({ params, us }: { params: Record<string, number>; us
     dim.visible = showDimensions
     g.add(dim)
     return g
-  }, [params, showDimensions, showForces, us])
+  }, [params, showDimensions, showForces, us, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -221,6 +224,9 @@ function RoundSolidColumn3D({ params, us }: { params: Record<string, number>; us
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     host.appendChild(renderer.domElement)
 
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -304,10 +310,10 @@ function RoundSolidColumn3D({ params, us }: { params: Record<string, number>; us
   )
 }
 
-export default function RoundSolidColumnModelPreview({ params, us }: Props) {
+export default function RoundSolidColumnModelPreview({ params, us, materialId }: Props) {
   return (
     <div className="transducer-svg-wrap" style={{ height: '800px' }}>
-      <RoundSolidColumn3D params={params} us={us} />
+      <RoundSolidColumn3D params={params} us={us} materialId={materialId} />
     </div>
   )
 }

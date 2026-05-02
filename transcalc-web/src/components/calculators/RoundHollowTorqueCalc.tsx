@@ -29,7 +29,7 @@ export default function RoundHollowTorqueCalc({ unitSystem, onUnitChange }: Prop
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
   const [gageFactor, setGageFactor] = useState(2.1)
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [showDiagrams, setShowDiagrams] = useState(false)
+  const [showDiagrams, setShowDiagrams] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -78,6 +78,13 @@ export default function RoundHollowTorqueCalc({ unitSystem, onUnitChange }: Prop
     <div className="bino-wrap">
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
+      {mode === 'analytical' && showDiagrams && (
+        <div className="calc-diagram-2d">
+          <WheatstoneBridgeDiagram config="torque" />
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -109,13 +116,6 @@ export default function RoundHollowTorqueCalc({ unitSystem, onUnitChange }: Prop
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
-      {mode === 'analytical' && showDiagrams && (
-        <div className="calc-diagram-2d">
-          <WheatstoneBridgeDiagram config="torque" />
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -123,6 +123,7 @@ export default function RoundHollowTorqueCalc({ unitSystem, onUnitChange }: Prop
             <RoundHollowTorqueModelPreview
               params={{ torque, outerDiameter: outerDia, innerDiameter: innerDia, modulus: modulusGPa }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (() => {

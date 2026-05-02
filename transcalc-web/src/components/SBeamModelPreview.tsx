@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * S-Beam 3D viewer.
@@ -13,7 +15,7 @@ import { createAxesGizmo } from './sceneHelpers'
  * Holes represented by dark discs on the ±Z faces (opaque body strategy).
  */
 
-type Props = { params: Record<string, number>; us?: boolean }
+type Props = { params: Record<string, number>; us?: boolean; materialId?: string }
 
 function p(params: Record<string, number>, key: string, fallback: number) {
   const v = params[key]; return Number.isFinite(v) && v > 0 ? v : fallback
@@ -47,7 +49,7 @@ function addDimLine(group: THREE.Group, from: THREE.Vector3, to: THREE.Vector3, 
   group.add(lbl)
 }
 
-function SBeam3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
+function SBeam3D({ params, us, materialId }: { params: Record<string, number>; us?: boolean; materialId?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showForces, setShowForces] = useState(true)
@@ -95,12 +97,12 @@ function SBeam3D({ params, us }: { params: Record<string, number>; us?: boolean 
     const lowerHoleY = -D / 2
 
     // ── Body (opaque) ─────────────────────────────────────────────────────
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.4, metalness: 0.08 })
+    const bodyMat = makeBodyMaterial(materialId)
     const body = new THREE.Mesh(new THREE.BoxGeometry(bodyHalfX * 2, H, W), bodyMat)
     g.add(body)
 
     // ── Flanges ───────────────────────────────────────────────────────────
-    const flangeMat = new THREE.MeshStandardMaterial({ color: 0x3a6888, roughness: 0.5, metalness: 0.15 })
+    const flangeMat = makeBodyMaterial(materialId)
     const flangeH = H * 0.08
     const topFlange = new THREE.Mesh(new THREE.BoxGeometry(bodyHalfX * 2.3, flangeH, W * 1.3), flangeMat)
     topFlange.position.set(0, H / 2 + flangeH / 2, 0)
@@ -217,7 +219,7 @@ function SBeam3D({ params, us }: { params: Record<string, number>; us?: boolean 
     dim.visible = showDimensions
     g.add(dim)
     return g
-  }, [params, us, showDimensions, showForces])
+  }, [params, us, showDimensions, showForces, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -227,7 +229,11 @@ function SBeam3D({ params, us }: { params: Record<string, number>; us?: boolean 
     camera.position.set(1.8, 1.2, 2.4)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(host.clientWidth, host.clientHeight); host.appendChild(renderer.domElement)
+    renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
+    host.appendChild(renderer.domElement)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
     controls.target.set(0, 0, 0); controls.update()
@@ -275,10 +281,10 @@ function SBeam3D({ params, us }: { params: Record<string, number>; us?: boolean 
   )
 }
 
-export default function SBeamModelPreview({ params, us }: Props) {
+export default function SBeamModelPreview({ params, us, materialId }: Props) {
   return (
     <div className="transducer-svg-wrap" style={{ height: '800px' }}>
-      <SBeam3D params={params} us={us} />
+      <SBeam3D params={params} us={us} materialId={materialId} />
     </div>
   )
 }

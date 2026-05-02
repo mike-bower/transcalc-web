@@ -41,7 +41,7 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
   const [poissonRatio, setPoissonRatio] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).nu)
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [show2D, setShow2D] = useState(false)
+  const [show2D, setShow2D] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -126,6 +126,27 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {mode === 'analytical' && show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <ReverseBeamDiagram
+              load={load}
+              width={width}
+              thickness={thickness}
+              beamLength={beamLength}
+              distBetweenGages={distBetweenGages}
+              gageLength={gageLength}
+              unitSystem={unitSystem}
+              bridgeConfig={bridgeConfig}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <ReverseBeamBridgeDiagram bridgeConfig={bridgeConfig} poissonRatio={poissonRatio} />
+          </div>
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -169,27 +190,6 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
-      {mode === 'analytical' && show2D && (
-        <div className="calc-diagram-row">
-          <div className="calc-diagram-2d">
-            <ReverseBeamDiagram
-              load={load}
-              width={width}
-              thickness={thickness}
-              beamLength={beamLength}
-              distBetweenGages={distBetweenGages}
-              gageLength={gageLength}
-              unitSystem={unitSystem}
-              bridgeConfig={bridgeConfig}
-            />
-          </div>
-          <div className="calc-diagram-2d">
-            <ReverseBeamBridgeDiagram bridgeConfig={bridgeConfig} poissonRatio={poissonRatio} />
-          </div>
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -203,6 +203,7 @@ export default function ReverseBeamCalc({ unitSystem, onUnitChange }: Props) {
               gageLength={gageLength}
               unitSystem={unitSystem}
               bridgeConfig={bridgeConfig}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (

@@ -50,8 +50,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
   const [yieldMPa,   setYieldMPa]   = useState(() => getMaterial(DEFAULT_MATERIAL_ID).yieldMPa)
   const [gageFactor, setGageFactor] = useState(2.0)
   const [bridgeType, setBridgeType] = useState<'quarter' | 'half' | 'full'>('quarter')
-  // mat alias for params compatibility
-  const mat = { densityKgM3, yieldMPa }
+  const mat = getMaterial(materialId)
 
   // Geometry — stored in display units
   const [topRadius,   setTopRadius]   = useState(us ? +(35 / MM_PER_IN).toFixed(4) : 35)
@@ -66,7 +65,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
   const [ratedMoment, setRatedMoment] = useState(us ? +(5 / NM_PER_INLB).toFixed(2) : 5)
 
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [showSketch,  setShowSketch]  = useState(false)
+  const [showSketch,  setShowSketch]  = useState(true)
   const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
@@ -124,6 +123,18 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
 
       {/* Controls */}
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
+
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <HexapodSketch2D {...sketchProps} width={480} height={260} />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
 
       {/* Inputs */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
@@ -381,18 +392,6 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       )}
 
-      {/* 2D Sketch */}
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
-      {mode === 'analytical' && showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <HexapodSketch2D {...sketchProps} width={480} height={260} />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
       {/* 3D View */}
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
@@ -406,6 +405,7 @@ export default function HexapodFTCalc({ unitSystem, onUnitChange }: Props) {
               strutSpreadDeg={params.strutSpreadDeg}
               topAnglesOffsetDeg={params.topAnglesOffsetDeg}
               us={us}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && <p className="workspace-note" style={{ padding: '1.5rem', textAlign: 'center' }}>3D FEA is not yet available for this calculator type.</p>}

@@ -104,8 +104,7 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
   const [densityKgM3, setDensityKgM3] = useState(() => getMaterial(DEFAULT_MATERIAL_ID).densityKgM3)
   const [yieldMPa,   setYieldMPa]   = useState(() => getMaterial(DEFAULT_MATERIAL_ID).yieldMPa)
   const [gageFactor, setGageFactor] = useState(2.0)
-  // mat alias for params compatibility
-  const mat = { densityKgM3, yieldMPa }
+  const mat = getMaterial(materialId)
 
   const lenUnit    = us ? 'in' : 'mm'
   const forceUnit  = us ? 'lbf' : 'N'
@@ -122,7 +121,7 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
   const [ratedMoment,  setRatedMoment]  = useState(us ? 0.27 : 3.0)
 
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [showSketch,  setShowSketch]  = useState(false)
+  const [showSketch,  setShowSketch]  = useState(true)
   const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
@@ -163,6 +162,23 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
 
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
+
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <ThreeBeamSketch
+              outerR={params.outerRadiusMm}
+              innerR={params.innerRadiusMm}
+              armW={params.beamWidthMm}
+              gageD={params.gageDistFromOuterRingMm}
+            />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
 
       {/* Inputs */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
@@ -348,23 +364,6 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
         </div>
       )}
 
-      {/* 2D Sketch */}
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
-      {mode === 'analytical' && showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <ThreeBeamSketch
-              outerR={params.outerRadiusMm}
-              innerR={params.innerRadiusMm}
-              armW={params.beamWidthMm}
-              gageD={params.gageDistFromOuterRingMm}
-            />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
       {/* 3D View */}
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
@@ -377,6 +376,7 @@ export default function ThreeBeamFTCalc({ unitSystem, onUnitChange }: Props) {
               beamThicknessMm={params.beamThicknessMm}
               gageDistFromOuterRingMm={params.gageDistFromOuterRingMm}
               us={us}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (

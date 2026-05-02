@@ -75,7 +75,7 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
       default:                return 'halfBending'
     }
   }, [bridgeConfig])
-  const [show2D, setShow2D]         = useState(false)
+  const [show2D, setShow2D]         = useState(true)
   const [show3D, setShow3D]         = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -203,6 +203,45 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         {mode === 'analytical' && <button className="export-btn" onClick={exportStep} disabled={!!inputError}>Export STEP</button>}
       </WorkspaceControls>
 
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {mode === 'analytical' && show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <CantileverDiagram
+              load={norm.loadN}
+              width={norm.widthMm}
+              thickness={norm.thicknessMm}
+              momentArm={norm.momentArmMm}
+              gageLength={norm.gageLengthMm}
+              unitSystem={unitSystem}
+              bridgeConfig={bridgeConfig}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+              {([
+                ['cantQuarter',     '¼ Bridge'],
+                ['cantPoissonHalf', '½ Poisson'],
+                ['cantHalfTopBot',  '½ Top/Bot'],
+                ['cantFullBend',    'Full Bend'],
+                ['cantFullPoisson', 'Full Poisson'],
+              ] as [BridgePreset, string][]).map(([key, label]) => (
+                <button key={key} onClick={() => setBridgeConfig(key)} style={{
+                  fontSize: '0.72rem', padding: '3px 7px',
+                  border: '1px solid', borderRadius: 3, cursor: 'pointer',
+                  background: bridgeConfig === key ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
+                  borderColor: bridgeConfig === key ? 'rgba(96,165,250,0.7)' : 'rgba(71,85,105,0.4)',
+                  color: '#f8fafc',
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <WheatstoneBridgeDiagram config={bridgeConfig} />
+          </div>
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -253,45 +292,6 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
-      {mode === 'analytical' && show2D && (
-        <div className="calc-diagram-row">
-          <div className="calc-diagram-2d">
-            <CantileverDiagram
-              load={norm.loadN}
-              width={norm.widthMm}
-              thickness={norm.thicknessMm}
-              momentArm={norm.momentArmMm}
-              gageLength={norm.gageLengthMm}
-              unitSystem={unitSystem}
-              bridgeConfig={bridgeConfig}
-            />
-          </div>
-          <div className="calc-diagram-2d">
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-              {([
-                ['cantQuarter',     '¼ Bridge'],
-                ['cantPoissonHalf', '½ Poisson'],
-                ['cantHalfTopBot',  '½ Top/Bot'],
-                ['cantFullBend',    'Full Bend'],
-                ['cantFullPoisson', 'Full Poisson'],
-              ] as [BridgePreset, string][]).map(([key, label]) => (
-                <button key={key} onClick={() => setBridgeConfig(key)} style={{
-                  fontSize: '0.72rem', padding: '3px 7px',
-                  border: '1px solid', borderRadius: 3, cursor: 'pointer',
-                  background: bridgeConfig === key ? 'rgba(37,99,235,0.55)' : 'rgba(51,65,85,0.35)',
-                  borderColor: bridgeConfig === key ? 'rgba(96,165,250,0.7)' : 'rgba(71,85,105,0.4)',
-                  color: '#f8fafc',
-                }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <WheatstoneBridgeDiagram config={bridgeConfig} />
-          </div>
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -312,6 +312,7 @@ export default function CantileverCalc({ unitSystem, onUnitChange }: Props) {
                 bridgeConfig: model3DBridgeConfig,
               }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (

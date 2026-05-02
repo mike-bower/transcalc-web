@@ -41,7 +41,7 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
   const [showYield,     setShowYield]     = useState(false)
 
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [showSketch,  setShowSketch]  = useState(false)
+  const [showSketch,  setShowSketch]  = useState(true)
   const [show3D,      setShow3D]      = useState(false)
   const [showInputs,  setShowInputs]  = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -86,6 +86,25 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
 
       {/* Controls */}
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
+
+      {/* 2D Sketch */}
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
+      {mode === 'analytical' && showSketch && (
+        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
+          {result.isValid ? (
+            <JTSSketch2D
+              outerRadiusMm={params.outerRadiusMm}
+              innerRadiusMm={params.innerRadiusMm}
+              spokeWidthMm={params.spokeWidthMm}
+              spokeCount={params.spokeCount}
+              width={300}
+              height={300}
+            />
+          ) : (
+            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
+          )}
+        </div>
+      )}
 
       {/* Inputs */}
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
@@ -221,25 +240,6 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
         </table>
       )}
 
-      {/* 2D Sketch */}
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showSketch} onToggle={() => setShowSketch(v => !v)} />}
-      {mode === 'analytical' && showSketch && (
-        <div className="calc-diagram-2d" style={{ display: 'flex', justifyContent: 'center' }}>
-          {result.isValid ? (
-            <JTSSketch2D
-              outerRadiusMm={params.outerRadiusMm}
-              innerRadiusMm={params.innerRadiusMm}
-              spokeWidthMm={params.spokeWidthMm}
-              spokeCount={params.spokeCount}
-              width={300}
-              height={300}
-            />
-          ) : (
-            <p className="workspace-note" style={{ color: '#a03020' }}>{result.error}</p>
-          )}
-        </div>
-      )}
-
       {/* 3D View */}
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
@@ -252,6 +252,7 @@ export default function JointTorqueCalc({ unitSystem, onUnitChange }: Props) {
               spokeThicknessMm={params.spokeThicknessMm}
               spokeCount={params.spokeCount}
               us={us}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && <p className="workspace-note" style={{ padding: '1.5rem', textAlign: 'center' }}>3D FEA is not yet available for this calculator type.</p>}

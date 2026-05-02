@@ -30,7 +30,7 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
   const [materialId, setMaterialId] = useState(DEFAULT_MATERIAL_ID)
   const [gageFactor, setGageFactor] = useState(2.1)
   const [analysisMode, setAnalysisMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [show2D, setShow2D] = useState(false)
+  const [show2D, setShow2D] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -123,6 +123,24 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
       <WorkspaceControls mode={analysisMode} onModeChange={setAnalysisMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
+      {analysisMode !== '3d-fea' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
+      {analysisMode !== '3d-fea' && show2D && (
+        <div className="calc-diagram-row">
+          <div className="calc-diagram-2d">
+            <SquareColumnDiagram
+              load={siInputs.loadN}
+              width={siInputs.widthMm}
+              depth={siInputs.depthMm}
+              length={siInputs.lengthMm}
+              unitSystem={unitSystem}
+            />
+          </div>
+          <div className="calc-diagram-2d">
+            <WheatstoneBridgeDiagram config="column" />
+          </div>
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -158,24 +176,6 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
         </>
       )}
 
-      {analysisMode !== '3d-fea' && <SectionToggle label="Diagrams" open={show2D} onToggle={() => setShow2D(v => !v)} />}
-      {analysisMode !== '3d-fea' && show2D && (
-        <div className="calc-diagram-row">
-          <div className="calc-diagram-2d">
-            <SquareColumnDiagram
-              load={siInputs.loadN}
-              width={siInputs.widthMm}
-              depth={siInputs.depthMm}
-              length={siInputs.lengthMm}
-              unitSystem={unitSystem}
-            />
-          </div>
-          <div className="calc-diagram-2d">
-            <WheatstoneBridgeDiagram config="column" />
-          </div>
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -191,6 +191,7 @@ export default function SquareColumnCalc({ unitSystem, onUnitChange }: Props) {
                 gageFactor,
               }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {analysisMode === '3d-fea' && (

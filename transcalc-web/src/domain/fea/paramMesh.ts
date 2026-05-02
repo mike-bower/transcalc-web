@@ -6,6 +6,8 @@ export interface RectTetMeshParams {
   ny: number  // hex cell count along y
   nz: number  // hex cell count along z
   maskFn?: (cx: number, cy: number, cz: number) => boolean
+  yPositions?: Float64Array  // ny+1 explicit node positions along Y; uniform if omitted
+  zPositions?: Float64Array  // nz+1 explicit node positions along Z; uniform if omitted
 }
 
 export interface Tet4Mesh {
@@ -30,7 +32,7 @@ const FREUDENTHAL_TETS: [number, number, number, number][] = [
 ]
 
 export function generateRectTetMesh(p: RectTetMeshParams): Tet4Mesh {
-  const { L, W, H, nx, ny, nz, maskFn } = p
+  const { L, W, H, nx, ny, nz, maskFn, yPositions, zPositions } = p
 
   // Build node grid (nx+1)(ny+1)(nz+1) nodes
   const NX = nx + 1, NY = ny + 1, NZ = nz + 1
@@ -43,8 +45,8 @@ export function generateRectTetMesh(p: RectTetMeshParams): Tet4Mesh {
       for (let k = 0; k < NZ; k++) {
         const n = nodeIdx(i, j, k)
         nodes[n * 3]     = (i / nx) * L
-        nodes[n * 3 + 1] = (j / ny) * W
-        nodes[n * 3 + 2] = (k / nz) * H
+        nodes[n * 3 + 1] = yPositions ? yPositions[j] : (j / ny) * W
+        nodes[n * 3 + 2] = zPositions ? zPositions[k] : (k / nz) * H
       }
 
   // Build tet connectivity — only for active cells
@@ -53,10 +55,10 @@ export function generateRectTetMesh(p: RectTetMeshParams): Tet4Mesh {
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
       for (let k = 0; k < nz; k++) {
-        // Cell centre
+        // Cell centre — use actual node midpoints when graded positions are supplied
         const cx = ((i + 0.5) / nx) * L
-        const cy = ((j + 0.5) / ny) * W
-        const cz = ((k + 0.5) / nz) * H
+        const cy = yPositions ? (yPositions[j] + yPositions[j + 1]) / 2 : ((j + 0.5) / ny) * W
+        const cz = zPositions ? (zPositions[k] + zPositions[k + 1]) / 2 : ((k + 0.5) / nz) * H
         if (maskFn && !maskFn(cx, cy, cz)) continue
 
         // Hex node indices in VTK H8 order

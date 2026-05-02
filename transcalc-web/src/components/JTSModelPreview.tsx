@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 interface Props {
   outerRadiusMm: number
@@ -10,6 +12,7 @@ interface Props {
   spokeThicknessMm: number
   spokeCount: number
   us?: boolean
+  materialId?: string
 }
 
 function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, v)) }
@@ -94,9 +97,9 @@ function buildJTSScene(p: Props, showDims: boolean, showForces: boolean): THREE.
   const spokeLen = R_o - R_i
 
   // -- Materials
-  const beamMat  = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.4, metalness: 0.1 })
-  const hubMat   = new THREE.MeshStandardMaterial({ color: 0x3570a0, roughness: 0.3, metalness: 0.18 })
-  const ringMat  = new THREE.MeshStandardMaterial({ color: 0x5a7898, roughness: 0.45, metalness: 0.14 })
+  const beamMat  = makeBodyMaterial(p.materialId)
+  const hubMat   = makeBodyMaterial(p.materialId)
+  const ringMat  = makeBodyMaterial(p.materialId)
 
   // -- Outer ring: rectangular cross-section annulus (spoke tips connect at inner face R_o)
   const ringWall = clamp(W * 0.70, 0.03, 0.14)
@@ -238,6 +241,9 @@ function JTS3D(p: Props) {
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     host.appendChild(renderer.domElement)
 
     const controls = new OrbitControls(camera, renderer.domElement)

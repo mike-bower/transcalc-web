@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { createAxesGizmo } from './sceneHelpers'
+import { makeBodyMaterial } from '../domain/materialAppearance'
 
 /**
  * 3D parametric model viewer for the Square Shear load cell.
@@ -13,7 +15,7 @@ import { createAxesGizmo } from './sceneHelpers'
  * Four shear gages at 45° on the outer web face (±Z), at mid-span, y=0.
  */
 
-type Props = { params: Record<string, number>; us?: boolean }
+type Props = { params: Record<string, number>; us?: boolean; materialId?: string }
 
 function p(params: Record<string, number>, key: string, fallback: number): number {
   const v = params[key]
@@ -64,6 +66,7 @@ function buildShearIBeam(
   showDimensions: boolean,
   slotShape: 'rect',
   showForces: boolean,
+  materialId?: string,
 ) {
   const mmToScene = 1 / 60
 
@@ -85,8 +88,8 @@ function buildShearIBeam(
   const t = clamp(tmm * mmToScene, 0.01, W * 0.9)
 
   const flangeH = (H - D) / 2
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a88b8, roughness: 0.45, metalness: 0.1 })
-  const webMat = new THREE.MeshStandardMaterial({ color: 0x3d7aaa, roughness: 0.5, metalness: 0.08 })
+  const bodyMat = makeBodyMaterial(materialId)
+  const webMat = makeBodyMaterial(materialId)
 
   // Top flange
   const topFlange = new THREE.Mesh(new THREE.BoxGeometry(beamLen, flangeH, W), bodyMat)
@@ -228,16 +231,16 @@ function buildShearIBeam(
   g.add(dim)
 }
 
-function SquareShear3D({ params, us }: { params: Record<string, number>; us?: boolean }) {
+function SquareShear3D({ params, us, materialId }: { params: Record<string, number>; us?: boolean; materialId?: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showForces, setShowForces] = useState(true)
 
   const model = useMemo(() => {
     const g = new THREE.Group()
-    buildShearIBeam(g, params, us, showDimensions, 'rect', showForces)
+    buildShearIBeam(g, params, us, showDimensions, 'rect', showForces, materialId)
     return g
-  }, [params, us, showDimensions, showForces])
+  }, [params, us, showDimensions, showForces, materialId])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -249,6 +252,9 @@ function SquareShear3D({ params, us }: { params: Record<string, number>; us?: bo
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(host.clientWidth, host.clientHeight)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     host.appendChild(renderer.domElement)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true; controls.dampingFactor = 0.08
@@ -309,10 +315,10 @@ function SquareShear3D({ params, us }: { params: Record<string, number>; us?: bo
   )
 }
 
-export default function SquareShearModelPreview({ params, us }: Props) {
+export default function SquareShearModelPreview({ params, us, materialId }: Props) {
   return (
     <div className="transducer-svg-wrap" style={{ height: '800px' }}>
-      <SquareShear3D params={params} us={us} />
+      <SquareShear3D params={params} us={us} materialId={materialId} />
     </div>
   )
 }

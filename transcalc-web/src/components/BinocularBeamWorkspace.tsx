@@ -228,7 +228,7 @@ export default function BinocularBeamWorkspace({ unitSystem, onUnitChange, onHel
       {show3D && (
         <div className="calc-model-3d">
           {mode === 'analytical' && (
-            <BinocularModelPreview params={viewerParams} us={unitSystem === 'US'} />
+            <BinocularModelPreview params={viewerParams} us={unitSystem === 'US'} materialId={materialId} />
           )}
           {mode === '3d-fea' && (
             <BinocularFea3DCalc

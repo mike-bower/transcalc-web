@@ -29,7 +29,7 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
   const [gageLength, setGageLength] = useState(5)    // mm or in
   const [gageFactor, setGageFactor] = useState(2.1)
   const [mode, setMode] = useState<'analytical' | '3d-fea'>('analytical')
-  const [showDiagrams, setShowDiagrams] = useState(false)
+  const [showDiagrams, setShowDiagrams] = useState(true)
   const [show3D, setShow3D] = useState(false)
   const [showInputs, setShowInputs] = useState(true)
   const [showResults, setShowResults] = useState(true)
@@ -83,6 +83,13 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
     <div className="bino-wrap">
       <WorkspaceControls mode={mode} onModeChange={setMode} unitSystem={unitSystem} onUnitChange={onUnitChange} />
 
+      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
+      {mode === 'analytical' && showDiagrams && (
+        <div className="calc-diagram-2d">
+          <WheatstoneBridgeDiagram config="torque" />
+        </div>
+      )}
+
       <SectionToggle label="Inputs" open={showInputs} onToggle={() => setShowInputs(v => !v)} />
       {showInputs && (
         <>
@@ -115,13 +122,6 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
         </table>
       )}
 
-      {mode === 'analytical' && <SectionToggle label="Diagrams" open={showDiagrams} onToggle={() => setShowDiagrams(v => !v)} />}
-      {mode === 'analytical' && showDiagrams && (
-        <div className="calc-diagram-2d">
-          <WheatstoneBridgeDiagram config="torque" />
-        </div>
-      )}
-
       <SectionToggle label="3D View" open={show3D} onToggle={() => setShow3D(v => !v)} />
       {show3D && (
         <div className="calc-model-3d">
@@ -129,6 +129,7 @@ export default function SquareTorqueCalc({ unitSystem, onUnitChange }: Props) {
             <SquareTorqueModelPreview
               params={{ torque, width, gageLength, modulus: modulusGPa }}
               us={unitSystem === 'US'}
+              materialId={materialId}
             />
           )}
           {mode === '3d-fea' && (() => {
